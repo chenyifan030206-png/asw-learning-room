@@ -1,0 +1,2433 @@
+{
+  "schema": 1,
+  "kind": "public-static-courses",
+  "lessons": {
+    "1": {
+      "day": 1,
+      "title": "看懂并运行一个完整的 ACC 程序",
+      "summary": "在线练习版：浏览器模拟，不执行C、不进行服务端检测。接上你现有的 mini_acc_v5。今天不堆新语法：在网页里跑真实 C 程序，看清输入、函数调用、输出和错误处理。",
+      "goals": [
+        "能解释 &input、const AccInput * 和 output->valid",
+        "能根据输入预测期望间距、误差与模式",
+        "知道函数状态和算法输出是两条不同的通道",
+        "能区分有效结果和故障结果"
+      ],
+      "time": "约3小时：回忆15分钟 → 理解35分钟 → 实作75分钟 → 排错25分钟 → 检验30分钟。已熟悉的内容可以快速诊断，但仍须完成检测。",
+      "source": "day01.c",
+      "runner": "acc_day01",
+      "reading": [
+        {
+          "title": "0 · 先分清今天的三种东西",
+          "text": "输入：车辆此刻测到的速度和距离，例如72km/h、45m。\n标定参数：我们给算法规定的计算规则，例如基础间距10m、时间间隔1.4s。它们不是测量结果。\n输出：本程序算出的期望间距、误差和模式。\n这只是一个教学监视器，打印“间距模式”并不意味着电脑真的踩了刹车。"
+        },
+        {
+          "title": "1 · 从main开始：变量、类型和初始化",
+          "text": "AccInput input = {0}; 可以拆成：AccInput是类型，input是对象名字，= {0}把成员先设为0。\n你可以想成按一张表格的格式创建了一张空表：里面有speed_kmh和distance_m两个格子。\nAccCalibration calibration = {10.0f, 1.4f}; 依照定义顺序，把10放进spacing_m，把1.4放进time_gap_s。f说明这里用float小数。\nAccOutput output = {0}; 是另一张表，暂时等待算法填入结果。\n变量名可以自定义，但类型与成员要按照定义使用。"
+        },
+        {
+          "title": "2 · 网页输入怎样进入scanf",
+          "text": "你在网页填4个值，后台按顺序传给C程序：速度、距离、基础间距、时间间隔。\nscanf里的4个%f表示要读取4个float数字。&input.speed_kmh给出那个格子的地址，scanf才能把数字写进去。\nread_count不是车速，它记录成功读了几个值。若不是4，程序return 2，直接结束。\n这里scanf的%f对应float变量地址；printf的%f则用于输出小数，规则不同，不要混用。"
+        },
+        {
+          "title": "3 · 调用函数：一条状态输出，另一条数据输出",
+          "text": "const int status = Acc_Process(&input, &calibration, &output);\n从右边看：先调用Acc_Process，给它三个地址。函数执行结束后，返回整数0、-1或-2，把这个整数放进status。\n同时，函数通过output指针填期望距离、误差、模式、valid。\n例如正常运行：status=0表示执行成功；output.distance_error_m=7表示距离误差7m。0和7承担不同职责，不应该互换。\nconst int status表示初始化后不再修改status；不是说函数不能返回错误。"
+        },
+        {
+          "title": "4 · input、&input、*input和箭头分别是什么",
+          "text": "main里的input是结构体对象；&input是该对象的地址。\n函数参数const AccInput *input里的星号表示“input是一个指向AccInput对象的指针”。参数名字碰巧也叫input，但它保存地址。\ninput->speed_kmh就是顺着地址，读取那份结构体中的speed_kmh格子。\nmain里output是对象，所以写output.valid；函数里output是指针，所以写output->valid。\nconst约束通过这个输入指针修改成员；函数可以读取，但不能写input->speed_kmh=100。"
+        },
+        {
+          "title": "5 · 为什么先检查NULL，再写输出",
+          "text": "NULL是空指针：没有给出可用对象的地址。对空指针使用箭头读写是不允许的。\n所以先判断output == NULL。==比较是否相等，=才是赋值。没有输出对象时，只能return -1报告错误。\n有输出对象时，把指标归零、mode设故障、valid设0。这样即使下面验证失败，也不会把上次的有效指标当作新结果。\nreturn在这里会结束Acc_Process并回到main，不是跳过一行继续执行下面的公式。"
+        },
+        {
+          "title": "6 · 新语法不跳过：isfinite、!、||",
+          "text": "isfinite来自math.h，不是我们自己写的函数名。它检查一个float是不是有限数字。\nisfinite(72.0f)为真；isfinite(NAN)和isfinite(INFINITY)为假。NaN表示“不是数值”，不是0，也不是一个很小的负数。\n!是逻辑非：原来真变假，原来假变真。所以!isfinite(72)是假，不进入错误分支；!isfinite(NaN)是真，进入错误分支。\n||是“或者”。只要四个信号中有一个不是有限数字，就拒绝输入。\n不能只写x<0检测NaN，因为NaN参与这类比较不会按普通负数表现。\n上一版static限制函数在当前源文件内可见，不表示“函数不执行”。本版已去掉static，你现在先掌握函数声明、调用和定义即可。"
+        },
+        {
+          "title": "7 · 为什么km/h要除以3.6",
+          "text": "1km=1000m；1小时=3600秒。\n1km/h=1000÷3600m/s=1÷3.6m/s。所以速度v（m/s）=速度（km/h）÷3.6。\n72÷3.6=20：意思是车辆每秒前进20m。\n不能把72直接带入以秒为单位的公式，否则混用了小时与秒。\n代码const float speed_ms = input->speed_kmh / 3.6f;只完成这一步换算。"
+        },
+        {
+          "title": "8 · 期望间距公式从哪里来",
+          "text": "本课人为采用一个简单规则：期望间距D=基础间距d0+时间间隔T×自车速度v。\nd0用m，T用s，v用m/s。s×m/s=m，单位相同才能相加。\n基础间距10m意味着即使速度为0也保留10m；时间间隔1.4s意味着再加上自车1.4秒行进的距离。\n72km/h→20m/s→1.4×20=28m→10+28=38m。\n这个规则只提供教学目标值，并不包含前车急刹、路面附着和制动能力的安全证明。"
+        },
+        {
+          "title": "9 · 误差有正负：一定是实际减期望",
+          "text": "距离误差e=实际距离d-期望距离D。顺序固定。\n实际45、期望38：45-38=+7，表示比期望多7m。\n实际35、期望38：35-38=-3，表示比期望少3m。\n实际40、期望45：40-45=-5，表示少5m。不能因为想得到正数就改成45-40。\n负号是信息，告诉你距离不足，不是计算错了。"
+        },
+        {
+          "title": "10 · 模式判断，逐个条件走一遍",
+          "text": "本课约定：输入无效→故障；输入有效且误差≥0→速度模式；输入有效且误差<0→间距模式。\n模式不是根据“速度快不快”决定，而是看实际间距有没有达到期望间距。\nif(error>=0)：error=7时条件为真，执行ACC_SPEED。error=-3时条件为假，执行else中的ACC_SPACING。error=0时也为真，因为符号是>=。\n速度模式：本课认为当前间距足够，可侧重目标速度；间距模式：当前间距不足，需要侧重距离。但此监视器没有实现实际闭环控制。",
+          "table": {
+            "headers": [
+              "输入",
+              "期望间距",
+              "误差",
+              "模式"
+            ],
+            "rows": [
+              [
+                "72km/h、45m",
+                "38m",
+                "+7m",
+                "速度"
+              ],
+              [
+                "72km/h、35m",
+                "38m",
+                "-3m",
+                "间距"
+              ],
+              [
+                "72km/h、38m",
+                "38m",
+                "0m",
+                "速度"
+              ],
+              [
+                "负距离或NaN",
+                "不提供",
+                "不提供",
+                "故障"
+              ]
+            ]
+          }
+        },
+        {
+          "title": "11 · 返回main后，如何读网页输出",
+          "text": "status=0：Acc_Process计算成功；valid=1：可以读本次结果；mode=0或1：对应速度或间距模式。\nstatus=-2：输入数值或参数不合要求；valid=0：不能使用本次间距和误差；mode=2：故障。\n程序只在valid!=0时打印speed_ms、desired、error。这里!=是“不等于”。\n最后main return 0表示程序本身正常结束，不会把之前status=-2变成算法成功。它们属于两个不同函数。"
+        },
+        {
+          "title": "12 · 做实验之前先明确操作",
+          "text": "依次点击上方“跑案例”→某个场景按钮→填写预测→运行案例。点场景按钮只填数，不执行代码。\n正常巡航：手算20、38、7、速度模式，运行后对照4项。\n前车更近：只改距离为35，预期误差-3，模式间距。\n边界距离：距离38，误差0仍为速度模式。\n负距离故障：距离-1，预期status=-2、valid=0、故障；不是去填写一个正常误差。\n做完后进入“做检测”；迁移输入90、40、10、1.4要另亲自运行。页面现在列出实验完成状态，缺哪项就点对应运行按钮。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "正常巡航",
+          "values": [
+            72,
+            45,
+            10,
+            1.4
+          ],
+          "hint": "先预测：20m/s，期望38m，误差7m，速度模式。",
+          "steps": [
+            "点击此场景按钮填入对应输入。",
+            "根据教学区公式手算；可把预测写进下方输入框。",
+            "点击运行案例，看模式、有效性和返回状态；正常时再看速度、间距、误差。",
+            "与预测不同就回到教学区查单位换算、减法顺序与>=条件。"
+          ]
+        },
+        {
+          "name": "前车更近",
+          "values": [
+            72,
+            35,
+            10,
+            1.4
+          ],
+          "hint": "速度相同，只改距离。先判断模式会怎样改变。",
+          "steps": [
+            "点击此场景按钮填入对应输入。",
+            "根据教学区公式手算；可把预测写进下方输入框。",
+            "点击运行案例，看模式、有效性和返回状态；正常时再看速度、间距、误差。",
+            "与预测不同就回到教学区查单位换算、减法顺序与>=条件。"
+          ]
+        },
+        {
+          "name": "边界距离",
+          "values": [
+            72,
+            38,
+            10,
+            1.4
+          ],
+          "hint": "误差等于0。找出代码中决定边界归属的符号。",
+          "steps": [
+            "点击此场景按钮填入对应输入。",
+            "根据教学区公式手算；可把预测写进下方输入框。",
+            "点击运行案例，看模式、有效性和返回状态；正常时再看速度、间距、误差。",
+            "与预测不同就回到教学区查单位换算、减法顺序与>=条件。"
+          ]
+        },
+        {
+          "name": "负距离故障",
+          "values": [
+            72,
+            -1,
+            10,
+            1.4
+          ],
+          "hint": "不要期待正常的间距输出。观察status、valid和mode。",
+          "steps": [
+            "点击此场景按钮填入对应输入。",
+            "根据教学区公式手算；可把预测写进下方输入框。",
+            "点击运行案例，看模式、有效性和返回状态；正常时再看速度、间距、误差。",
+            "与预测不同就回到教学区查单位换算、减法顺序与>=条件。"
+          ]
+        },
+        {
+          "name": "NaN信号",
+          "values": [
+            "nan",
+            45,
+            10,
+            1.4
+          ],
+          "hint": "NaN是非数值浮点量。仅用小于0检查能拦住它吗？",
+          "steps": [
+            "点击此场景按钮填入对应输入。",
+            "根据教学区公式手算；可把预测写进下方输入框。",
+            "点击运行案例，看模式、有效性和返回状态；正常时再看速度、间距、误差。",
+            "与预测不同就回到教学区查单位换算、减法顺序与>=条件。"
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "Acc_Process(&input, &calibration, &output) 中 &input 是什么？",
+          "options": [
+            "input的地址",
+            "input的速度值",
+            "新建一个input副本"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "status 和 output 的区别是什么？",
+          "options": [
+            "status是速度；output是地址",
+            "status报告执行状态；output保存算法结果",
+            "它们是同一个值"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "72km/h、基础间距10m、时间间隔1.4s，期望间距是多少？",
+          "options": [
+            "110.8m",
+            "28m",
+            "38m"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "const AccInput *input 对函数意味着什么？",
+          "options": [
+            "不能通过这个指针修改输入成员",
+            "不能读取输入成员",
+            "整个系统中input永远不能改变"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "负距离导致valid=0时，应怎么处理本次结果？",
+          "options": [
+            "继续使用上一帧指标并当作新结果",
+            "把模式强制改成速度模式",
+            "不消费无效指标，查看错误状态"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "迁移检测：速度90km/h、距离40m、基础间距10m、时间间隔1.4s。先手算，再填写；并在运行区亲自跑一次。",
+        "fields": [
+          {
+            "id": "speed_ms",
+            "label": "① 速度换成m/s",
+            "kind": "number"
+          },
+          {
+            "id": "desired",
+            "label": "② 期望间距（m）",
+            "kind": "number"
+          },
+          {
+            "id": "error",
+            "label": "③ 实际减期望（m）",
+            "kind": "number"
+          },
+          {
+            "id": "mode",
+            "label": "④ 根据误差选择模式",
+            "kind": "select",
+            "options": [
+              [
+                "SPEED",
+                "速度模式"
+              ],
+              [
+                "SPACING",
+                "间距模式"
+              ],
+              [
+                "FAULT",
+                "故障模式"
+              ]
+            ]
+          }
+        ],
+        "values": [
+          90,
+          40,
+          10,
+          1.4
+        ],
+        "steps": [
+          "先在纸上计算90÷3.6，填第①格；再算10+1.4×第①格，填第②格。",
+          "误差一定按40减第②格计算，填第③格。不是用较大的数减较小的数。",
+          "误差≥0选速度模式，误差<0选间距模式；不要用速度高低判断模式。",
+          "先填完四格，再点“将这组输入带到运行区”；点运行案例；看数值是否与你手算一致。",
+          "回到做检测，回答全部概念题，点击提交。下面会逐项说明还有哪项没完成。"
+        ]
+      },
+      "pass_rule": "本浏览器内判定题目、指定实验和模拟回归。此结果只表示在线练习通过；真实C与正式通关请在本地完成。",
+      "revision": "2026-10-08-beginner-v2",
+      "run_fields": [
+        {
+          "id": "speed",
+          "label": "自车速度（km/h）",
+          "kind": "text",
+          "value": 72
+        },
+        {
+          "id": "distance",
+          "label": "前车距离（m）",
+          "kind": "text",
+          "value": 45
+        },
+        {
+          "id": "spacing",
+          "label": "基础间距（m）",
+          "kind": "text",
+          "value": 10
+        },
+        {
+          "id": "gap",
+          "label": "时间间隔（s）",
+          "kind": "text",
+          "value": 1.4
+        }
+      ],
+      "lab_steps": [
+        "点击一个场景按钮：它只帮你填输入，不会自动运行。",
+        "按公式先手算。可在“运行前预测”写速度、期望间距、误差和模式。",
+        "点击“运行案例”，等到按钮恢复。看输出区，不要把输入框里的数当输出。",
+        "正常场景看3个指标和模式；故障场景应显示无效，不提供正常间距指标。",
+        "通关必须亲自运行：正常巡航、负距离故障、迁移场景。其他场景用来帮助理解，也建议做。"
+      ],
+      "test_steps": [
+        "逐题点选答案，没选的题会提示未通过，不会丢掉已有记录。",
+        "填写迁移检测的4格；选择模式；亲自运行一次该输入。",
+        "确认已经运行“正常巡航”和“负距离故障”。只点场景按钮不算运行。",
+        "点击提交答案并运行回归测试。程序会自动检查代码，你不需要再在终端输入命令。",
+        "没有通过时先看红色项：知识题给推导；缺实验项会给“去运行”按钮。完成后返回检测重新提交。"
+      ],
+      "code": "#include <stdio.h> /* 使用scanf读取输入、printf打印输出，需要这个头文件。 */\n#include <math.h> /* 使用isfinite检查浮点数是否为有限数字，需要这个头文件。 */\n\ntypedef struct { /* 定义一个把相关输入放在一起的结构体类型。 */\n    float speed_kmh; /* 保存自车速度；float表示可带小数；单位km/h。 */\n    float distance_m; /* 保存前车距离；单位m。 */\n} AccInput; /* 以后用AccInput作为这种结构体的类型名字。 */\n\ntypedef struct { /* 定义参数类型；它不保存实时车速，而保存计算规则。 */\n    float spacing_m; /* 基础间距；本课用10m。 */\n    float time_gap_s; /* 时间间隔；本课用1.4s。 */\n} AccCalibration; /* 给这组参数的类型起名字。 */\n\ntypedef enum { /* 定义有限的几个状态；每个名字对应一个整数。 */\n    ACC_SPEED = 0, /* 0：速度模式，当前距离达到本课期望值。 */\n    ACC_SPACING = 1, /* 1：间距模式，当前距离低于本课期望值。 */\n    ACC_FAULT = 2 /* 2：故障，当前输入不能用于计算。 */\n} AccMode; /* AccMode是状态类型名。 */\n\ntypedef struct { /* 定义输出类型：这里保存函数计算出来的结果。 */\n    float desired_distance_m; /* 期望间距；不是碰撞安全保证。 */\n    float distance_error_m; /* 实际间距减期望间距；可能为负数。 */\n    AccMode mode; /* 上面三个状态中的一个。 */\n    int valid; /* 1：结果有效；0：结果无效，不能消费本次指标。 */\n} AccOutput; /* 给输出结构体的类型起名字。 */\n\nint Acc_Process(const AccInput *input, const AccCalibration *calibration,\n                AccOutput *output); /* 先声明函数；下面main就知道怎样调用它。 */\n\nint main(void) /* 程序从main开始；void表示main不接收参数。 */\n{ /* main函数体开始。 */\n    AccInput input = {0}; /* 创建输入对象，把成员初始化为0。 */\n    AccCalibration calibration = {10.0f, 1.4f}; /* f表示float常量。 */\n    AccOutput output = {0}; /* 创建输出对象；等Acc_Process往里面写结果。 */\n    /* scanf需要4个float变量的地址；网页输入的4个值按顺序写进去。 */\n    int read_count = scanf(\"%f %f %f %f\", &input.speed_kmh, &input.distance_m,\n                           &calibration.spacing_m, &calibration.time_gap_s);\n    if (read_count != 4) /* !=表示不等于；没有读到4个值则停止。 */\n    { /* 进入读取失败分支。 */\n        return 2; /* 结束main；2表示读取失败，不是ACC模式。 */\n    } /* 读取失败分支结束。 */\n    /* &取对象地址；返回的整数存入status；结果另写入output。 */\n    const int status = Acc_Process(&input, &calibration, &output);\n    printf(\"status=%d\\n\", status); /* %d对应int；\\n换行。 */\n    printf(\"valid=%d\\n\", output.valid); /* output是对象，用点号访问成员。 */\n    printf(\"mode=%d\\n\", output.mode); /* 打印状态整数0、1或2。 */\n    if (output.valid != 0) /* 只有本次结果有效时，才打印计算指标。 */\n    { /* 有效结果分支开始。 */\n        printf(\"speed_ms=%.4f\\n\", (double)(input.speed_kmh / 3.6f)); /* km/h转m/s。 */\n        printf(\"desired=%.4f\\n\", (double)output.desired_distance_m); /* %.4f保留4位小数。 */\n        printf(\"error=%.4f\\n\", (double)output.distance_error_m); /* 转double与printf格式匹配。 */\n    } /* 故障时不会打印这三项。 */\n    return 0; /* main正常结束；与Acc_Process的返回值是不同函数的返回值。 */\n} /* main结束。 */\n\nint Acc_Process(const AccInput *input, const AccCalibration *calibration,\n                AccOutput *output) /* 输入只读；输出指针允许写入。 */\n{ /* 函数体开始。 */\n    if (output == NULL) /* NULL表示没有指向可用对象；不能对空指针写入。 */\n    { /* 没有输出对象时，只能报告错误。 */\n        return -1; /* -1表示接口地址错误。 */\n    } /* 空输出检查结束。 */\n    output->desired_distance_m = 0.0f; /* output是指针，用箭头访问它指向的成员。 */\n    output->distance_error_m = 0.0f; /* 每次先清除上次结果，避免旧结果冒充新结果。 */\n    output->mode = ACC_FAULT; /* 在验证之前，先假定故障。 */\n    output->valid = 0; /* 在计算成功之前，先标为无效。 */\n    if (input == NULL || calibration == NULL) /* ||表示或；有一个地址为空就失败。 */\n    { /* 输入或参数地址错误分支。 */\n        return -1; /* 返回状态，而不是输出距离。 */\n    } /* 空输入检查结束。 */\n    /* isfinite(x)：有限数字返回非0；NaN和无穷大返回0；!把真假反过来。 */\n    if (!isfinite(input->speed_kmh) || !isfinite(input->distance_m) ||\n        !isfinite(calibration->spacing_m) || !isfinite(calibration->time_gap_s))\n    { /* 只要有一项不是有限数字，就不计算。 */\n        return -2; /* -2表示数值不符合本课输入要求。 */\n    } /* 有限性检查结束。 */\n    if (input->speed_kmh < 0.0f || input->speed_kmh > 250.0f ||\n        input->distance_m < 0.0f || input->distance_m > 500.0f ||\n        calibration->spacing_m < 0.0f || calibration->spacing_m > 50.0f ||\n        calibration->time_gap_s <= 0.0f || calibration->time_gap_s > 5.0f)\n    { /* 上述是教学输入范围，不是量产车型标定。 */\n        return -2; /* 范围不对，valid保持0，不提供有效指标。 */\n    } /* 范围检查结束。 */\n    const float speed_ms = input->speed_kmh / 3.6f; /* 72km/h÷3.6=20m/s。 */\n    output->desired_distance_m = calibration->spacing_m + calibration->time_gap_s * speed_ms; /* 10+1.4×20=38m。 */\n    output->distance_error_m = input->distance_m - output->desired_distance_m; /* 45-38=7m；35-38=-3m。 */\n    if (output->distance_error_m >= 0.0f) /* >=表示大于或等于；等于0也走这一边。 */\n    { /* 实际距离达到期望距离。 */\n        output->mode = ACC_SPEED; /* 本课选择速度模式。 */\n    } /* 非负误差分支结束。 */\n    else /* 只有前面条件不成立时，才执行else。 */\n    { /* 这里意味着误差小于0：实际距离不足。 */\n        output->mode = ACC_SPACING; /* 本课选择间距模式。 */\n    } /* 负误差分支结束。 */\n    output->valid = 1; /* 经过验证并完成计算，现在才把本次输出标为有效。 */\n    return 0; /* 报告计算成功；main里的status接收这个0。 */\n} /* Acc_Process结束，执行返回main调用点之后。 */\n"
+    },
+    "2": {
+      "day": 2,
+      "revision": "2026-10-08-beginner-v1",
+      "title": "数组不是指针：把几帧车速正确传给函数",
+      "summary": "在线练习版：浏览器模拟，不执行C、不进行服务端检测。今天只打通一条链：5个车速放进数组 → 选择有效数量 → 函数按数量读取 → 算总和与平均值 → 拦截超长和空指针。先补稳D01的误差符号，再逐步解释每个新写法。",
+      "source": "day02.c",
+      "runner": "array_day02",
+      "time": "约3小时：D01复习15分钟；读完整代码与执行讲解60分钟；5个实验45分钟；指针与sizeof复习30分钟；检测与笔记30分钟。可暂停，笔记会自动保存。",
+      "goals": [
+        "分清数组容量5与有效数量count；下标从0开始",
+        "知道函数的指针参数不能自行得知数组长度",
+        "用for逐个累加，并正确计算平均车速",
+        "知道数量0、数量超过容量、NULL各应该怎样处理"
+      ],
+      "run_fields": [
+        {
+          "id": "speed0",
+          "label": "第0帧 speeds[0]（km/h）",
+          "kind": "number",
+          "value": 72
+        },
+        {
+          "id": "speed1",
+          "label": "第1帧 speeds[1]（km/h）",
+          "kind": "number",
+          "value": 73
+        },
+        {
+          "id": "speed2",
+          "label": "第2帧 speeds[2]（km/h）",
+          "kind": "number",
+          "value": 75
+        },
+        {
+          "id": "speed3",
+          "label": "第3帧 speeds[3]（km/h）",
+          "kind": "number",
+          "value": 74
+        },
+        {
+          "id": "speed4",
+          "label": "第4帧 speeds[4]（km/h）",
+          "kind": "number",
+          "value": 70
+        },
+        {
+          "id": "count",
+          "label": "有效数量 count（整数）",
+          "kind": "number",
+          "value": 5,
+          "step": 1
+        },
+        {
+          "id": "pointer_choice",
+          "label": "传入哪种地址？",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "真实车速数组"
+            ],
+            [
+              "1",
+              "NULL空指针（故障实验）"
+            ]
+          ]
+        }
+      ],
+      "lab_steps": [
+        "先点一个实验按钮，它会填5个车速、有效数量和地址选择；还没有运行。",
+        "5个车速框是数组的5个位置；count决定这次只读前几个，不能改变数组容量。",
+        "先按“前count个相加，再除count”手算，写在预测中。数量0或故障时不填写有效平均值。",
+        "点击运行案例。看读取哪些元素、总和、平均值；故障时应没有有效统计指标。",
+        "通关需要运行：5帧统计、只读前3帧、数量为0、超出容量、空指针、迁移实验。页面下方会列出已完成和未完成。"
+      ],
+      "test_steps": [
+        "回答6道概念题。每个新词都能在教学区找到解释，不需要猜没教过的语法。",
+        "迁移检测只读10、20、30三个值；填实际数量、最后一个下标、总和、平均值。",
+        "先填自己的答案，再点“将这组输入带到运行区”并运行；回来检查是否一致。",
+        "看实验清单，未完成的点“去运行”，运行后再回来。",
+        "点击提交；程序自动运行回归测试。红色项是待补项，修正后可再次提交，不会清除笔记。"
+      ],
+      "experiments": [
+        {
+          "name": "5帧统计",
+          "values": [
+            72,
+            73,
+            75,
+            74,
+            70,
+            5,
+            0
+          ],
+          "hint": "读下标0、1、2、3、4。总和364；平均364÷5=72.8km/h。",
+          "steps": [
+            "点这个场景，检查5个车速框、有效数量、地址选择。",
+            "按提示手算或预测拒绝原因；在预测框记下你的判断。",
+            "点击运行案例；正常看实际读取元素、总和和平均值，异常看status与无效状态。",
+            "确认下方清单显示已完成；再做下一个实验。"
+          ]
+        },
+        {
+          "name": "只读前3帧",
+          "values": [
+            72,
+            73,
+            75,
+            74,
+            70,
+            3,
+            0
+          ],
+          "hint": "只读0、1、2：72+73+75=220；220÷3≈73.3333。第3、4帧仍在数组中，但本次不读。",
+          "steps": [
+            "点这个场景，检查5个车速框、有效数量、地址选择。",
+            "按提示手算或预测拒绝原因；在预测框记下你的判断。",
+            "点击运行案例；正常看实际读取元素、总和和平均值，异常看status与无效状态。",
+            "确认下方清单显示已完成；再做下一个实验。"
+          ]
+        },
+        {
+          "name": "数量为0",
+          "values": [
+            72,
+            73,
+            75,
+            74,
+            70,
+            0,
+            0
+          ],
+          "hint": "不读任何元素。操作成功，但没有数据，不显示平均值，也不做0除法。",
+          "steps": [
+            "点这个场景，检查5个车速框、有效数量、地址选择。",
+            "按提示手算或预测拒绝原因；在预测框记下你的判断。",
+            "点击运行案例；正常看实际读取元素、总和和平均值，异常看status与无效状态。",
+            "确认下方清单显示已完成；再做下一个实验。"
+          ]
+        },
+        {
+          "name": "超出容量",
+          "values": [
+            72,
+            73,
+            75,
+            74,
+            70,
+            6,
+            0
+          ],
+          "hint": "数组容量5，要求读6个应拒绝。不要真的访问speeds[5]。",
+          "steps": [
+            "点这个场景，检查5个车速框、有效数量、地址选择。",
+            "按提示手算或预测拒绝原因；在预测框记下你的判断。",
+            "点击运行案例；正常看实际读取元素、总和和平均值，异常看status与无效状态。",
+            "确认下方清单显示已完成；再做下一个实验。"
+          ]
+        },
+        {
+          "name": "空指针",
+          "values": [
+            72,
+            73,
+            75,
+            74,
+            70,
+            3,
+            1
+          ],
+          "hint": "想读3个值，却没给可用数据地址。应拒绝，不访问NULL。",
+          "steps": [
+            "点这个场景，检查5个车速框、有效数量、地址选择。",
+            "按提示手算或预测拒绝原因；在预测框记下你的判断。",
+            "点击运行案例；正常看实际读取元素、总和和平均值，异常看status与无效状态。",
+            "确认下方清单显示已完成；再做下一个实验。"
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "float speeds[5]的最后一个合法下标是什么？",
+          "options": [
+            "4",
+            "5",
+            "取决于车速数值"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "数组有5个位置，count=3时，本次读取哪些下标？",
+          "options": [
+            "1、2、3",
+            "0、1、2",
+            "0、1、2、3"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "在AnalyzeSpeeds(const float *speeds,...)内，sizeof(speeds)得到什么？",
+          "options": [
+            "5个车速的总字节数",
+            "有效数量count",
+            "指针自身的字节数"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "为什么还要传count与capacity？",
+          "options": [
+            "首地址不携带长度；count说明本次有效数量，capacity说明约定的真实容量",
+            "传指针会把数组所有值清零",
+            "函数名要求必须4个参数"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "本课count=0时应该怎么处理？",
+          "options": [
+            "继续求sum÷0",
+            "不读元素，成功返回，但has_data=0且不提供平均值",
+            "强行读取speeds[0]"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "count=3、speeds=NULL时，正确做法是什么？",
+          "options": [
+            "把NULL当作车速0",
+            "继续访问speeds[0]试一下",
+            "先拒绝输入，不访问空指针"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "迁移实验：5个框依次填10、20、30、40、50km/h；有效数量=3；地址选择真实车速数组。只统计前3个。填写下面4项，先算再运行。",
+        "values": [
+          10,
+          20,
+          30,
+          40,
+          50,
+          3,
+          0
+        ],
+        "fields": [
+          {
+            "id": "count",
+            "label": "① 本次读取数量（个）",
+            "kind": "number",
+            "step": 1
+          },
+          {
+            "id": "last_index",
+            "label": "② 最后读取的下标",
+            "kind": "number",
+            "step": 1
+          },
+          {
+            "id": "sum",
+            "label": "③ 总和（km/h）",
+            "kind": "number"
+          },
+          {
+            "id": "average",
+            "label": "④ 平均车速（km/h）",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "根据count决定读取几个，不要把数组容量5当成读取数量。",
+          "从下标0开始列出被读取的下标，填写最后一个下标。",
+          "只把被读取的那些车速相加；剩余两帧不参与。",
+          "平均值=上一步总和÷本次读取数量。可以有小数。",
+          "填写四格后点按钮带到运行区，亲自运行。返回做检测并提交。"
+        ]
+      },
+      "pass_rule": "本浏览器内判定题目、指定实验和模拟回归。此结果只表示在线练习通过；真实C与正式通关请在本地完成。",
+      "reading": [
+        {
+          "title": "0 · 先补D01：负号不是错，而是距离不足",
+          "text": "这里再完整算一次：90km/h÷3.6=25m/s；期望间距=10+1.4×25=45m；实际40m，所以误差=40-45=-5m。\n负号说明实际距离比期望少5m。输入有效、误差<0时，本课才选择间距模式。\n平均车速实验与ACC模式判断是两种职责，请分别理解。"
+        },
+        {
+          "title": "1 · 今天为什么学车速数组",
+          "text": "真实程序往往不是只处理当前一帧，而要处理最近几帧车速，例如统计一段日志的平均速度。\n不用数组会写speed0、speed1、speed2等许多变量，传函数也麻烦。\nfloat speeds[5]把5个同类型车速放在一块连续内存里。你可以想成有5个相邻格子的盒子：盒子叫speeds，编号从0到4。\n本课只做离线日志统计，平均的是这几个数值；没有时间加权，不推断真实行程均速。"
+        },
+        {
+          "title": "2 · main第一步：数组如何创建",
+          "text": "float speeds[5] = {72.0f,73.0f,75.0f,74.0f,70.0f};\nfloat是每个元素的类型；speeds是数组名；[5]表示拥有5个元素位置；花括号按顺序初始化。\nspeeds[0]=72，speeds[1]=73，speeds[2]=75，speeds[3]=74，speeds[4]=70。\n注意：[5]在定义处表示数量5；speeds[5]在读取处则表示访问第6个位置，这个位置不在数组内。\n即使运行没立刻报错，越界访问也不合法。",
+          "table": {
+            "headers": [
+              "下标",
+              "第几个位置",
+              "初始车速（km/h）"
+            ],
+            "rows": [
+              [
+                "0",
+                "第1个",
+                "72"
+              ],
+              [
+                "1",
+                "第2个",
+                "73"
+              ],
+              [
+                "2",
+                "第3个",
+                "75"
+              ],
+              [
+                "3",
+                "第4个",
+                "74"
+              ],
+              [
+                "4",
+                "第5个",
+                "70"
+              ]
+            ]
+          }
+        },
+        {
+          "title": "3 · main读取网页输入：为什么一共7项",
+          "text": "网页前5个框覆盖数组5个元素。第6项是requested_count：希望统计前几个值。第7项是pointer_choice：选择真实数组地址或NULL。\nscanf的5个%f读float，2个%d读int。&speeds[0]给第0个元素的地址，让scanf把数字写进去。\n网页下标与代码下标一一对应，不是随便排序。\nread_count必须为7才继续；它表示成功读取了7个输入项目，不表示统计了7帧。\n今天只接受0到250的有限车速数字，网页后端在传给C程序前验证这些输入；本C统计函数重点演示长度和地址检查，不是完整的车载信号验证模块。"
+        },
+        {
+          "title": "4 · 容量与有效数量：两个数分别回答不同问题",
+          "text": "capacity回答“盒子最多有几个位置？”本数组始终5个。\ncount回答“这一次要读前几个？”可以为0、3、5，但不能超过5。\n当count=3，第3、4下标的元素还存在，只是这一次不参与统计。\n函数不靠“车速是否为0”判断结束；0km/h也可能是有效停车信号。\n把count写成6并不会扩容数组，只会让请求超出容量，应被拒绝。"
+        },
+        {
+          "title": "5 · sizeof：先看整个数组，再看一个元素",
+          "text": "sizeof(x)得到x类型或对象所占的字节数，单位是字节，不是元素数。\n在main里speeds还是真数组：sizeof(speeds)得到5个float的总字节数。sizeof(speeds[0])得到一个float的字节数。\n如果当前平台一个float占4字节：整块20字节；20÷4=5个元素。程序用这个比值，不把4硬写死。\n所以capacity = sizeof(speeds)/sizeof(speeds[0])。括号先算各自大小，然后做除法。\nsize_t是标准库提供的数量类型，sizeof的结果也是这个类型；%zu对应打印size_t。你目前把它当“用于大小和数量的非负整数类型”理解即可。"
+        },
+        {
+          "title": "6 · 为什么requested_count先用int，再转size_t",
+          "text": "网页允许演示负数量，例如-1。int可以保留这个负数，让if(requested_count<0)先拒绝。\nsize_t是无符号数量类型，不适合直接保存负数；负数转换进去可能变成很大的数。\n因此先拒绝负数，再写(size_t)requested_count。括号里的类型是显式转换，意思是把已验证的值转成该类型。\n它不改变数组容量，不会创建新数组，也不会重新读车速。"
+        },
+        {
+          "title": "7 · selected = speeds：给地址，不复制数组",
+          "text": "const float *selected = speeds;\nselected是指向float的指针。数组名speeds在这个赋值环境中转换为首元素地址，也就是&speeds[0]。\n你可以理解为把“第一个格子在哪里”写在selected里，而不是把5个格子再复制一份。\nconst限制通过selected去改车速；这条路径只读。selected这个指针变量本身仍可改成NULL，因此const float *并不是“指针不能换地址”。\n不要把这个规则扩展为“数组就是指针”：数组拥有整个存储，指针保存地址。sizeof数组时也不会先转换成指针。"
+        },
+        {
+          "title": "8 · 调用AnalyzeSpeeds，逐个参数对上",
+          "text": "AnalyzeSpeeds(selected,count,capacity,&summary)共有4个参数。\nselected：首元素地址；count：这次有效数量；capacity：调用方明确给出的容量；&summary：结果对象地址。\n函数中的speeds只是一个指针参数，指向调用方数组。它没有额外获得数组定义里的[5]信息。\n因此函数不能凭这个地址自动得知长度，需要count和capacity。\n重要边界：capacity必须由调用方如实给出。C指针不会自动验证“地址后面真的有这么长”；本例由main计算真实容量5，不允许网页伪造容量。"
+        },
+        {
+          "title": "9 · 进入函数：先重置结果，再决定能否读取",
+          "text": "先判断summary是不是NULL；如果没有结果对象地址，无法写结果，就返回-1。\nsummary->sum_kmh=0把累计值清零。箭头因为summary是指针；main里的summary.sum_kmh用点号。\n接着检查count>capacity。count=6、capacity=5时直接返回-2，不进入循环。\n然后检查count==0：本课把空片段定义为合法，成功返回0，但has_data保持0。\n最后，对于count>0检查speeds==NULL；为空则返回-1，避免读取speeds[i]。检查顺序决定NULL且count=0也允许，因为不需要读取元素。"
+        },
+        {
+          "title": "10 · for循环不跳步：三个部分分别干什么",
+          "text": "for (size_t i=0; i<count; i++) 分成三段。\n① size_t i=0：进入循环前只执行一次，创建下标i，初值0。\n② i<count：每一轮读元素前判断。为真才执行花括号里的语句；为假直接离开循环。\n③ i++：执行完这一轮之后，把i加1，然后再回到②判断。\ncount=3时：i=0读72；i=1读73；i=2读75；i变3时，3<3是假，停止。\n为什么不写i<=count？那会额外读下标3：需要3个元素却读4个；count=5时更会读非法下标5。"
+        },
+        {
+          "title": "11 · 累加：每一轮把旧总和变成新总和",
+          "text": "summary->sum_kmh = summary->sum_kmh + speeds[i];\n先算等号右边，再把结果存到左边。这里等号不是数学里的恒等关系，而是赋值。\n开始总和0；读72后变72；读73后变145；读75后变220。\n今天不用sum+=value的缩写，先用完整写法看清数据变化。以后+=表示sum=sum+value，同样道理。",
+          "table": {
+            "headers": [
+              "这一轮i",
+              "读取值",
+              "计算",
+              "新总和"
+            ],
+            "rows": [
+              [
+                "0",
+                "72",
+                "0+72",
+                "72"
+              ],
+              [
+                "1",
+                "73",
+                "72+73",
+                "145"
+              ],
+              [
+                "2",
+                "75",
+                "145+75",
+                "220"
+              ]
+            ]
+          }
+        },
+        {
+          "title": "12 · 平均值：总和除以本次数量，不是容量",
+          "text": "平均车速=被读取车速的总和÷本次读取数量。\n读前3个：220÷3≈73.3333km/h；不是220÷5，因为后两帧没有参与。\n读全部5个：72+73+75+74+70=364；364÷5=72.8km/h。\n代码(float)count把数量转成float参与浮点计算，方便保留小数。sum本身已是float，但这个转换也把教学意图写清楚。\ncount=0时前面已经return，所以走不到除法，避免除以0。has_data=0表示“没有平均值”，而不是“平均速度是0”。"
+        },
+        {
+          "title": "13 · 回到main：status、valid与has_data不一样",
+          "text": "status=0：接口操作成功；valid=1：本次操作结果可按约定读取。\nhas_data=1：实际有至少1个车速，可以看平均值。\ncount=0时：status=0、valid=1、has_data=0，这是成功处理了一个空片段，但没有平均值。\nstatus=-1：空指针错误；status=-2：数量错误。这时valid=0，不打印总和或平均值作为结果。\n网页“无效”与“没有数据”会分别显示，不会都当作0km/h。"
+        },
+        {
+          "title": "14 · 参数里的sizeof为何不再是20",
+          "text": "在main里，speeds是数组对象；在AnalyzeSpeeds的参数里，speeds被声明为const float *，所以它是指针。\nsizeof(函数参数speeds)只问这个指针变量本身有多大。在常见64位平台可能是8字节，但运行时以实际输出为准。\n8字节不是8个车速，不是count=8，也不是数组容量8。\n错误做法是拿指针字节数÷一个float字节数来当长度；若8÷4=2，会把5元素数组误认为只有2个。\n正确做法：main在还能看到真实数组时算容量，再显式传给函数。",
+          "table": {
+            "headers": [
+              "位置",
+              "表达式",
+              "实际含义"
+            ],
+            "rows": [
+              [
+                "main",
+                "sizeof(speeds)",
+                "整个数组字节数"
+              ],
+              [
+                "main",
+                "sizeof(speeds[0])",
+                "一个元素字节数"
+              ],
+              [
+                "函数参数内",
+                "sizeof(speeds)",
+                "指针自身字节数"
+              ],
+              [
+                "函数参数count",
+                "count",
+                "这次有效元素数量"
+              ]
+            ]
+          }
+        },
+        {
+          "title": "15 · 按按钮做完5种实验",
+          "text": "先进入“跑案例”。点击“5帧统计”会填数据；再点击“运行案例”才真正执行。核对读取下标0—4，总和364，平均72.8。\n点击“只读前3帧”，运行后核对仅0—2参与；总和220，平均73.3333。\n点击“数量为0”，运行后看没有数据，不显示有效平均值。\n点击“超出容量”，运行后看status=-2、无效，没有越界读取。\n点击“空指针”，运行后看status=-1、无效，没有访问空地址。\n下方实验清单会自动显示完成状态。每个正常输出还列出本次实际读取的格子，便于你对照循环。"
+        },
+        {
+          "title": "16 · 测验前最后检查",
+          "text": "概念题检查：下标从0开始、count不等于capacity、指针不带长度、sizeof在两处不同、空片段和NULL处理。\n迁移题不是重做72这一组，而是10、20、30、40、50，只读前3个。先自己算再运行。\n题目不会要求你计算未教过的位运算或新控制公式。\n如果错的是知识题，结果会解释具体原因；如果缺的是实验，点该项旁边的去运行，再回来提交。\n笔记建议写三句话：为什么3个元素最后下标是2；为什么不把指针大小当长度；为什么空片段没有平均值。"
+        }
+      ],
+      "code": "#include <stdio.h> /* scanf读取网页输入，printf输出运行结果。 */\n#include <stddef.h> /* 提供size_t与NULL；size_t适合表示数组大小和数量。 */\n\ntypedef struct { /* 定义统计结果类型；沿用你学过的结构体。 */\n    size_t count; /* 这一次实际读取了几个车速。 */\n    float sum_kmh; /* 读取的车速加起来；单位km/h。 */\n    float average_kmh; /* 平均车速；单位km/h。 */\n    int has_data; /* 1表示有数据；0表示空片段，不提供平均值。 */\n    size_t pointer_bytes; /* 参数指针自身的字节数，不是数组长度。 */\n} SpeedSummary; /* 以后可用SpeedSummary创建统计结果对象。 */\n\nint AnalyzeSpeeds(const float *speeds, size_t count, size_t capacity,\n                  SpeedSummary *summary); /* 声明：首地址、有效数量、容量、结果地址。 */\n\nint main(void) /* 创建数组→读输入→算容量→调用统计→打印。 */\n{ /* main开始。 */\n    float speeds[5] = {72.0f, 73.0f, 75.0f, 74.0f, 70.0f}; /* 拥有5个连续float元素。 */\n    int requested_count = 0; /* 网页希望处理的数量；用int读取，便于拒绝负数。 */\n    int pointer_choice = 0; /* 0使用数组；1故意传NULL，观察错误。 */\n    SpeedSummary summary = {0}; /* 创建结果对象；成员初始化为0。 */\n    /* 前5个%f读车速，后2个%d读数量与指针选择；数组下标从0开始。 */\n    int read_count = scanf(\"%f %f %f %f %f %d %d\", &speeds[0], &speeds[1],\n                           &speeds[2], &speeds[3], &speeds[4], &requested_count, &pointer_choice);\n    if (read_count != 7) /* 没读到7项说明输入格式不符合要求。 */\n    { /* 格式错误分支。 */\n        return 2; /* main提前结束；不调用统计函数。 */\n    } /* 格式检查结束。 */\n    const size_t capacity = sizeof(speeds) / sizeof(speeds[0]); /* 整块数组字节数÷单个元素字节数=5。 */\n    printf(\"capacity=%zu\\n\", capacity); /* %zu打印size_t；这里是容量5。 */\n    printf(\"array_bytes=%zu\\n\", sizeof(speeds)); /* 这里speeds是真数组，得到整块大小。 */\n    printf(\"element_bytes=%zu\\n\", sizeof(speeds[0])); /* 单个float大小；以实际平台为准。 */\n    if (requested_count < 0) /* 负数不能成为有效元素数量。 */\n    { /* 不把负int转换成无符号size_t，以免变成很大的数。 */\n        printf(\"status=-2\\nvalid=0\\n\"); /* -2数量错误；valid=0本次统计不可用。 */\n        return 0; /* 完成错误演示，结束main。 */\n    } /* 负数量检查结束。 */\n    const size_t count = (size_t)requested_count; /* 确认非负，再转换为数量类型。 */\n    const float *selected = speeds; /* 保存首元素地址，没有复制5个车速。 */\n    if (pointer_choice == 1) /* 选择“空指针实验”才进入此分支。 */\n    { /* 用于演示异常，不会真的访问空地址。 */\n        selected = NULL; /* 指针不再指向数组；数组本身仍然存在。 */\n    } /* 指针选择结束。 */\n    const int status = AnalyzeSpeeds(selected, count, capacity, &summary); /* 传地址和数量，写结果。 */\n    printf(\"status=%d\\n\", status); /* 0成功；-1空指针；-2数量错误。 */\n    printf(\"valid=%d\\n\", status == 0); /* 比较为真产生1，为假产生0。 */\n    printf(\"pointer_bytes=%zu\\n\", summary.pointer_bytes); /* 指针字节数与容量5不同。 */\n    if (status != 0) /* 失败时不能继续读取或打印数组指标。 */\n    { /* 错误分支。 */\n        return 0; /* main结束，不执行后面的结果打印。 */\n    } /* 返回状态检查结束。 */\n    printf(\"count=%zu\\n\", summary.count); /* 本次有效数量，可能是0、3或5。 */\n    printf(\"has_data=%d\\n\", summary.has_data); /* 数量0时为0。 */\n    printf(\"sum=%.4f\\n\", (double)summary.sum_kmh); /* %.4f打印4位小数。 */\n    if (summary.has_data != 0) /* 至少1个车速时，平均值才有意义。 */\n    { /* 非空片段分支。 */\n        printf(\"average=%.4f\\n\", (double)summary.average_kmh); /* 不会对数量0做除法。 */\n    } /* 平均值打印结束。 */\n    printf(\"visited=\"); /* 接着逐个打印本次实际读取的元素。 */\n    for (size_t i = 0; i < summary.count; i++) /* 先i=0；检查i<count；执行后i加1。 */\n    { /* 本次只读取合法范围内的一个元素。 */\n        printf(\"%.4f,\", (double)speeds[i]); /* speeds[i]读取元素，不是打印地址。 */\n    } /* i=count时停止，绝不读取speeds[count]。 */\n    printf(\"\\n\"); /* 这一行输出结束。 */\n    return 0; /* main正常结束。 */\n} /* main结束。 */\n\nint AnalyzeSpeeds(const float *speeds, size_t count, size_t capacity,\n                  SpeedSummary *summary) /* speeds现在是指针参数，不是新数组。 */\n{ /* 统计函数开始。 */\n    if (summary == NULL) /* 没有结果对象可写，不能继续。 */\n    { /* 空输出地址分支。 */\n        return -1; /* 报告接口地址错误。 */\n    } /* 输出地址检查结束。 */\n    summary->count = 0; /* 每次先重置结果。 */\n    summary->sum_kmh = 0.0f; /* 加法从0开始累计。 */\n    summary->average_kmh = 0.0f; /* 空片段时不把这个0当有效平均值。 */\n    summary->has_data = 0; /* 先标记没有有效数据。 */\n    summary->pointer_bytes = sizeof(speeds); /* 参数的sizeof只能得到指针字节数。 */\n    if (count > capacity) /* 想读的数量超过数组容量，必须拒绝。 */\n    { /* 数量错误分支。 */\n        return -2; /* 先检查再访问，避免越界。 */\n    } /* 容量检查结束。 */\n    if (count == 0) /* 本课约定：数量0是合法的空片段。 */\n    { /* 不读元素，也不除以0。 */\n        return 0; /* 操作成功，但has_data仍是0。 */\n    } /* 空片段处理结束。 */\n    if (speeds == NULL) /* 数量大于0，必须有可读数据地址。 */\n    { /* 空输入地址分支。 */\n        return -1; /* 在speeds[i]之前拒绝，不访问空指针。 */\n    } /* 输入地址检查结束。 */\n    for (size_t i = 0; i < count; i++) /* 只读count个元素：0到count-1。 */\n    { /* 累加循环开始。 */\n        summary->sum_kmh = summary->sum_kmh + speeds[i]; /* 新总和=旧总和+本次车速。 */\n    } /* 有效元素已累加。 */\n    summary->count = count; /* 记录本次读了几个元素。 */\n    summary->average_kmh = summary->sum_kmh / (float)count; /* 总和÷数量；float保留小数。 */\n    summary->has_data = 1; /* 至少读到1个元素，平均值有效。 */\n    return 0; /* 回到main调用点之后，status接收到0。 */\n} /* AnalyzeSpeeds结束。 */\n"
+    },
+    "3": {
+      "day": 3,
+      "revision": "2026-10-09-beginner-v1",
+      "title": "CAN信号：把车速和模式装进8字节，再安全读回来",
+      "source": "day03.c",
+      "runner": "can_day03",
+      "summary": "在线练习版：浏览器模拟，不执行C、不进行服务端检测。先补清return、int负数、容量与有效性，再沿main→Encode→main→Decode走完整链。案例使用自定义教学协议，真实GCC运行，内存模拟传输，不连接实车。",
+      "time": "约3小时：D02补习25分钟；完整代码与逻辑链65分钟；实作45分钟；迁移与检测30分钟；笔记15分钟。每一段可停下复看。",
+      "goals": [
+        "分开函数状态、进程退出状态、输出数据、valid与has_data",
+        "从执行入口追踪输入→校验→量化→拆字节→组合位→解码",
+        "知道分辨率0.1、小端顺序、位掩码和量化误差的前因后果",
+        "能通过真实输出定位输入错、帧长错和接收协议错"
+      ],
+      "run_fields": [
+        {
+          "id": "speed",
+          "label": "车速（km/h；可填nan/inf做拒绝实验）",
+          "kind": "text",
+          "value": 72.5
+        },
+        {
+          "id": "mode",
+          "label": "上游已决定的模式",
+          "kind": "select",
+          "value": 1,
+          "options": [
+            [
+              "0",
+              "0 · 速度模式"
+            ],
+            [
+              "1",
+              "1 · 间距模式"
+            ],
+            [
+              "2",
+              "2 · 故障模式"
+            ],
+            [
+              "3",
+              "3 · 未定义（拒绝实验）"
+            ]
+          ]
+        },
+        {
+          "id": "radar",
+          "label": "雷达数据有效标记",
+          "kind": "select",
+          "value": 1,
+          "options": [
+            [
+              "0",
+              "0 · 无效"
+            ],
+            [
+              "1",
+              "1 · 有效"
+            ]
+          ]
+        },
+        {
+          "id": "length",
+          "label": "协议帧长（字节；正常8）",
+          "kind": "number",
+          "value": 8
+        },
+        {
+          "id": "damage",
+          "label": "模拟接收损坏",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "0 · 不损坏"
+            ],
+            [
+              "1",
+              "1 · 把模式位改为3"
+            ]
+          ]
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "1 · 从main创建容器开始",
+          "start": "    /* [入口]",
+          "end": "    /* [输入]",
+          "text": "程序入口是main，不是文件最上面。头文件和声明帮助编译，运行从main开始。先分别准备输入speed、mode、radar、length_input、damage，以及输出data、decoded_speed。\nfloat记录带小数的车速；int记模式编号和开关；uint8_t用一格8位存0到255（没有负数）；data[8]有8格、下标0到7。{0}初始化全部8格，是数组初始化规则，不是只写第一格。\n8位的权重从右往左为1、2、4、8、16、32、64、128。8位最多全1，即255。两个字节有16位，可装0到65535；本协议只用0到2500，足够装250km/h。为什么不直接发送float？两端约定整数分辨率和字节顺序，方便不同处理器一致读取；这是本示例的协议选择，并非CAN禁止浮点数。",
+          "pattern": "通用模板：类型 变量=初值； 类型 数组[格数]={0}; 创建存储，不代表已计算结果。",
+          "trace": "本次：speed等到输入后才是72.5；data起初是00 00 00 00 00 00 00 00。"
+        },
+        {
+          "title": "2 · 读取输入：类型允许与业务允许是两层",
+          "start": "    /* [输入]",
+          "end": "    /* [调用编码]",
+          "text": "网页先把5个字段串成文本，如72.5 1 1 8 0。scanf按格式依次转换，&speed给可写地址。返回5表示5项转换成功，!=5时进入失败分支，不再调用编码。\nif(条件){语句}：条件非0就执行括号里的语句，0就跳过。!=是“不等于”，与赋值=、判断相等==不同。return 0结束main；网页看stdout里的status=-3知道读入失败。正常结束的进程也可以报告一次业务失败。\n输入负数给int并不会自动报错。下一段if负责把负长度拒绝；Encode负责把负车速、模式超范围拒绝。网页的整数校验只防带小数等类型形状错误，业务错误保留给真实C演示。",
+          "pattern": "通用模板：if (函数返回值 != 期望值) { 输出原因; return; }。int函数必须return整数，不能写没有值的return。",
+          "trace": "scanf返回5 → 条件5!=5为假 → 继续；若只有2项转换成功 → 真 → status=-3 → main结束。"
+        },
+        {
+          "title": "3 · 调用与返回：调用者暂停，函数执行，再回到原处",
+          "start": "    /* [调用编码]",
+          "end": "    /* [观察帧]",
+          "text": "首先检查length_input是否等于协议长度8。负数虽然是合法int，却不是合法帧长。通过检查才转换成size_t（专门表示非负长度的无符号整数类型）。负数转无符号不会变空，而是按该无符号类型的模数转换，可能成为非常大的值。\nEncode调用时，speed、mode、radar传数值；data在这里变成指向首格的指针；length单独告诉函数有8格。调用者main停在这一句，进入Encode执行，遇到return后回到这里把值赋给status。\nprintf里的status==0是比较表达式。status0时打印valid1，status-2时打印valid0。下一句if(status!=0)return 0拦住失败路径，不让main用失败输出。算法状态0和main退出状态0不是同一层。",
+          "pattern": "通用模板：int status=处理函数(输入, 输出地址, 长度); if(status!=0){停止使用输出;}。返回状态说明成败，指针输出承载业务结果。",
+          "trace": "72.5、1、1、8 → Encode返回0 → status0 valid1 → main继续打印；speed=-1 → Encode返回-2 → main停止。"
+        },
+        {
+          "title": "4 · 进入Encode：在修改输出前先检查",
+          "start": "    /* [编码守门]",
+          "end": "    /* [量化]",
+          "text": "长度和指针先查，防止读写越界或空地址；再查车速有限且0到250，模式0到2，雷达只能0或1。||是逻辑或：任何一个坏条件成立就返回。短路求值意味着左边已经真时无需再判断右边。\nisfinite不是自定义算法，是math.h提供的宏：普通72.5有限，NaN和inf非有限。!把真转假、假转真，所以!isfinite(speed)是“不是有限数”。NaN是特殊浮点值，对<0和>250都可能为假，仅范围判断会漏掉它。\n这些判断不会自动修正数值。返回-2只是给调用者报错；main接到它后停止，才能避免把无效帧用于后续动作。它也不等于车速-2。",
+          "pattern": "通用模板：if(地址错 || 长度错) return 地址错误码; if(数值不符合契约) return 数值错误码; 最后才写输出。",
+          "trace": "mode3能存进int，仍然被mode>2拒绝；speed=nan被!isfinite拒绝。编码输出保持原来的内容，调用者必须检查状态。"
+        },
+        {
+          "title": "5 · 车速变整数：先定义单位与精度",
+          "start": "    /* [量化]",
+          "end": "    /* [拆字节]",
+          "text": "协议规定physical=raw×0.1+0，physical单位km/h，raw没有物理单位；一个raw刻度代表0.1km/h。这就是分辨率。逆过来raw=(physical-偏移)/分辨率，本课=车速×10。\nroundf返回最接近的整数浮点值；半数按远离0取整，例如正数72.25×10=722.5→723。然后(uint32_t)显式转换成整数。若直接转换，会截去小数，不等于四舍五入。先检查有限和范围，才安全进行转换。\n72.5→725→解码72.5，无损；72.24→722→72.2，有量化误差。正车速最多约0.05km/h误差；二进制浮点在临界点还可能带微小表示误差，工程测试应包含边界和容差。",
+          "pattern": "通用模板：先验证物理范围 → roundf((physical-offset)/resolution) → 转无符号整数。f结尾的数是float；u结尾的整数是unsigned。",
+          "trace": "speed72.5 ×10=725.0 → roundf仍725.0 → raw整数725。最大250×10=2500。"
+        },
+        {
+          "title": "6 · 拆车速：低字节放前面",
+          "start": "    /* [拆字节]",
+          "end": "    /* [合控制位]",
+          "text": "每格最多255，725不能塞进一格。除以256得商2余213，所以分成低字节213和高字节2。&255保留低8位，相当于本范围内取除256余数；>>8右移8位，相当于无符号数除256取整。\n&有两种语法：&变量是取地址；A & B是按位与，逐位两边都是1才得到1。uint32_t raw与255u都是无符号；本课不对负数做移位。转uint8_t之前已经掩码到0—255。\n十六进制用0—9、A—F表示0—15，D是13，D5=13×16+5=213，02=2。0x前缀表示代码里的十六进制常量；printf打印D5时不带0x。小端把低字节放低下标，所以发送D5 02；调换成02 D5，接收方会读成54530，不是725。",
+          "pattern": "通用模板：low=raw & 0xFFu; high=(raw >> 8) & 0xFFu; 数组第0格放low，第1格放high。",
+          "trace": "725十六进制02D5 → data[0]=D5(213)；data[1]=02(2)。不要把十进制725当成7、2、5三个字符发送。"
+        },
+        {
+          "title": "7 · 合并模式与雷达位",
+          "start": "    /* [合控制位]",
+          "end": "    return 0;\n}\n\nint Decode",
+          "text": "模式由上游决定：0速度模式、1间距模式、2故障模式，本课不从车速推断模式。它需要2位，00、01、10；11对应3，保留不用。radar是“本帧雷达数据是否有效”，不表示测得车速。\n雷达用1位，安排在bit2。编号从右边最低位bit0开始，bit2权重4。radar<<2把0或1移到这里。|按位或，只要一边为1该位就是1。低两位模式与bit2雷达不重叠，组合后0到6。\nmode1雷达1：001 OR 100 = 101，即十进制5；mode2雷达1：010 OR 100=110，即6。只因先验证位域范围且无重叠，本例才能用mode+radar×4验算。|不是逻辑或||，后者通常只产生真假0/1，不能拿来拼位。\nfor(size_t i=3;i<8;i++)从第3格到第7格清0；协议约定这些格子保留。本例必须清它们，否则未初始化或旧数据可能混进帧。",
+          "pattern": "通用模板：验证每个字段范围 → 字段移到自己的起始位 → 按位或组合。读取字段：先移回最低位，再&掩码。",
+          "trace": "模式1、radar1 → data[2]=05；后面5格00；完整帧D5 02 05 00 00 00 00 00。"
+        },
+        {
+          "title": "8 · 回main观察，再模拟损坏",
+          "start": "    /* [观察帧]",
+          "end": "    return 0;\n}\n\nint Encode",
+          "text": "Encode返回0后，main打印raw和发送帧。printf的%02X是十六进制大写、至少两位、不足补0。循环i=0到7打印8格；三目表达式i==7 ? \"\\n\" : \" \"只决定最后换行还是中间空格，不参与编码。\ndamage0不修改；damage1执行data[2]|3u，把低2位都置1。正常05变07，这意味着模式3、雷达仍1。先显示的是发送帧，received_control是接收端看到的控制字节；界面分开呈现，避免误以为同一个帧。\n再调用Decode，把&decoded_speed作为写回地址；decode_status是新的返回值，与上一个编码status独立。编码成功不保证接收数据没损坏；每个接口都要检查自己的状态。",
+          "pattern": "通用模板：生产者验证并生成 → 传输/缓冲 → 消费者重新验证 → 成功才使用。今天用内存模拟传输，不发送真实CAN帧。",
+          "trace": "damage1：encode status0，发送控制05，接收控制07，Decode返回-2，不显示可用解码车速。"
+        },
+        {
+          "title": "9 · Decode检查帧，再拼回物理量",
+          "start": "    /* [解码守门]",
+          "end": "    return 0;\n}",
+          "text": "Decode先检查指针和长度。const uint8_t *data表示只能通过这个指针读数据；float *speed用于写车速，所以没有const。\ndata[2]&248：248二进制11111000，留下高5位，任何非0说明保留位被占用。data[2]&3：3二进制00000011，只留下模式两位，超过2就是保留模式3。后5个保留字节也必须0。\ndata[1]先转uint32_t再<<8，把它摆到高8位。data[0]在低8位，|合并。D5 02得到213|(2×256)=725；再检查raw<=2500，转float乘0.1=72.5。\n*speed=...不是修改指针本身；它把结果写到main的decoded_speed。失败路径提前return，没有写新车速，调用者若不看状态仍用旧值，就会把旧结果当本次结果。今天main检查status==0才输出。",
+          "pattern": "通用模板：检查接收长度/格式 → raw=low | (high<<8) → 验证原始范围 → *输出指针=raw×分辨率+偏移 → return0。",
+          "trace": "接收完整正常帧 → raw725 → decoded_speed72.5 → Decode返回0 → main显示72.5km/h。"
+        }
+      ],
+      "reading": [
+        {
+          "title": "开课补习 · 返回值、类型、容量与有效性",
+          "text": "return不是统一的成功或失败按钮。通用语法：返回类型 函数名(参数){ return 值; }。return会立刻结束当前函数，把一个值交给调用处。int status=Encode(...);会把Encode的return值装进status。我们约定0成功、-1长度或地址错、-2数值或协议错；这些负数含义是作者定的，不是C自动规定。scanf返回成功转换的项数；main返回给操作系统的退出状态；求和函数也可以return总和。先看函数职责，再解释返回值。\nint能存负数：int count=-1完全合法，不会自动成为空输入，也不会自动报错。D02拒绝-1，是我们写的if(count<0)，不是类型系统替我们查了业务规则。signed int只表示可存一定范围内的整数，数量必须非负是额外的业务要求。\n输入文本也分情况：scanf(\"%d\", &x)读取\"-1\"返回1，x变-1；读取\"abc\"返回0，没有成功转换，x保留原值；输入结束且没有转换返回EOF。读\"3.5\"会先读整数3，点号和5留在输入中，不会自动读成3.5。本网页先检查输入是完整数字、整数字段是否带小数，再交给C。不要用网页行为代替所有scanf行为。%d必须对应int*；把float地址交给%d不是正常校验失败，而是未定义行为，不应这样试。\n为什么有车速数组？传感器周期性报告车速：72、73、75、74、70是5个时刻的采样，单个float只能留一个值，float speeds[5]留住5个值。示例用平均值演示逐个处理；生产里可能用于滤波、诊断窗口，但本课平均不是完整车速滤波算法。\nsizeof不读取车速，也不做平均，它回答“存这个对象要多少字节”。当前GCC环境一个float占4字节，5个float占20字节：array_bytes=sizeof(speeds)=20，element_bytes=sizeof(speeds[0])=4，capacity=20/4=5个。就像总柜宽20厘米，每格宽4厘米，才知道有5格；字节数20本身不是20帧。不同平台大小要实际测量，别把4、20写成所有平台的规律。\npointer_bytes=sizeof(指针变量)测的是“记地址的纸条占几字节”。本机64位程序通常显示8；这张纸条只记第一个格子的地址，既不记20字节，也不记5格。函数里参数是指针，对它sizeof测纸条，不能恢复柜子宽。调用方知道真实数组容量，必须另外传capacity。\nvalid不是C关键词，它是作者命名的字段。本课valid=(status==0)：括号比较若真产生1，假产生0。D02的valid=1表示操作成功，has_data=1表示有至少一帧数据。count=0时status0、valid1、has_data0：请求合法，但没有平均值。D01的valid是算法写进输出结构体的字段；读取每个接口时要看它具体怎样设置。"
+        },
+        {
+          "title": "代码架构与今日边界",
+          "text": "下文描述源码所属的本地完整版架构。当前Pages版用JavaScript模拟接口；没有Python、SQLite或C执行后端。\n输入层main读参数；业务层Encode只校验与编码；接收层Decode校验与还原；main负责打印和控制失败路径。网页负责填参数、显示、保存记录；Python服务编译运行可信C并判分。网页不执行你任意粘贴的代码。\n今天只学CAN载荷，不含总线仲裁、帧ID、驱动、DBC文件、CRC或超时状态机。这个教学布局不是行业统一协议。后续阅读生产工程时，要按项目DBC与接口文档确认位序、分辨率、偏移和有效性。ROS 2消息也需要在接收与控制接口之间明确单位和有效性。"
+        },
+        {
+          "title": "三小时使用顺序",
+          "text": "先看完整代码，能看懂多少算多少。然后在“代码旁讲解”里先读开课补习，点击步骤1到9；每个步骤同时给代码、通用语法、职责和具体数值，不用来回找行。步骤3调用Encode后先读4到7，再回8，最后9，完成真实调用链。\n不必一次背下所有符号：今天做到给定车速能手算字节；看到status能知道哪一步失败；知道失败时为什么不能继续用输出。"
+        },
+        {
+          "title": "与生产工程对照 · 查阅依据",
+          "text": "经典CAN允许0到8字节载荷；CAN FD可到64字节。本教学协议固定使用8字节，不代表所有CAN消息都必须8字节。Linux SocketCAN的can_frame还包含帧ID和长度等元数据，今天的data数组只对应载荷部分。\nDBC相当于信号说明书：信号名、起始位、位数、字节序、是否有符号、分辨率、偏移、范围和单位。cantools可读取DBC并编码、解码；本课先手写同样的核心变换，后续才能看懂生成代码和排查单位、位序错误。今天不宣称这份手写教学协议来自量产车辆。",
+          "sources": [
+            {
+              "title": "Linux内核 · SocketCAN与载荷长度",
+              "url": "https://docs.kernel.org/networking/can.html"
+            },
+            {
+              "title": "cantools官方 · 信号定义与编码解码",
+              "url": "https://cantools.readthedocs.io/en/stable/"
+            }
+          ]
+        }
+      ],
+      "experiments": [
+        {
+          "name": "标准帧",
+          "values": [
+            72.5,
+            1,
+            1,
+            8,
+            0
+          ],
+          "hint": "先算raw725；低213(D5)、高2(02)、控制5(05)。发送与解码都成功。",
+          "steps": [
+            "点击“标准帧”，5项输入自动填好。",
+            "对照下方字段：车速、模式、雷达、长度和损坏开关。先在预测栏写结果。",
+            "点击“运行案例”，等待“运行记录已保存到电脑”。",
+            "检查输出：先算raw725；低213(D5)、高2(02)、控制5(05)。发送与解码都成功。",
+            "把与你预测不同的原因写到右侧笔记；停止输入后自动保存。"
+          ]
+        },
+        {
+          "name": "切换模式",
+          "values": [
+            100,
+            2,
+            0,
+            8,
+            0
+          ],
+          "hint": "模式2由你输入，雷达0。raw1000=3×256+232，发送E8 03 02，解码100。",
+          "steps": [
+            "点击“切换模式”，5项输入自动填好。",
+            "对照下方字段：车速、模式、雷达、长度和损坏开关。先在预测栏写结果。",
+            "点击“运行案例”，等待“运行记录已保存到电脑”。",
+            "检查输出：模式2由你输入，雷达0。raw1000=3×256+232，发送E8 03 02，解码100。",
+            "把与你预测不同的原因写到右侧笔记；停止输入后自动保存。"
+          ]
+        },
+        {
+          "name": "短帧拒绝",
+          "values": [
+            72.5,
+            1,
+            1,
+            2,
+            0
+          ],
+          "hint": "长度2缺少控制位和保留字节，main先拒绝：status-1，不发送半帧。",
+          "steps": [
+            "点击“短帧拒绝”，5项输入自动填好。",
+            "对照下方字段：车速、模式、雷达、长度和损坏开关。先在预测栏写结果。",
+            "点击“运行案例”，等待“运行记录已保存到电脑”。",
+            "检查输出：长度2缺少控制位和保留字节，main先拒绝：status-1，不发送半帧。",
+            "把与你预测不同的原因写到右侧笔记；停止输入后自动保存。"
+          ]
+        },
+        {
+          "name": "负车速",
+          "values": [
+            -1,
+            1,
+            1,
+            8,
+            0
+          ],
+          "hint": "float能存-1；是编码范围判断拒绝它：status-2。",
+          "steps": [
+            "点击“负车速”，5项输入自动填好。",
+            "对照下方字段：车速、模式、雷达、长度和损坏开关。先在预测栏写结果。",
+            "点击“运行案例”，等待“运行记录已保存到电脑”。",
+            "检查输出：float能存-1；是编码范围判断拒绝它：status-2。",
+            "把与你预测不同的原因写到右侧笔记；停止输入后自动保存。"
+          ]
+        },
+        {
+          "name": "非有限车速",
+          "values": [
+            "nan",
+            1,
+            1,
+            8,
+            0
+          ],
+          "hint": "NaN通过文本字段交给真实C，!isfinite拒绝：status-2。",
+          "steps": [
+            "点击“非有限车速”，5项输入自动填好。",
+            "对照下方字段：车速、模式、雷达、长度和损坏开关。先在预测栏写结果。",
+            "点击“运行案例”，等待“运行记录已保存到电脑”。",
+            "检查输出：NaN通过文本字段交给真实C，!isfinite拒绝：status-2。",
+            "把与你预测不同的原因写到右侧笔记；停止输入后自动保存。"
+          ]
+        },
+        {
+          "name": "接收损坏",
+          "values": [
+            72.5,
+            1,
+            1,
+            8,
+            1
+          ],
+          "hint": "发送仍D5 02 05；接收控制变07，模式3无定义：编码成功，解码-2。",
+          "steps": [
+            "点击“接收损坏”，5项输入自动填好。",
+            "对照下方字段：车速、模式、雷达、长度和损坏开关。先在预测栏写结果。",
+            "点击“运行案例”，等待“运行记录已保存到电脑”。",
+            "检查输出：发送仍D5 02 05；接收控制变07，模式3无定义：编码成功，解码-2。",
+            "把与你预测不同的原因写到右侧笔记；停止输入后自动保存。"
+          ]
+        },
+        {
+          "name": "迁移实验",
+          "values": [
+            54.3,
+            2,
+            1,
+            8,
+            0
+          ],
+          "hint": "先手算再运行：raw=车速×10；低=除256余数；高=商；控制=mode+radar×4。",
+          "steps": [
+            "点击“迁移实验”，5项输入自动填好。",
+            "对照下方字段：车速、模式、雷达、长度和损坏开关。先在预测栏写结果。",
+            "点击“运行案例”，等待“运行记录已保存到电脑”。",
+            "检查输出：先手算再运行：raw=车速×10；低=除256余数；高=商；控制=mode+radar×4。",
+            "把与你预测不同的原因写到右侧笔记；停止输入后自动保存。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "切到“跑案例”。场景按钮仅填写输入，没有真正运行。",
+        "按从左到右顺序执行每个场景，先看场景里的具体操作说明。",
+        "标准帧先算725=2×256+213，控制1+1×4=5，预测D5 02 05。",
+        "运行后看十进制与十六进制对照表、编码状态、解码状态和接收控制字节；失败场景不显示有效车速。",
+        "完成7个实验；检查清单标记“已运行”。迁移实验先手算，不要直接抄输出。"
+      ],
+      "test_steps": [
+        "先在实验清单确认7项都已运行；缺项点击“去运行”再点“运行案例”。",
+        "完成8道单选题，检查你能解释每个选择，不需要输入程序。",
+        "迁移题填写4个十进制整数；十六进制仅用于观察，答题不要填0x。",
+        "点击“提交答案并运行回归测试”，等待真实C测试结束。未通过按每项提示补习后重试。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "int变量收到-1，会自动报错吗？",
+          "options": [
+            "不会；int可以存负数，业务是否合法要另查",
+            "会自动清成0",
+            "会自动变成NULL"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "Encode返回-2，main返回0，应该怎样理解？",
+          "options": [
+            "两者都说明车速为0",
+            "Encode报告业务失败；main的0表示进程正常结束",
+            "C禁止函数返回负数"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "数组20字节，每元素4字节，指针8字节，容量是多少？",
+          "options": [
+            "20帧",
+            "8帧",
+            "20÷4=5帧；指针大小不用于算容量"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "本协议72.5km/h的raw是多少？",
+          "options": [
+            "725",
+            "72",
+            "72.5"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "raw725=2×256+213，小端前两字节怎样放？",
+          "options": [
+            "02 D5",
+            "D5 02",
+            "07 02"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "mode2、radar1，控制字节是多少（十进制）？",
+          "options": [
+            "3",
+            "6",
+            "1"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "本例status0、valid1，是否由C自动规定？",
+          "options": [
+            "valid是C关键词",
+            "每个C函数都必须这么返回",
+            "是本接口的约定和status==0表达式产生的结果"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "编码成功但接收模式位变3，应怎样处理？",
+          "options": [
+            "Decode拒绝，不消费解码输出",
+            "继续沿用旧车速作为本次结果",
+            "车速正常所以跳过模式检查"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "换成54.3km/h、模式2、雷达有效1、长度8、不损坏。手算raw、低字节、高字节、控制字节，全部填写十进制。",
+        "values": [
+          54.3,
+          2,
+          1,
+          8,
+          0
+        ],
+        "fields": [
+          {
+            "id": "raw",
+            "label": "原始整数raw",
+            "kind": "number",
+            "value": 0
+          },
+          {
+            "id": "low",
+            "label": "低字节（十进制）",
+            "kind": "number",
+            "value": 0
+          },
+          {
+            "id": "high",
+            "label": "高字节（十进制）",
+            "kind": "number",
+            "value": 0
+          },
+          {
+            "id": "control",
+            "label": "控制字节（十进制）",
+            "kind": "number",
+            "value": 0
+          }
+        ],
+        "steps": [
+          "raw=车速×10，再四舍五入。",
+          "用raw÷256取整得到high，再算low=raw-high×256。",
+          "control=mode+radar×4；本课因为位域不重叠才可这样验算。",
+          "先填答案，再用“将这组输入带到运行区”运行，核对并解释差异。"
+        ]
+      },
+      "pass_rule": "本浏览器内判定题目、指定实验和模拟回归。此结果只表示在线练习通过；真实C与正式通关请在本地完成。",
+      "protocol": {
+        "headers": [
+          "字段",
+          "字节/位",
+          "编码规则",
+          "合法范围"
+        ],
+        "rows": [
+          [
+            "车速",
+            "字节0低8位；字节1高8位",
+            "raw=round(车速×10)，解码raw×0.1",
+            "0—250km/h"
+          ],
+          [
+            "模式",
+            "字节2的bit0—1",
+            "0速度；1间距；2故障，由上游给定",
+            "0、1、2"
+          ],
+          [
+            "雷达有效",
+            "字节2的bit2",
+            "0无效；1有效，编码为radar×4",
+            "0、1"
+          ],
+          [
+            "保留",
+            "字节2的bit3—7、字节3—7",
+            "本教学协议必须为0",
+            "0"
+          ]
+        ]
+      },
+      "code": "/* D03：教学用 CAN 数据布局。不是某款车的协议，不连接实车。\n * 8字节载荷：0、1号字节存车速；2号字节存模式与雷达有效位；其余为0。\n * 车速单位km/h，分辨率0.1，偏移0；低字节先放（Intel小端）。 */\n#include <stdio.h>   /* scanf读输入，printf输出；网页把参数交给这个程序。 */\n#include <stdint.h>  /* uint8_t为8位无符号数，uint32_t为32位无符号数。 */\n#include <stddef.h>  /* size_t表示长度，NULL表示没有可用地址。 */\n#include <math.h>    /* isfinite检查有限数，roundf四舍五入float。 */\n\n/* [接口] 先声明函数：编译器读到main调用时，就知道参数和返回类型。\n * int返回状态：0成功，-1地址/长度错，-2数值/协议错。\n * 真正的帧与解码车速经指针写到调用方变量，不能把状态当车速。 */\nint Encode(float speed, int mode, int radar, uint8_t *data, size_t length);\nint Decode(const uint8_t *data, size_t length, float *speed);\n\nint main(void)\n{\n    /* [入口] 创建本次输入和输出容器。数组如8个小格，每格只能装0到255。\n     * {0}使所有格子从0开始；单独的变量用=0初始化。\n     * mode=0速度模式，1间距模式，2故障模式；由上游决定，本课只传输。 */\n    float speed = 0.0f;\n    int mode = 0, radar = 0, length_input = 0, damage = 0;\n    uint8_t data[8] = {0};\n    float decoded_speed = 0.0f;\n    /* [输入] %f读float，%d读int；&给scanf可写的变量地址。\n     * 返回5表示5项都读到了。它与Encode返回0是不同函数的不同约定。 */\n    if (scanf(\"%f %d %d %d %d\", &speed, &mode, &radar, &length_input, &damage) != 5) {\n        printf(\"status=-3\\nvalid=0\\nstage=0\\n\");\n        return 0; /* 结束main；0表示进程正常结束，不表示输入正确。 */\n    }\n    /* [调用编码] 先查int长度，避免负数转成无符号的巨大正数。\n     * 这里8是本协议的固定长度，不是靠指针推测出来的。 */\n    if (length_input != 8) {\n        printf(\"status=-1\\nvalid=0\\nstage=1\\n\");\n        return 0;\n    }\n    int status = Encode(speed, mode, radar, data, (size_t)length_input);\n    printf(\"status=%d\\nvalid=%d\\nstage=1\\n\", status, status == 0);\n    if (status != 0) return 0; /* 失败就停止，不把未完成的帧交给下游。 */\n    /* [观察帧] %02X按十六进制显示，至少两位；十进制213显示为D5。\n     * printf的%X需要unsigned int，所以做明确转换；不改变数值。 */\n    printf(\"raw=%u\\n\", (unsigned int)((uint32_t)data[0] | ((uint32_t)data[1] << 8)));\n    printf(\"frame=\");\n    for (size_t i = 0; i < 8; i++) {\n        printf(\"%02X%s\", (unsigned int)data[i], i == 7 ? \"\\n\" : \" \");\n        /* 条件 ? A : B：条件为真选A，否则选B；最后一格换行，其余加空格。 */\n    }\n    /* [接收实验] 模拟传输中模式位损坏：把低2位改成二进制11（值3）。\n     * 不连接CAN设备；页面显示的是发送前的帧，解码读取这里修改后的帧。 */\n    if (damage == 1) data[2] = (uint8_t)(data[2] | 3u);\n    status = Decode(data, 8, &decoded_speed);\n    printf(\"decode_status=%d\\ndecode_valid=%d\\nreceived_control=%u\\n\", status, status == 0, (unsigned int)data[2]);\n    if (status == 0) printf(\"decoded_speed=%.1f\\n\", (double)decoded_speed);\n    return 0;\n}\n\nint Encode(float speed, int mode, int radar, uint8_t *data, size_t length)\n{\n    /* [编码守门] 先拒绝，后写输出：失败时不产生半个新帧。\n     * ||是“任一成立”；isfinite返回非0表示有限，!把真变假、假变真。\n     * NaN不是普通负数；它不适合只用<0、>250检测。 */\n    if (data == NULL || length != 8) return -1;\n    if (!isfinite(speed) || speed < 0.0f || speed > 250.0f) return -2;\n    if (mode < 0 || mode > 2 || radar < 0 || radar > 1) return -2;\n    /* [量化] 物理量=原始整数×0.1，所以原始整数=车速÷0.1。\n     * 写×10减少小数除法；roundf先取最近整数，再转uint32_t。\n     * 72.5×10=725。u表示无符号整数常量；f表示float常量。 */\n    uint32_t raw = (uint32_t)roundf(speed * 10.0f);\n    /* [拆字节] &是按位与，不是这里的取地址：保留掩码为1的位置。\n     * 255=0xFF=低8位全1。raw&255取低8位；raw>>8丢掉低8位。\n     * 725=2×256+213，所以byte0=213(D5)，byte1=2(02)。 */\n    data[0] = (uint8_t)(raw & 255u);\n    data[1] = (uint8_t)((raw >> 8) & 255u);\n    /* [合控制位] |为按位或；<<2把雷达位移到bit2（权重4）。\n     * 模式占bit0、bit1；雷达占bit2。mode1、radar1 => 1|4=5。\n     * 已校验范围，两部分不重叠，所以本课也可用mode+radar×4验算。 */\n    data[2] = (uint8_t)((uint32_t)mode | ((uint32_t)radar << 2));\n    for (size_t i = 3; i < 8; i++) data[i] = 0;\n    return 0;\n}\n\nint Decode(const uint8_t *data, size_t length, float *speed)\n{\n    /* [解码守门] const表示只读载荷；speed是要写回的车速地址。\n     * 指针自身不含数组长度，length由调用方传入。\n     * 248=11111000，检查bit3到bit7这些保留位；&3提取低2位模式。 */\n    if (data == NULL || speed == NULL || length != 8) return -1;\n    if ((data[2] & 248u) != 0 || (data[2] & 3u) > 2u) return -2;\n    for (size_t i = 3; i < 8; i++) if (data[i] != 0) return -2;\n    /* [拼回车速] 先把高字节提升到32位再左移8位，相当于乘256。\n     * 高低位不重叠，按位或拼成原始数。D5 02 => 213+2×256=725。\n     * *speed放在赋值左边表示写入指针指向的位置，不是乘号。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    if (raw > 2500u) return -2;\n    *speed = (float)raw * 0.1f;\n    return 0;\n}\n"
+    }
+  },
+  "rules": {
+    "1": {
+      "correct": {
+        "q1": 0,
+        "q2": 1,
+        "q3": 2,
+        "q4": 0,
+        "q5": 2
+      },
+      "explanations": {
+        "q1": "&input取结构体地址，不是速度值。",
+        "q2": "status接函数return状态；output经指针写入算法数据。",
+        "q3": "先72÷3.6=20m/s，再10+1.4×20=38m。",
+        "q4": "const限制通过该指针修改成员，不限制读取。",
+        "q5": "valid=0时不消费本次指标；旧值不能当新值。"
+      },
+      "numeric": {
+        "speed_ms": [
+          25,
+          "90÷3.6=25m/s。"
+        ],
+        "desired": [
+          45,
+          "期望=10+1.4×25=45m。"
+        ],
+        "error": [
+          -5,
+          "误差固定为实际减期望：40-45=-5。负号说明实际间距不足。"
+        ]
+      },
+      "needed": [
+        [
+          [
+            72,
+            45,
+            10,
+            1.4
+          ],
+          "normal",
+          "正常巡航"
+        ],
+        [
+          [
+            72,
+            -1,
+            10,
+            1.4
+          ],
+          "fault",
+          "负距离故障"
+        ],
+        [
+          [
+            90,
+            40,
+            10,
+            1.4
+          ],
+          "transfer",
+          "迁移实验"
+        ]
+      ],
+      "labels": {
+        "q1": "地址",
+        "q2": "状态与输出",
+        "q3": "间距计算",
+        "q4": "const输入",
+        "q5": "无效结果",
+        "speed_ms": "迁移速度",
+        "desired": "迁移间距",
+        "error": "误差的正负",
+        "mode": "模式判断"
+      }
+    },
+    "2": {
+      "correct": {
+        "q1": 0,
+        "q2": 1,
+        "q3": 2,
+        "q4": 0,
+        "q5": 1,
+        "q6": 2
+      },
+      "explanations": {
+        "q1": "5个位置从0编号：0、1、2、3、4；5是第6个位置，越界。",
+        "q2": "count=3时循环i=0、1、2；到i=3时3<3为假，停止。",
+        "q3": "函数参数声明为指针，sizeof只得到指针字节数；不是原数组的字节数。",
+        "q4": "首地址不附带长度；count给有效数量，capacity由调用方给真实容量。",
+        "q5": "本课空片段成功返回，但has_data=0；不读元素，也不除以0。",
+        "q6": "需要读3个元素时，NULL没有可用地址，应在访问前返回错误。"
+      },
+      "numeric": {
+        "count": [
+          3,
+          "只读前3个，数量是3，不是容量5。"
+        ],
+        "last_index": [
+          2,
+          "下标从0开始：0、1、2，共3个；最后是2。"
+        ],
+        "sum": [
+          60,
+          "只累加前3帧：10+20+30=60，不加40和50。"
+        ],
+        "average": [
+          20,
+          "平均=前3帧总和60÷数量3=20，不除以容量5。"
+        ]
+      },
+      "needed": [
+        [
+          [
+            72,
+            73,
+            75,
+            74,
+            70,
+            5,
+            0
+          ],
+          "all",
+          "5帧统计"
+        ],
+        [
+          [
+            72,
+            73,
+            75,
+            74,
+            70,
+            3,
+            0
+          ],
+          "partial",
+          "只读前3帧"
+        ],
+        [
+          [
+            72,
+            73,
+            75,
+            74,
+            70,
+            0,
+            0
+          ],
+          "empty",
+          "数量为0"
+        ],
+        [
+          [
+            72,
+            73,
+            75,
+            74,
+            70,
+            6,
+            0
+          ],
+          "over",
+          "超出容量"
+        ],
+        [
+          [
+            72,
+            73,
+            75,
+            74,
+            70,
+            3,
+            1
+          ],
+          "null",
+          "空指针"
+        ],
+        [
+          [
+            10,
+            20,
+            30,
+            40,
+            50,
+            3,
+            0
+          ],
+          "transfer",
+          "迁移实验"
+        ]
+      ],
+      "labels": {
+        "q1": "合法下标",
+        "q2": "有效数量",
+        "q3": "sizeof指针",
+        "q4": "长度契约",
+        "q5": "空片段",
+        "q6": "空指针",
+        "count": "迁移数量",
+        "last_index": "最后下标",
+        "sum": "车速总和",
+        "average": "平均值"
+      }
+    },
+    "3": {
+      "correct": {
+        "q1": 0,
+        "q2": 1,
+        "q3": 2,
+        "q4": 0,
+        "q5": 1,
+        "q6": 1,
+        "q7": 2,
+        "q8": 0
+      },
+      "explanations": {
+        "q1": "int可以存负数；业务数量非负需要另行判断。",
+        "q2": "Encode的-2是业务状态，main的0是进程退出状态，两种接口各有约定。",
+        "q3": "容量=数组字节数20÷元素字节数4=5；指针只记录地址。",
+        "q4": "raw=72.5÷0.1=725。",
+        "q5": "低213=D5先放，高2=02后放，小端D5 02。",
+        "q6": "mode2 | (radar1<<2)=2|4=6。",
+        "q7": "valid是变量名，本例status==0比较为真得到1。",
+        "q8": "模式3未定义；Decode拒绝，不消费旧车速。"
+      },
+      "numeric": {
+        "raw": [
+          543,
+          "54.3×10=543。"
+        ],
+        "low": [
+          31,
+          "543-2×256=31，十六进制1F。"
+        ],
+        "high": [
+          2,
+          "543÷256取整=2。"
+        ],
+        "control": [
+          6,
+          "模式2+雷达1×4=6。"
+        ]
+      },
+      "labels": {
+        "q1": "负int与业务校验",
+        "q2": "函数返回约定",
+        "q3": "容量的来源",
+        "q4": "分辨率",
+        "q5": "小端",
+        "q6": "位域组合",
+        "q7": "有效性的来源",
+        "q8": "接收校验",
+        "raw": "迁移raw",
+        "low": "迁移low",
+        "high": "迁移high",
+        "control": "迁移control"
+      },
+      "needed": [
+        [
+          [
+            72.5,
+            1,
+            1,
+            8,
+            0
+          ],
+          "lab0",
+          "标准帧"
+        ],
+        [
+          [
+            100,
+            2,
+            0,
+            8,
+            0
+          ],
+          "lab1",
+          "切换模式"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            2,
+            0
+          ],
+          "lab2",
+          "短帧拒绝"
+        ],
+        [
+          [
+            -1,
+            1,
+            1,
+            8,
+            0
+          ],
+          "lab3",
+          "负车速"
+        ],
+        [
+          [
+            "nan",
+            1,
+            1,
+            8,
+            0
+          ],
+          "lab4",
+          "非有限车速"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            8,
+            1
+          ],
+          "lab5",
+          "接收损坏"
+        ],
+        [
+          [
+            54.3,
+            2,
+            1,
+            8,
+            0
+          ],
+          "lab6",
+          "迁移实验"
+        ]
+      ]
+    }
+  },
+  "curriculum": [
+    {
+      "主题": "起点诊断与调试环境",
+      "实作与产物": "编译现有 mini_acc_v5；画 main 到 Acc_Process 的调用图；记录 gcc/gdb 版本",
+      "概念检验": "返回状态与 output 指针各负责什么？",
+      "故障或改动检验": "把输入距离改为负数，观察输出是否遗留旧值",
+      "验收条件": "独立解释3个指针参数；保存断点、变量与运行输出",
+      "day": 1,
+      "week": 1,
+      "stage": "C／CAN与接口"
+    },
+    {
+      "主题": "数组与接口契约",
+      "实作与产物": "给 array_function 加显式容量说明；写数组长度与指针长度对照实验",
+      "概念检验": "为什么函数内 sizeof 指针无法求数组长度？",
+      "故障或改动检验": "把有效长度减到3，解释哪些元素应被访问",
+      "验收条件": "列出长度0、NULL、正常3元素三种行为；不越界",
+      "day": 2,
+      "week": 1,
+      "stage": "C／CAN与接口"
+    },
+    {
+      "主题": "CAN 编解码衔接课",
+      "实作与产物": "运行 starter/can_codec.c；手算72.5对应的三个字节",
+      "概念检验": "取地址 & 与按位 & 有什么区别？",
+      "故障或改动检验": "速度换为100.0、模式换为0，先预测再运行",
+      "验收条件": "72.5得到D5 02 05；100.0得到E8 03 04；全部内置测试通过",
+      "day": 3,
+      "week": 1,
+      "stage": "C／CAN与接口"
+    },
+    {
+      "主题": "位宽、整数提升与端序",
+      "实作与产物": "写16位有符号温度编解码；画大小端字节布局",
+      "概念检验": "整数提升为什么可能改变移位运算的类型？",
+      "故障或改动检验": "给-12.3摄氏度编码；与错误无符号解码比较",
+      "验收条件": "正负温度往返误差≤0.05；记录协议与内存端序的区别",
+      "day": 4,
+      "week": 1,
+      "stage": "C／CAN与接口"
+    },
+    {
+      "主题": "DBC 与独立判定依据",
+      "实作与产物": "写教学DBC描述车速、状态、有效位；用cantools核对手工结果",
+      "概念检验": "physical=raw×factor+offset中offset在哪里起作用？",
+      "故障或改动检验": "修改factor为0.01，列出新范围和溢出条件",
+      "验收条件": "工具、手算、C实现对3个向量一致；保存依赖版本",
+      "day": 5,
+      "week": 1,
+      "stage": "C／CAN与接口"
+    },
+    {
+      "主题": "C 模块化与构建",
+      "实作与产物": "把codec拆为.h/.c、demo与test；写最小CMakeLists",
+      "概念检验": "声明、定义与链接分别在哪一步处理？",
+      "故障或改动检验": "制造重复定义，再修复并解释链接错误",
+      "验收条件": "独立构建demo与test；头文件保护生效；警告为0",
+      "day": 6,
+      "week": 1,
+      "stage": "C／CAN与接口"
+    },
+    {
+      "主题": "第1周闯关",
+      "实作与产物": "不看答案重建编码接口；提交代码、测试、调用图",
+      "概念检验": "解释const指针、size_t、掩码、长度契约",
+      "故障或改动检验": "定位端序反转和枚举值3两个问题",
+      "验收条件": "能解释失败输入不修改输出；完成本周评分与补课记录",
+      "day": 7,
+      "week": 1,
+      "stage": "C／CAN与接口"
+    },
+    {
+      "主题": "信号时间戳与有效性",
+      "实作与产物": "给VehicleSignal加stamp、valid、source；实现freshness检查",
+      "概念检验": "接收成功是否意味着信号足够新？",
+      "故障或改动检验": "模拟50ms、100ms、101ms信号年龄",
+      "验收条件": "明确超时边界；未来时间戳拒绝；测试边界三例",
+      "day": 8,
+      "week": 2,
+      "stage": "时序／状态／汽车架构"
+    },
+    {
+      "主题": "周期任务与dt",
+      "实作与产物": "用离线时间轴模拟10ms控制、20ms感知任务",
+      "概念检验": "为什么算法不能把循环次数直接当时间？",
+      "故障或改动检验": "引入漏周期，比较固定dt与实际dt积分",
+      "验收条件": "保存周期表；错误dt导致的积分差异可复现",
+      "day": 9,
+      "week": 2,
+      "stage": "时序／状态／汽车架构"
+    },
+    {
+      "主题": "状态机与滞环",
+      "实作与产物": "为ACC做OFF、READY、ACTIVE、FAULT及状态转换表",
+      "概念检验": "状态和事件有什么区别？",
+      "故障或改动检验": "阈值附近输入交替摆动，加入进入/退出滞环",
+      "验收条件": "10帧抖动不会每帧切换；故障优先级明确",
+      "day": 10,
+      "week": 2,
+      "stage": "时序／状态／汽车架构"
+    },
+    {
+      "主题": "缓冲与数据快照",
+      "实作与产物": "写固定容量环形缓存；给一帧输入建立一致快照",
+      "概念检验": "volatile为什么不能代替线程同步？",
+      "故障或改动检验": "制造速度新、距离旧的混合数据并检测",
+      "验收条件": "满/空/回绕测试通过；跨周期数据不可悄然混用",
+      "day": 11,
+      "week": 2,
+      "stage": "时序／状态／汽车架构"
+    },
+    {
+      "主题": "ASW、RTE 与车辆接口",
+      "实作与产物": "画应用、适配层、通信层；用mock read/write替换硬件",
+      "概念检验": "应用为什么通过接口读取信号？",
+      "故障或改动检验": "让read返回失败，检查应用默认行为",
+      "验收条件": "算法不包含硬件读写；标明mock不是AUTOSAR实现",
+      "day": 12,
+      "week": 2,
+      "stage": "时序／状态／汽车架构"
+    },
+    {
+      "主题": "需求、测试与故障记录",
+      "实作与产物": "为超时、范围、使能、故障输出写6条可测试需求",
+      "概念检验": "需求、实现、测试如何一一对应？",
+      "故障或改动检验": "检查NaN与负数比较，修复有限性检查",
+      "验收条件": "每条需求有测试ID；保存一次修复前后证据",
+      "day": 13,
+      "week": 2,
+      "stage": "时序／状态／汽车架构"
+    },
+    {
+      "主题": "第2周闯关",
+      "实作与产物": "完成带时间戳的周期ACC监视器",
+      "概念检验": "完整讲清信号进入、判断、状态输出的路径",
+      "故障或改动检验": "排查单位错、过期信号、状态抖动三类问题",
+      "验收条件": "15分钟定位任一已注入故障；无效输入无有效控制输出",
+      "day": 14,
+      "week": 2,
+      "stage": "时序／状态／汽车架构"
+    },
+    {
+      "主题": "Python 与NumPy基础",
+      "实作与产物": "读控制日志CSV；生成速度、距离、模式三条曲线",
+      "概念检验": "数组shape、标量与向量有什么区别？",
+      "故障或改动检验": "故意混入字符串和缺失值并定位行号",
+      "验收条件": "解析错误有行号；绘图轴标中文、单位完整",
+      "day": 15,
+      "week": 3,
+      "stage": "数学／Python／估计"
+    },
+    {
+      "主题": "线性代数与坐标系",
+      "实作与产物": "用NumPy做二维旋转、齐次变换；画车体与世界坐标",
+      "概念检验": "矩阵乘法顺序为什么影响结果？",
+      "故障或改动检验": "把度当弧度，检查90度旋转结果",
+      "验收条件": "(1,0)旋转90度为(0,1)；逆变换闭环误差<1e-9",
+      "day": 16,
+      "week": 3,
+      "stage": "数学／Python／估计"
+    },
+    {
+      "主题": "微积分与离散时间",
+      "实作与产物": "实现速度积分为位置、差分为加速度",
+      "概念检验": "dt变化为什么影响差分噪声？",
+      "故障或改动检验": "采样周期由0.1变0.05，比较积分结果",
+      "验收条件": "恒速10m/s持续2s位移20m；解释离散误差",
+      "day": 17,
+      "week": 3,
+      "stage": "数学／Python／估计"
+    },
+    {
+      "主题": "概率与低通滤波",
+      "实作与产物": "生成固定随机种子噪声；实现一阶滤波",
+      "概念检验": "噪声方差下降与响应变慢有什么关系？",
+      "故障或改动检验": "alpha从0.1变0.8，比较方差与阶跃延迟",
+      "验收条件": "报告原始/滤后方差和上升时间；不只看曲线好看",
+      "day": 18,
+      "week": 3,
+      "stage": "数学／Python／估计"
+    },
+    {
+      "主题": "卡尔曼滤波入门",
+      "实作与产物": "做一维位置速度估计；写预测与更新两步",
+      "概念检验": "Q、R、P分别代表什么？",
+      "故障或改动检验": "传感器丢失5帧，仅预测后再恢复更新",
+      "验收条件": "记录RMSE与协方差变化；禁止把真值喂入估计器",
+      "day": 19,
+      "week": 3,
+      "stage": "数学／Python／估计"
+    },
+    {
+      "主题": "二维车辆模型",
+      "实作与产物": "实现运动学自行车模型，参数轴距与转角用SI单位",
+      "概念检验": "转角、航向角、角速度有什么区别？",
+      "故障或改动检验": "零转角直线和固定转角圆弧验证",
+      "验收条件": "零转角轨迹直；圆弧半径与L/tan(delta)相符",
+      "day": 20,
+      "week": 3,
+      "stage": "数学／Python／估计"
+    },
+    {
+      "主题": "第3周闯关",
+      "实作与产物": "把含噪轨迹变成估计速度并绘图",
+      "概念检验": "说明坐标、单位、时间戳在每层如何流动",
+      "故障或改动检验": "排查弧度错误与测量方差误设",
+      "验收条件": "给出固定种子、参数和可复现图；解释估计失败边界",
+      "day": 21,
+      "week": 3,
+      "stage": "数学／Python／估计"
+    },
+    {
+      "主题": "闭环与P控制",
+      "实作与产物": "搭建速度目标→控制器→车辆模型→反馈闭环",
+      "概念检验": "开环、闭环、参考值、误差各是什么？",
+      "故障或改动检验": "把误差符号反转，定位发散原因",
+      "验收条件": "无扰动目标20m/s，报告稳态误差与超调",
+      "day": 22,
+      "week": 4,
+      "stage": "闭环／PID／ACC"
+    },
+    {
+      "主题": "PI/PID与积分饱和",
+      "实作与产物": "实现限幅、条件积分及复位；记录P/I/D贡献",
+      "概念检验": "执行器饱和时为什么积分仍可能增长？",
+      "故障或改动检验": "锁定执行器5s再释放，对比抗饱和前后",
+      "验收条件": "输出始终在[-3,2]m/s²；报告恢复时间而非仅通过运行",
+      "day": 23,
+      "week": 4,
+      "stage": "闭环／PID／ACC"
+    },
+    {
+      "主题": "前馈、延迟与jerk",
+      "实作与产物": "加入目标加速度前馈、一阶执行器延迟与jerk限幅",
+      "概念检验": "加速度与jerk的单位分别是什么？",
+      "故障或改动检验": "dt改一半，检查jerk限幅是否同步改变",
+      "验收条件": "每周期|Δa|≤j_max×dt；绘制延迟前后误差",
+      "day": 24,
+      "week": 4,
+      "stage": "闭环／PID／ACC"
+    },
+    {
+      "主题": "ACC 跟车控制",
+      "实作与产物": "用d_des=d0+T×v和相对速度设计教学控制律",
+      "概念检验": "距离误差与相对速度各提供什么信息？",
+      "故障或改动检验": "前车减速时比较只用距离与加入相对速度",
+      "验收条件": "报告最小间距与加速度；不把期望间距等同碰撞保证",
+      "day": 25,
+      "week": 4,
+      "stage": "闭环／PID／ACC"
+    },
+    {
+      "主题": "停车与模式切换",
+      "实作与产物": "加入行驶、停车中、已停车、故障四种模式",
+      "概念检验": "低速积分与停车保持为什么需要单独处理？",
+      "故障或改动检验": "目标速度为0附近加噪声观察切换",
+      "验收条件": "仿真10s不反复起步；输出复位行为有明确测试",
+      "day": 26,
+      "week": 4,
+      "stage": "闭环／PID／ACC"
+    },
+    {
+      "主题": "场景与指标",
+      "实作与产物": "统一匀速、减速、cut-in、丢包、恢复5个场景",
+      "概念检验": "RMSE、超调、最小间距、最大jerk能回答什么？",
+      "故障或改动检验": "选一组参数改善RMSE但恶化jerk，解释权衡",
+      "验收条件": "每个场景保存参数、种子、CSV、指标JSON",
+      "day": 27,
+      "week": 4,
+      "stage": "闭环／PID／ACC"
+    },
+    {
+      "主题": "第4周闯关",
+      "实作与产物": "提交Python教学ACC闭环及实验报告",
+      "概念检验": "按执行顺序讲清一个完整控制周期",
+      "故障或改动检验": "随机挑一个单位、符号或dt故障定位修复",
+      "验收条件": "固定基准与修改后指标对比；列出模型局限",
+      "day": 28,
+      "week": 4,
+      "stage": "闭环／PID／ACC"
+    },
+    {
+      "主题": "C++ 值、引用与const",
+      "实作与产物": "把VehicleSignal改成C++结构体；比较值/引用/指针接口",
+      "概念检验": "引用与指针在空值和绑定上有什么差别？",
+      "故障或改动检验": "把输入参数设为const引用并尝试修改",
+      "验收条件": "能解释编译器拒绝原因；接口不用无意义复制",
+      "day": 29,
+      "week": 5,
+      "stage": "C++核心与测试"
+    },
+    {
+      "主题": "RAII与生命周期",
+      "实作与产物": "用vector/string及文件对象处理日志；读栈和堆生命周期",
+      "概念检验": "RAII如何在提前返回时释放资源？",
+      "故障或改动检验": "制造悬空引用并用诊断工具定位",
+      "验收条件": "修复后无悬空访问；写清谁拥有数据",
+      "day": 30,
+      "week": 5,
+      "stage": "C++核心与测试"
+    },
+    {
+      "主题": "STL容器与算法",
+      "实作与产物": "用vector、array、optional实现轨迹和可选目标",
+      "概念检验": "vector扩容为什么可能让旧指针失效？",
+      "故障或改动检验": "保存元素地址后push_back，解释失效风险",
+      "验收条件": "实现中不保留跨扩容地址；空轨迹显式处理",
+      "day": 31,
+      "week": 5,
+      "stage": "C++核心与测试"
+    },
+    {
+      "主题": "类与控制器接口",
+      "实作与产物": "实现PidController的reset/step及参数结构体",
+      "概念检验": "为什么状态与标定参数应区分？",
+      "故障或改动检验": "创建两个控制器，验证积分状态不共享",
+      "验收条件": "两实例独立；step不打印不读取全局配置",
+      "day": 32,
+      "week": 5,
+      "stage": "C++核心与测试"
+    },
+    {
+      "主题": "错误处理与数值健壮性",
+      "实作与产物": "定义Status和结果对象；检查有限性与范围",
+      "概念检验": "异常、返回错误码、无效结果怎么选择？",
+      "故障或改动检验": "传NaN、空轨迹、dt=0并检查调用方",
+      "验收条件": "错误可追踪；无非法除法；不能忽略结果有效性",
+      "day": 33,
+      "week": 5,
+      "stage": "C++核心与测试"
+    },
+    {
+      "主题": "CMake与单元测试",
+      "实作与产物": "建立include/src/tests结构；用CTest运行控制器测试",
+      "概念检验": "target与全局编译选项为何不同？",
+      "故障或改动检验": "删去一个源文件，解释undefined reference",
+      "验收条件": "干净目录可构建；测试覆盖reset、饱和、非法dt",
+      "day": 34,
+      "week": 5,
+      "stage": "C++核心与测试"
+    },
+    {
+      "主题": "第5周闯关",
+      "实作与产物": "将第4周控制核心移植为C++库",
+      "概念检验": "解释.h接口、.cpp实现与对象生命周期",
+      "故障或改动检验": "定位一个悬空引用或错误复位",
+      "验收条件": "同输入下Python/C++误差<1e-5或说明误差来源",
+      "day": 35,
+      "week": 5,
+      "stage": "C++核心与测试"
+    },
+    {
+      "主题": "现代C++工程阅读",
+      "实作与产物": "练习unique_ptr、shared_ptr、lambda、auto和模板用法",
+      "概念检验": "shared_ptr为什么不自动保证对象线程安全？",
+      "故障或改动检验": "把长期持有改为weak_ptr，解释循环拥有",
+      "验收条件": "画所有权图；只在需要共享时使用共享拥有",
+      "day": 36,
+      "week": 6,
+      "stage": "C++工程与性能"
+    },
+    {
+      "主题": "Eigen与线性方程",
+      "实作与产物": "用Eigen表达状态、旋转和小规模线性求解",
+      "概念检验": "为什么优先求解Ax=b而非显式求逆？",
+      "故障或改动检验": "输入接近奇异矩阵，记录残差与失败处理",
+      "验收条件": "维度正确；报告残差；奇异输入有明确策略",
+      "day": 37,
+      "week": 6,
+      "stage": "C++工程与性能"
+    },
+    {
+      "主题": "日志与配置",
+      "实作与产物": "把控制参数放YAML；记录模式、误差、时间戳",
+      "概念检验": "默认配置与运行时修改需要哪些校验？",
+      "故障或改动检验": "设置负time_gap，启动必须拒绝",
+      "验收条件": "坏参数不进入运行；日志含版本和参数摘要",
+      "day": 38,
+      "week": 6,
+      "stage": "C++工程与性能"
+    },
+    {
+      "主题": "多线程与数据竞争",
+      "实作与产物": "实现mutex保护的输入快照；了解atomic适用范围",
+      "概念检验": "数据竞争和逻辑上的跨帧不一致有何区别？",
+      "故障或改动检验": "让生产者高速更新而控制线程读取",
+      "验收条件": "一次读取同一帧；说明锁持有范围；无重负载置于锁内",
+      "day": 39,
+      "week": 6,
+      "stage": "C++工程与性能"
+    },
+    {
+      "主题": "性能与确定性",
+      "实作与产物": "用steady_clock测1000周期；分离初始化与运行期分配",
+      "概念检验": "均值为什么不能说明尾部延迟？",
+      "故障或改动检验": "增加日志频率，观察p95/p99变化",
+      "验收条件": "报告p50/p95/p99及样本量；区分仿真时间和耗时",
+      "day": 40,
+      "week": 6,
+      "stage": "C++工程与性能"
+    },
+    {
+      "主题": "Git与代码审查",
+      "实作与产物": "为一次控制器改动做小提交、diff和中文说明",
+      "概念检验": "回归测试如何证明修复不破坏旧功能？",
+      "故障或改动检验": "加入失败测试后修复，保存两个版本",
+      "验收条件": "提交可回滚；改动动机、指标、验证可读",
+      "day": 41,
+      "week": 6,
+      "stage": "C++工程与性能"
+    },
+    {
+      "主题": "第6周闯关",
+      "实作与产物": "完成无ROS依赖的C++控制库",
+      "概念检验": "从配置到输入快照再到输出按顺序讲解",
+      "故障或改动检验": "定位参数错误、竞争风险与积分残留",
+      "验收条件": "库能独立测试；所有权、线程与时间契约明确",
+      "day": 42,
+      "week": 6,
+      "stage": "C++工程与性能"
+    },
+    {
+      "主题": "ROS 2 环境与图",
+      "实作与产物": "在Ubuntu24.04核对并配置ROS2Jazzy；运行talker/listener",
+      "概念检验": "node、topic、message、executor分别是什么？",
+      "故障或改动检验": "不同终端漏source，解释节点消失原因",
+      "验收条件": "ros2 node/topic list可查看；保存环境版本",
+      "day": 43,
+      "week": 7,
+      "stage": "ROS 2通信与回放"
+    },
+    {
+      "主题": "C++发布与订阅",
+      "实作与产物": "做ego_state与target_speed两个topic",
+      "概念检验": "为什么订阅回调不等于固定周期控制？",
+      "故障或改动检验": "把发布频率从50Hz降到10Hz",
+      "验收条件": "观察接收间隔；控制周期与消息频率分别记录",
+      "day": 44,
+      "week": 7,
+      "stage": "ROS 2通信与回放"
+    },
+    {
+      "主题": "自定义消息与单位",
+      "实作与产物": "建立包含stamp、速度、距离、valid的接口包",
+      "概念检验": "header时间戳标记产生时间还是收到时间？",
+      "故障或改动检验": "两节点使用不同单位，定位接口违约",
+      "验收条件": "消息注释写单位和frame；异常输入显式拒绝",
+      "day": 45,
+      "week": 7,
+      "stage": "ROS 2通信与回放"
+    },
+    {
+      "主题": "QoS与通信诊断",
+      "实作与产物": "对比可靠/尽力、持久性与历史深度",
+      "概念检验": "QoS不兼容为什么可能没有任何回调？",
+      "故障或改动检验": "制造可靠订阅与尽力发布不兼容",
+      "验收条件": "用topic info --verbose定位；恢复后记录匹配策略",
+      "day": 46,
+      "week": 7,
+      "stage": "ROS 2通信与回放"
+    },
+    {
+      "主题": "参数、launch与命名空间",
+      "实作与产物": "一个launch启动模拟器、控制器、日志节点",
+      "概念检验": "重映射与namespace各解决什么问题？",
+      "故障或改动检验": "启动两辆车，避免topic交叉",
+      "验收条件": "参数YAML可加载；两实例信号隔离",
+      "day": 47,
+      "week": 7,
+      "stage": "ROS 2通信与回放"
+    },
+    {
+      "主题": "时间与rosbag2",
+      "实作与产物": "录制输入输出，按原速和半速回放；学习use_sim_time",
+      "概念检验": "ROS时间与steady_clock分别用于什么？",
+      "故障或改动检验": "只给部分节点启用仿真时间制造过期判断错误",
+      "验收条件": "回放可复现；所有节点时间域一致；报告录制topics",
+      "day": 48,
+      "week": 7,
+      "stage": "ROS 2通信与回放"
+    },
+    {
+      "主题": "第7周闯关",
+      "实作与产物": "把C++库包成ROS2控制节点",
+      "概念检验": "画节点图并指出算法库与消息适配边界",
+      "故障或改动检验": "定位未source、QoS错与时间域错",
+      "验收条件": "输入回放能产生一致输出；核心库仍可脱离ROS测试",
+      "day": 49,
+      "week": 7,
+      "stage": "ROS 2通信与回放"
+    },
+    {
+      "主题": "tf2与坐标变换",
+      "实作与产物": "发布map/odom/base_link关系；转换目标点",
+      "概念检验": "为什么同一数值在不同frame意义不同？",
+      "故障或改动检验": "缺失或陈旧transform，检查失败处理",
+      "验收条件": "画变换链；能识别时间外推；不默默用单位矩阵代替",
+      "day": 50,
+      "week": 8,
+      "stage": "ROS 2系统与故障"
+    },
+    {
+      "主题": "executor与回调组",
+      "实作与产物": "比较单/多线程executor和互斥回调组",
+      "概念检验": "多线程为什么不保证控制任务更准时？",
+      "故障或改动检验": "订阅回调sleep或重计算阻塞控制",
+      "验收条件": "记录周期抖动；重任务与控制回调隔离",
+      "day": 51,
+      "week": 8,
+      "stage": "ROS 2系统与故障"
+    },
+    {
+      "主题": "Lifecycle与使能管理",
+      "实作与产物": "实现configure/activate/deactivate与控制授权",
+      "概念检验": "节点在线为什么不等于控制已授权？",
+      "故障或改动检验": "在deactivate后继续送目标消息",
+      "验收条件": "未激活不产生有效控制请求；状态转换有日志",
+      "day": 52,
+      "week": 8,
+      "stage": "ROS 2系统与故障"
+    },
+    {
+      "主题": "故障监视与输出门控",
+      "实作与产物": "独立节点检查超时、范围、使能；统一valid=false语义",
+      "概念检验": "无效命令和零加速度为什么不等价？",
+      "故障或改动检验": "控制器死亡或输出NaN，监视节点阻断",
+      "验收条件": "接收方遵守valid契约；记录拒绝原因与时间",
+      "day": 53,
+      "week": 8,
+      "stage": "ROS 2系统与故障"
+    },
+    {
+      "主题": "ROS测试与回放回归",
+      "实作与产物": "写核心单测和节点集成测试；检查消息超时",
+      "概念检验": "单元测试和集成测试各能发现什么？",
+      "故障或改动检验": "改变消息字段或参数名，验证测试捕获",
+      "验收条件": "正常/丢包/恢复三回放可重复；失败有可读日志",
+      "day": 54,
+      "week": 8,
+      "stage": "ROS 2系统与故障"
+    },
+    {
+      "主题": "系统数据流与架构图",
+      "实作与产物": "画传感→估计→规划→控制→车辆接口→监视链",
+      "概念检验": "哪些模块处理世界模型，哪些只处理控制指令？",
+      "故障或改动检验": "新增控制器实现而不修改消息适配层",
+      "验收条件": "依赖方向明确；算法参数、接口和监视职责分离",
+      "day": 55,
+      "week": 8,
+      "stage": "ROS 2系统与故障"
+    },
+    {
+      "主题": "第8周闯关",
+      "实作与产物": "完成可离线回放的ROS2 ACC教学系统",
+      "概念检验": "从launch到一次定时step按运行顺序讲解",
+      "故障或改动检验": "抽取QoS、tf、超时、回调阻塞任一问题",
+      "验收条件": "20分钟给出根因、修复、回归证据；声明教学边界",
+      "day": 56,
+      "week": 8,
+      "stage": "ROS 2系统与故障"
+    },
+    {
+      "主题": "路径跟踪与Pure Pursuit",
+      "实作与产物": "实现最近点、前视点和转角计算",
+      "概念检验": "路径与带时间和速度的轨迹有什么区别？",
+      "故障或改动检验": "前视距离过小/过大，比较横向误差",
+      "验收条件": "直线/圆弧两轨迹RMSE和转角曲线可复现",
+      "day": 57,
+      "week": 9,
+      "stage": "路径跟踪／MPC"
+    },
+    {
+      "主题": "LQR与线性化",
+      "实作与产物": "建立横向误差状态模型；求解简单反馈增益",
+      "概念检验": "线性化工作点与Q/R权重分别影响什么？",
+      "故障或改动检验": "速度从5变20m/s，比较固定增益表现",
+      "验收条件": "解释模型适用范围；不把低速结果外推高速",
+      "day": 58,
+      "week": 9,
+      "stage": "路径跟踪／MPC"
+    },
+    {
+      "主题": "MPC问题构造",
+      "实作与产物": "列状态、控制量、预测步长、代价与约束",
+      "概念检验": "预测时域N×dt和控制周期有什么区别？",
+      "故障或改动检验": "把角度单位误写为度，检查模型矩阵",
+      "验收条件": "手工写清状态维度、控制维度、代价和单位",
+      "day": 59,
+      "week": 9,
+      "stage": "路径跟踪／MPC"
+    },
+    {
+      "主题": "QP求解与约束",
+      "实作与产物": "用OSQP做最小轨迹跟踪例；锁定版本",
+      "概念检验": "不可行、未收敛、超时分别怎么响应？",
+      "故障或改动检验": "给相互矛盾的约束，模拟求解失败",
+      "验收条件": "求解状态先检查再取解；失败输出valid=false",
+      "day": 60,
+      "week": 9,
+      "stage": "路径跟踪／MPC"
+    },
+    {
+      "主题": "延迟与warm start",
+      "实作与产物": "加入转向一阶延迟、上周期解热启动",
+      "概念检验": "为什么只提高预测步数可能变慢？",
+      "故障或改动检验": "比较N=10/20/40的误差与p99求解耗时",
+      "验收条件": "给出精度/耗时对照；不得宣称PC仿真具备硬实时保证",
+      "day": 61,
+      "week": 9,
+      "stage": "路径跟踪／MPC"
+    },
+    {
+      "主题": "控制器公平对比",
+      "实作与产物": "在同轨迹、初值、限幅下比较PID/PP/MPC",
+      "概念检验": "公平比较需要固定哪些条件？",
+      "故障或改动检验": "一种算法取消限幅，识别不公平结果",
+      "验收条件": "三算法报告RMSE、峰值转角、失败数与耗时",
+      "day": 62,
+      "week": 9,
+      "stage": "路径跟踪／MPC"
+    },
+    {
+      "主题": "第9周闯关",
+      "实作与产物": "提交有约束、状态检查的MPC教学原型",
+      "概念检验": "讲清模型→QP→求解→限幅→输出顺序",
+      "故障或改动检验": "定位单位错、不可行约束、求解超时",
+      "验收条件": "独立解释失败策略；能用曲线证明修复效果",
+      "day": 63,
+      "week": 9,
+      "stage": "路径跟踪／MPC"
+    },
+    {
+      "主题": "真实仓库版本与入口",
+      "实作与产物": "固定openpilot及opendbc提交；记录许可证、路径和依赖",
+      "概念检验": "为什么应固定提交而非一直读master？",
+      "故障或改动检验": "核对课程链接和本地rg结果，不存在则更新映射",
+      "验收条件": "保存SHA与阅读清单；不修改上游代码作为初始基准",
+      "day": 64,
+      "week": 10,
+      "stage": "openpilot真实模块"
+    },
+    {
+      "主题": "openpilot纵向状态机",
+      "实作与产物": "从controlsd调用到LongControl.update追踪输入输出",
+      "概念检验": "off、stopping、pid各怎样影响控制输出？",
+      "故障或改动检验": "用最小测试覆盖active/should_stop/brake组合",
+      "验收条件": "状态转换表与固定版本代码一致；记录行号",
+      "day": 65,
+      "week": 10,
+      "stage": "openpilot真实模块"
+    },
+    {
+      "主题": "openpilot控制与限幅",
+      "实作与产物": "阅读PID、a_target、aEgo及accel_limits流向",
+      "概念检验": "这里控制误差是速度还是加速度？",
+      "故障或改动检验": "离线改变a_target或限幅并预测输出",
+      "验收条件": "与第4周教学控制区分；符号与单位逐项核对",
+      "day": 66,
+      "week": 10,
+      "stage": "openpilot真实模块"
+    },
+    {
+      "主题": "opendbc与车辆接口",
+      "实作与产物": "读一份真实DBC及对应车辆接口的信号读取",
+      "概念检验": "DBC解析器与车型接口各承担什么职责？",
+      "故障或改动检验": "选3帧离线样本做raw/physical对照",
+      "验收条件": "提供来源、帧ID、端序、factor、offset；不接真实总线",
+      "day": 67,
+      "week": 10,
+      "stage": "openpilot真实模块"
+    },
+    {
+      "主题": "回放与测试框架阅读",
+      "实作与产物": "阅读process_replay配置与一个相关测试",
+      "概念检验": "为什么历史日志回放仍可能存在非确定性？",
+      "故障或改动检验": "用最小harness模拟输入缺失，不要求全栈启动",
+      "验收条件": "标明mock范围；固定种子/时间；不把harness当完整回放",
+      "day": 68,
+      "week": 10,
+      "stage": "openpilot真实模块"
+    },
+    {
+      "主题": "真实故障演练一",
+      "实作与产物": "在本地harness注入状态复位遗漏或限幅错误",
+      "概念检验": "如何从症状反推接口、状态和算法根因？",
+      "故障或改动检验": "先写失败测试再修复；给出最小diff",
+      "验收条件": "错误可复现；修复后相关正常与异常测试通过",
+      "day": 69,
+      "week": 10,
+      "stage": "openpilot真实模块"
+    },
+    {
+      "主题": "第10周闯关",
+      "实作与产物": "写openpilot阅读与修复报告",
+      "概念检验": "完整讲清某一真实函数的调用者、输入、状态、输出",
+      "故障或改动检验": "30分钟完成陌生的小故障定位",
+      "验收条件": "明确上游真实代码、本地mock、自己改动三部分",
+      "day": 70,
+      "week": 10,
+      "stage": "openpilot真实模块"
+    },
+    {
+      "主题": "Autoware包与依赖图",
+      "实作与产物": "固定autoware_universe提交；定位trajectory_follower与PID包",
+      "概念检验": "node、algorithm、vehicle interface如何分工？",
+      "故障或改动检验": "用rg找发布输出和参数声明，验证文档映射",
+      "验收条件": "保存SHA；画包依赖与topic契约；不预设全栈可编译",
+      "day": 71,
+      "week": 11,
+      "stage": "Autoware真实模块"
+    },
+    {
+      "主题": "Autoware纵向控制源码",
+      "实作与产物": "读PID类、停车模式及参数读取路径",
+      "概念检验": "前馈与反馈怎样共同形成目标加速度？",
+      "故障或改动检验": "检查低速积分开关与停车边界",
+      "验收条件": "整理状态表、参数表、输入输出单位；指出车辆接口假设",
+      "day": 72,
+      "week": 11,
+      "stage": "Autoware真实模块"
+    },
+    {
+      "主题": "Autoware延迟与坡度",
+      "实作与产物": "追踪坡度补偿和延迟相关代码及文档",
+      "概念检验": "坡度补偿为什么依赖下层接口语义？",
+      "故障或改动检验": "用离线场景把坡度符号反转观察起步异常",
+      "验收条件": "解释车身pitch与道路坡度符号；报告适用条件",
+      "day": 73,
+      "week": 11,
+      "stage": "Autoware真实模块"
+    },
+    {
+      "主题": "Autoware横向MPC源码",
+      "实作与产物": "追踪车辆模型、QP接口、转角限制与解状态",
+      "概念检验": "模型延迟与约束分别在哪层实现？",
+      "故障或改动检验": "沿函数调用查一次求解失败的处理路径",
+      "验收条件": "画数据流；证据来自固定提交与对应文档",
+      "day": 74,
+      "week": 11,
+      "stage": "Autoware真实模块"
+    },
+    {
+      "主题": "最小组件构建或抽取",
+      "实作与产物": "按固定版本依赖构建目标包；资源不足则做独立核心harness",
+      "概念检验": "抽取核心会失去哪类集成行为？",
+      "故障或改动检验": "列出未模拟的消息、时序、车辆动态",
+      "验收条件": "记录真实构建结果；失败则保留日志，不宣称全栈通过",
+      "day": 75,
+      "week": 11,
+      "stage": "Autoware真实模块"
+    },
+    {
+      "主题": "真实故障演练二",
+      "实作与产物": "以参数误设、过期轨迹或停车抖动做离线复现",
+      "概念检验": "如何区分算法错误、配置错误和接口错误？",
+      "故障或改动检验": "写回归用例并解释修改为什么不会放宽门控",
+      "验收条件": "症状、根因、diff、回放、指标五项证据齐全",
+      "day": 76,
+      "week": 11,
+      "stage": "Autoware真实模块"
+    },
+    {
+      "主题": "第11周闯关",
+      "实作与产物": "提交Autoware核心阅读与故障报告",
+      "概念检验": "用中文解释20至50行真实控制源码",
+      "故障或改动检验": "不看解答完成一个指定异常输入分析",
+      "验收条件": "定位调用与参数源；说明仍需集成验证的部分",
+      "day": 77,
+      "week": 11,
+      "stage": "Autoware真实模块"
+    },
+    {
+      "主题": "前沿一：BEV与Occupancy",
+      "实作与产物": "画多相机→特征→BEV/占用→规划接口；读Autoware相关设计",
+      "概念检验": "感知置信度如何影响规划而非直接等同控制命令？",
+      "故障或改动检验": "分析遮挡或坐标错误的故障传播",
+      "验收条件": "给出输入形状、时间、坐标与失败模式；不要求训练大模型",
+      "day": 78,
+      "week": 12,
+      "stage": "前沿与综合验收"
+    },
+    {
+      "主题": "前沿二：端到端与VLA",
+      "实作与产物": "读Alpamayo官方说明；画图像/语言/历史→轨迹→控制链",
+      "概念检验": "模型输出轨迹为何仍需要约束、门控与闭环评测？",
+      "故障或改动检验": "比较公开模型能力与所缺导航/训练环节",
+      "验收条件": "列可验证能力与未知项；GPU不足只做接口与案例分析",
+      "day": 79,
+      "week": 12,
+      "stage": "前沿与综合验收"
+    },
+    {
+      "主题": "综合项目需求冻结",
+      "实作与产物": "选cut-in或停车抖动；冻结5场景和统一指标",
+      "概念检验": "验收要求如何避免测试后调低标准？",
+      "故障或改动检验": "给每个场景定义初值、种子、限幅、阈值",
+      "验收条件": "先保存基准与验收JSON；之后改阈值必须写理由",
+      "day": 80,
+      "week": 12,
+      "stage": "前沿与综合验收"
+    },
+    {
+      "主题": "综合项目实施",
+      "实作与产物": "集成C++控制库、ROS2节点、仿真器、记录器、门控",
+      "概念检验": "哪些状态能复位，哪些参数在启动时校验？",
+      "故障或改动检验": "注入丢包、NaN、dt异常检查系统行为",
+      "验收条件": "正常运行能录包；异常命令拒绝；参数与版本可追溯",
+      "day": 81,
+      "week": 12,
+      "stage": "前沿与综合验收"
+    },
+    {
+      "主题": "综合项目故障修复",
+      "实作与产物": "随机选择3类故障，限时诊断并修复",
+      "概念检验": "什么证据足以证明根因而非碰巧改善？",
+      "故障或改动检验": "一类算法、一类接口、一类时序问题各做回归",
+      "验收条件": "每类给最小复现、根因、修复、指标与回归结果",
+      "day": 82,
+      "week": 12,
+      "stage": "前沿与综合验收"
+    },
+    {
+      "主题": "最终答辩与代码阅读",
+      "实作与产物": "录10分钟讲解；阅读陌生真实模块并写中文执行路线",
+      "概念检验": "输入契约、状态、标定、输出、故障五项能否说清？",
+      "故障或改动检验": "现场修改一个参数或边界逻辑，预测后验证",
+      "验收条件": "总分≥80且故障门控必过；不能仅凭代码运行即毕业",
+      "day": 83,
+      "week": 12,
+      "stage": "前沿与综合验收"
+    },
+    {
+      "主题": "补课、作品集与下一阶段",
+      "实作与产物": "整理README、版本清单、场景、测试、故障报告与待办",
+      "概念检验": "当前能力与量产集成岗位要求仍有哪些差距？",
+      "故障或改动检验": "选择最低分项重做；制定后续4周专项训练",
+      "验收条件": "产物别人可复现；未通过项保留；明确HIL/实车/公司流程待学",
+      "day": 84,
+      "week": 12,
+      "stage": "前沿与综合验收"
+    }
+  ]
+}
