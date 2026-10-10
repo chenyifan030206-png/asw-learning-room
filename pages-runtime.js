@@ -70,7 +70,7 @@ function pagesRegression(day){
 }
 function pagesReport(day,bundle,db){
   const note=db.notes.find(n=>n.day===day),progress=db.progress.find(p=>p.day===day),attempt=db.attempts.filter(a=>a.day===day).at(-1);
-  return `# D${String(day).padStart(2,'0')} 在线练习报告\n\n当前实验是浏览器模拟。恢复的原本地真实C成绩保留来源标记，不把新在线模拟当成真实C检测。\n课程：${bundle.lessons[day].title}\n完成方式：${progress?.source==='local-c'?'本地真实C已通过（从原记录恢复）':progress?.method==='test'?'在线练习通过':progress?'自定义通关':'未完成'}\n\n## 我的笔记\n${note?.notes||''}\n\n## 希望优化\n${note?.feedback||''}\n\n## 最近检测\n${attempt?.result||'未提交'}\n\n## 运行记录\n${JSON.stringify(db.runs.filter(r=>r.day===day).slice(-12),null,2)}\n`;
+  return `# D${String(day).padStart(2,'0')} 在线练习报告\n\n当前实验是浏览器模拟。恢复的原本地真实C成绩保留来源标记，不把新在线模拟当成真实C检测。\n课程：${bundle.lessons[day].title}\n完成方式：${progress?.method==='test'&&progress?.source==='local-c'?'本地真实C已通过（从原记录恢复）':progress?.method==='test'?'在线练习通过':progress?'自定义通关':'未完成'}\n\n## 我的笔记\n${note?.notes||''}\n\n## 希望优化\n${note?.feedback||''}\n\n## 最近检测\n${attempt?.result||'未提交'}\n\n## 运行记录\n${JSON.stringify(db.runs.filter(r=>r.day===day).slice(-12),null,2)}\n`;
 }
 window.pagesAPI=async function(url,obj){
   const bundle=await pagesReady,db=pagesLoad(),route=new URL(url,'https://local.invalid'),day=obj?.day??Number(route.searchParams.get('day'));
