@@ -10,7 +10,10 @@ function pagesLoad(){
   const value=localStorage.getItem(pagesStorageKey);
   return value?JSON.parse(value):{notes:[],progress:[],runs:[],attempts:[]};
 }
-function pagesStore(db){localStorage.setItem(pagesStorageKey,JSON.stringify(db));}
+function pagesStore(db){
+  for(const table of ['runs','attempts'])for(const row of db[table])if(!row.sync_id)row.sync_id=crypto.randomUUID();
+  localStorage.setItem(pagesStorageKey,JSON.stringify(db));window.dispatchEvent(new Event('asw-records-changed'));
+}
 function pagesNow(){return new Date().toISOString();}
 function pagesState(bundle,db){
   let frontier=1;while(db.progress.some(p=>p.day===frontier)&&frontier<=84)frontier++;
@@ -67,7 +70,7 @@ function pagesRegression(day){
 }
 function pagesReport(day,bundle,db){
   const note=db.notes.find(n=>n.day===day),progress=db.progress.find(p=>p.day===day),attempt=db.attempts.filter(a=>a.day===day).at(-1);
-  return `# D${String(day).padStart(2,'0')} 在线练习报告\n\n这是浏览器模拟与前端检测，不代表真实C运行或服务端通关。\n课程：${bundle.lessons[day].title}\n完成方式：${progress?.method==='test'?'在线练习通过':progress?'自定义通关':'未完成'}\n\n## 我的笔记\n${note?.notes||''}\n\n## 希望优化\n${note?.feedback||''}\n\n## 最近检测\n${attempt?.result||'未提交'}\n\n## 运行记录\n${JSON.stringify(db.runs.filter(r=>r.day===day).slice(-12),null,2)}\n`;
+  return `# D${String(day).padStart(2,'0')} 在线练习报告\n\n当前实验是浏览器模拟。恢复的原本地真实C成绩保留来源标记，不把新在线模拟当成真实C检测。\n课程：${bundle.lessons[day].title}\n完成方式：${progress?.source==='local-c'?'本地真实C已通过（从原记录恢复）':progress?.method==='test'?'在线练习通过':progress?'自定义通关':'未完成'}\n\n## 我的笔记\n${note?.notes||''}\n\n## 希望优化\n${note?.feedback||''}\n\n## 最近检测\n${attempt?.result||'未提交'}\n\n## 运行记录\n${JSON.stringify(db.runs.filter(r=>r.day===day).slice(-12),null,2)}\n`;
 }
 window.pagesAPI=async function(url,obj){
   const bundle=await pagesReady,db=pagesLoad(),route=new URL(url,'https://local.invalid'),day=obj?.day??Number(route.searchParams.get('day'));
@@ -81,7 +84,10 @@ window.pagesAPI=async function(url,obj){
   const updated=pagesNow();
   if(route.pathname==='/api/notes'){
     if(typeof obj.notes!=='string'||typeof obj.feedback!=='string'||obj.notes.length+obj.feedback.length>100000)throw Error('笔记格式或长度不正确。');
-    db.notes=db.notes.filter(n=>n.day!==day);db.notes.push({day,notes:obj.notes,feedback:obj.feedback,updated});pagesStore(db);return {saved:true,updated};
+    const previous=db.notes.find(n=>n.day===day);
+    const history=[...(previous?.history||[])];
+    if(previous&&(previous.notes!==obj.notes||previous.feedback!==obj.feedback))history.push({day,notes:previous.notes,feedback:previous.feedback,updated:previous.updated||'',source:previous.source||'browser'});
+    db.notes=db.notes.filter(n=>n.day!==day);db.notes.push({day,notes:obj.notes,feedback:obj.feedback,updated,source:'browser',history});pagesStore(db);return {saved:true,updated};
   }
   if(route.pathname==='/api/run'){const output=pagesSimulate(day,obj.values);db.runs.push({id:db.runs.length+1,day,inputs:JSON.stringify(obj.values),output:JSON.stringify(output),created:updated});pagesStore(db);return output;}
   if(route.pathname==='/api/grade'){
@@ -91,7 +97,7 @@ window.pagesAPI=async function(url,obj){
     if(day===1)checks.push({id:'mode',label:'模式判断',passed:answers.mode==='SPACING',message:'误差-5<0，所以选择SPACING间距模式。'});
     checks.push(...pagesChecklist(day,bundle,db));const tests=pagesRegression(day),passed=checks.every(c=>c.passed)&&tests.every(t=>t.passed),result={passed,checks,tests,updated,kind:'browser-practice'};
     db.attempts.push({id:db.attempts.length+1,day,answers:JSON.stringify(answers),result:JSON.stringify(result),created:updated});
-    if(passed){db.progress=db.progress.filter(p=>p.day!==day);db.progress.push({day,method:'test',detail:'在线前端练习通过，不是本地服务端通关',updated});}pagesStore(db);return result;
+    if(passed&&!db.progress.some(p=>p.day===day&&p.method==='test'&&p.source==='local-c')){db.progress=db.progress.filter(p=>p.day!==day);db.progress.push({day,method:'test',detail:'在线前端练习通过，不是本地服务端通关',updated});}pagesStore(db);return result;
   }
   if(route.pathname==='/api/override'){
     const reason=String(obj.reason||'').trim();if(!reason||reason.length>2000)throw Error('请填写自定义通关原因。');

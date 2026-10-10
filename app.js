@@ -41,13 +41,13 @@ function drawRoute(){
   $('routeSummary').textContent=`· 当前可推进到 D${String(state.frontier).padStart(2,'0')}`;
   $('days').replaceChildren();
   for(const c of state.courses){const b=document.createElement('button');
-    const status=c.completed?(c.method==='test'?'在线练习通过':'手动通关'):!c.unlocked?'未解锁':!c.published?'待准备':'可学习';
+    const status=c.completed?(state.progress.find(p=>p.day===c.day)?.source==='local-c'?'本地真实C已通过':c.method==='test'?'在线练习通过':'手动通关'):!c.unlocked?'未解锁':!c.published?'待准备':'可学习';
     b.textContent=`D${String(c.day).padStart(2,'0')} · ${c.title} · ${status}`;
     if(c.day===day)b.className='current';b.onclick=()=>selectDay(c.day).catch(e=>message(e.message));$('days').append(b);}
 }
 function completeUI(){
   const p=state.progress.find(p=>p.day===day);
-  $('completion').textContent=p?(p.method==='test'?'✓ 在线练习通过':'✓ 自定义通关'):'尚未通关';
+  $('completion').textContent=p?(p.source==='local-c'?'✓ 本地真实C已通过（已同步）':p.method==='test'?'✓ 在线练习通过':'✓ 自定义通关'):'尚未通关';
   $('next').hidden=!p;
   $('enterNext').hidden=!(p&&state.courses[day]?.published&&state.courses[day]?.unlocked);
   if(p){const c=state.courses[day];$('nextTitle').textContent=`D${String(day).padStart(2,'0')} 已完成`;
@@ -178,4 +178,4 @@ async function exportReport(){await saveNotes();const text=await api('/api/repor
 for(const id of ['exportReport','reportSide'])$(id).onclick=()=>exportReport().catch(e=>message(e.message));
 $('backup').onclick=async()=>{try{await saveNotes();const data=await api('/api/backup');download(JSON.stringify(data,null,2),'智驾学习数据备份.json','application/json');message('全部学习数据已导出。');}catch(e){message(e.message);}};
 async function start(){try{state=await api('/api/state');drawRoute();const ready=state.courses.filter(c=>c.unlocked&&c.published);const current=ready.find(c=>!c.completed)||ready[ready.length-1];if(!current)throw Error('尚无已发布课程。');await selectDay(current.day);}catch(e){message('在线课程读取失败：'+e.message+' 请检查网络与站点资源，再刷新。');}}
-start();
+window.pagesAppReady=start();

@@ -2,7 +2,24 @@
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>智驾学习室 · 在线版</title><link rel="stylesheet" href="./style.css"></head>
 <body><header><div><span class="eyebrow">免费在线练习 · C++ / ROS 2 / 智驾控制</span><h1>智驾学习室 · 在线版</h1></div><div id="progress" class="muted">正在读取进度…</div></header>
-<main><div class="hint" id="onlineNotice"><strong>在线练习版 · 浏览器模拟</strong><p>课程公开可读；实验与检测在浏览器模拟，不执行C、不进行服务端通关。笔记与在线进度仅保存在当前浏览器；换设备不会自动同步，清除浏览器数据会丢失，请定期导出备份。真实C实验与正式通关仍在本地网站完成。</p></div><div id="message" role="status" aria-live="polite"></div>
+<main><div class="hint" id="onlineNotice"><strong>在线练习版 · 浏览器模拟</strong><p>实验与检测在浏览器模拟，不执行C。记录先自动存浏览器；连接私有云仓库后可手动或定时同步，跨设备恢复。真实C实验仍在本地完成，已有真实通关会保留来源标记。</p></div><section class="panel" id="cloudPanel">
+<h2>我的云记录 · 私有同步</h2>
+<p>先恢复之前的进度，再合并当前浏览器的新记录。云端为你的GitHub私有仓库；别人打开课程链接不会读到这些记录。</p>
+<div class="row"><button id="cloudSave" class="primary">手动保存并同步云端</button><label>定时同步<select id="cloudInterval"><option value="60">每1分钟</option><option value="300">每5分钟</option><option value="600">每10分钟</option><option value="0">关闭定时，仅手动</option></select></label></div>
+<p id="cloudStatus" role="status" aria-live="polite">还未连接云端；笔记仍自动保存在当前浏览器。</p>
+<p class="muted">定时同步在网页打开且可见时运行，关闭网页后停止。网络失败会保留本地记录，稍后可重试。新设备连接同一仓库即可恢复；同一天的不同笔记保留历史版本。</p>
+<details id="cloudSetup"><summary>首次连接 · 只需配置一次</summary>
+<ol class="instructions"><li>打开下方GitHub专用授权页面，确认账号是chenyifan030206-png。选择Only select repositories，仅选asw-learning-records。</li><li>Repository permissions中只给Contents：Read and write；Metadata保持自动Read。设置有效期后点击Generate token。不要使用All repositories或通用classic令牌。</li><li>复制生成的令牌，粘贴到下面输入框，点击“连接并恢复进度”。不要发送到聊天，也不要把令牌分享给别人。</li></ol>
+<p><a href="https://github.com/settings/personal-access-tokens/new?name=ASW-learning-sync&amp;description=Sync%20private%20ASW%20learning%20records&amp;contents=write&amp;metadata=read&amp;expires_in=90" target="_blank" rel="noopener noreferrer">打开GitHub专用授权页面</a> · <a href="https://github.com/chenyifan030206-png/asw-learning-records" target="_blank" rel="noopener noreferrer">检查我的私有记录仓库</a></p>
+<label>仅限私有记录仓库的专用令牌<input id="cloudToken" type="password" autocomplete="off" placeholder="只粘贴到这里，不要发到聊天"></label>
+<label class="row"><input id="cloudRemember" type="checkbox" style="width:auto">记住此设备的授权（仅在本人设备上勾选）</label>
+<div class="row"><button id="cloudConnect">连接并恢复进度</button><button id="cloudDisconnect">断开云授权</button></div>
+<p class="muted">授权只发给api.github.com。默认只留在当前标签页会话；勾选记住后保存到当前浏览器。到期后重新连接，云端记录不会删除。</p>
+</details>
+<details><summary>无需授权，先从备份文件恢复进度</summary><p>选择已导出的备份JSON或电脑上的“恢复我的学习记录.json”。只做合并，不清空当前记录；连接后再同步云端。</p><label>选择恢复文件<input id="cloudImport" type="file" accept=".json,application/json"></label></details>
+<details><summary>合并后保留的历史笔记</summary><div id="cloudHistory"></div></details>
+</section>
+<div id="message" role="status" aria-live="polite"></div>
 <details id="roadmap"><summary>学习路线与进度 <span id="routeSummary"></span></summary><p class="muted">测试通过或自定义通关后才能推进。下一课会在你反馈后逐日补充。</p><div id="days" class="day-grid"></div></details>
 <div id="waiting" hidden class="panel"><h2 id="waitingTitle"></h2><p id="waitingText"></p><button id="backCurrent">回到已发布课程</button></div>
 <div id="workspace" class="workspace" hidden><article class="panel lesson"><div class="lesson-heading"><span id="dayTag" class="eyebrow"></span><span id="completion" class="badge"></span></div><h2 id="title"></h2><p id="summary"></p><p id="time" class="muted"></p>
@@ -12,4 +29,4 @@
 <section id="test" role="tabpanel" aria-labelledby="tab-test" hidden><h3>今日通关检测</h3><p id="passRule"></p><h4>提交前的操作步骤</h4><ol id="testSteps" class="instructions"></ol><div id="testChecklist"></div><form id="quiz"><div id="questions"></div><fieldset class="practice"><legend>迁移检测 · 换一组输入</legend><p id="practiceText"></p><ol id="practiceSteps" class="instructions"></ol><div id="answerFields" class="input-grid"></div><button type="button" id="transferRun">将这组输入带到运行区</button></fieldset><button id="gradeButton" type="submit" class="primary">提交在线练习并检查模拟用例</button></form><div id="result" aria-live="polite"></div><details class="override"><summary>已熟悉内容？使用自定义通关</summary><p class="muted">可跳过检测，但记录为“手动通关”，不算测试通过。只推进当前这一天。</p><label>原因<input id="overrideReason" placeholder="例如：已有独立项目经验，希望快速衔接"></label><button id="overrideButton">自定义通关当前日</button></details></section>
 <section id="next" class="next" hidden><h3 id="nextTitle">今天完成了</h3><p id="nextText"></p><div class="row"><button id="enterNext" hidden class="primary">进入已发布的下一课</button><button id="copyRequest">复制反馈，发给聊天准备下一课</button><button id="exportReport">下载今日报告</button></div><textarea id="requestFallback" aria-label="下一课请求文本" readonly hidden></textarea><p class="muted">点击复制后，在这个 Codex 聊天中粘贴发送。请把导出的报告或复制的笔记发到聊天，下一课会根据反馈制作并重新发布。</p></section></article>
 <aside class="panel notebook"><h2>我的笔记</h2><p class="muted">边学边记，停止输入后自动保存到当前浏览器。</p><label for="notes">理解、疑问、预测与结果</label><textarea id="notes" placeholder="用自己的话解释函数调用。记录哪里不明白、预测与实际哪里不同。"></textarea><div class="row"><button id="saveNotes">立即保存</button><span id="saveStatus" role="status">未修改</span></div><h3>下次怎么改进</h3><label for="feedback">哪一步不顺手，想怎样调整？</label><textarea id="feedback" placeholder="例如：代码太长；解释想更细；想增加一步一步的运行动画。"></textarea><div class="row"><button id="reportSide">导出今日笔记和报告</button><button id="backup">备份全部学习数据</button></div><p class="muted">笔记保存在当前浏览器，关闭网页后通常仍保留。不会上传GitHub；请定期导出备份。</p></aside></div></main>
-<footer>按你实际掌握情况推进 · 先给完整代码，再按执行顺序解释 · 模拟实验仅在浏览器运行</footer><script src="./pages-runtime.js"></script><script src="./app.js"></script></body></html>
+<footer>按你实际掌握情况推进 · 先给完整代码，再按执行顺序解释 · 模拟实验仅在浏览器运行</footer><script src="./pages-runtime.js"></script><script src="./app.js"></script><script src="./cloud-sync.js"></script></body></html>
