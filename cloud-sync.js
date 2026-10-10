@@ -83,7 +83,9 @@ async function cloudSync(jump=false){
     if(!repo.private||repo.owner?.login!==cloudOwner)throw Error('目标不是指定私有仓库，停止同步。');
     for(let retry=0;retry<3;retry++){
       let file=null;try{file=await cloudRequest(`/repos/${cloudOwner}/${cloudRepo}/contents/records.json`);}catch(e){if(e.status!==404)throw e;}
-      const remote=file?cloudClean(JSON.parse(cloudDecode(file.content))):{notes:[],progress:[],runs:[],attempts:[]};
+      // Contents超过1MB可能不内嵌content，改取同一个sha的blob，仍只读私有仓库。
+      const blob=file&&!file.content?await cloudRequest(`/repos/${cloudOwner}/${cloudRepo}/git/blobs/${file.sha}`):file;
+      const remote=blob?cloudClean(JSON.parse(cloudDecode(blob.content))):{notes:[],progress:[],runs:[],attempts:[]};
       // GET期间发生的本地编辑也纳入，不能用请求开始时的旧快照覆盖它。
       const merged=cloudMerge(remote,pagesLoad());
       localStorage.setItem(pagesStorageKey,JSON.stringify(merged));

@@ -117,7 +117,7 @@ async function selectDay(d){
   $('questions').replaceChildren();for(const q of lesson.questions){const f=document.createElement('fieldset'),leg=document.createElement('legend');f.className='question';leg.textContent=q.text;f.append(leg);q.options.forEach((o,i)=>{const label=document.createElement('label'),input=document.createElement('input'),span=document.createElement('span');input.type='radio';input.name=q.id;input.value=i;span.textContent=o;label.append(input,span);f.append(label);});$('questions').append(f);}
   $('output').replaceChildren();const empty=document.createElement('p');empty.className='muted';empty.textContent='选一个场景，点击运行。';$('output').append(empty);
   $('engine').textContent='';$('runStatus').textContent='';$('prediction').value='';$('overrideReason').value='';$('result').replaceChildren();$('requestFallback').hidden=true;
-  if(record.attempt){const answers=JSON.parse(record.attempt.answers);for(const q of lesson.questions){const value=answers[q.id];const input=$('quiz').querySelector(`input[name="${q.id}"][value="${value}"]`);if(input)input.checked=true;}for(const f of lesson.practice.fields)$('answer-'+f.id).value=answers[f.id]??'';showResult(JSON.parse(record.attempt.result));}
+  if(record.attempt){const answers=JSON.parse(record.attempt.answers);for(const q of lesson.questions){const value=answers[q.id];const input=$('quiz').querySelector(`input[name="${q.id}"][value="${value}"]`);if(input)input.checked=true;}for(const f of lesson.practice.fields)$('answer-'+f.id).value=answers[f.id]??'';const priorResult=JSON.parse(record.attempt.result);if(record.attempt.source==='local-c')priorResult.source='local-c';showResult(priorResult);}
   drawRoute();completeUI();tab('learn');message('');
 }
 $('backCurrent').onclick=()=>selectDay(day).catch(e=>message(e.message));
@@ -158,10 +158,10 @@ $('runButton').onclick=async()=>{
   }catch(e){message(e.message);$('runStatus').textContent='运行未完成，请检查提示后重试。';}finally{busy=false;b.disabled=false;b.textContent='运行案例';}
 };
 function showResult(result){
-  $('result').replaceChildren();const h=document.createElement('h3');h.className=result.passed?'pass':'fail';h.textContent=result.passed?'✓ 今日检测通过':'还没有通关：按下面提示补齐，再试一次';$('result').append(h);
+  $('result').replaceChildren();const h=document.createElement('h3');h.className=result.passed?'pass':'fail';h.textContent=result.passed?(result.source==='local-c'?'✓ 原本地真实C检测已通过':'✓ 今日检测通过（在线练习）'):'还没有通关：按下面提示补齐，再试一次';$('result').append(h);
   const names={q1:'地址',q2:'状态与输出',q3:'间距计算',q4:'const输入',q5:'无效结果',speed_ms:'迁移速度',desired:'迁移间距',error:'迁移误差',mode:'迁移模式',normal:'正常实验',fault:'故障实验',transfer:'迁移实验'};
   const ul=document.createElement('ul');ul.className='test-checks';for(const c of result.checks){const li=document.createElement('li');li.className=c.passed?'pass':'fail';li.textContent=`${c.passed?'✓':'✗'} ${c.label||names[c.id]||c.id}：${c.passed?'通过':c.message}`;if(!c.passed&&c.values){const b=document.createElement('button');b.type='button';b.textContent='去运行';b.className='small';b.onclick=()=>{setInputs(c.values,`补齐实验：${c.label}；输入已填好，请点击运行案例。`);tab('run');$('runButton').focus();};li.append(document.createTextNode(' '),b);}ul.append(li);}$('result').append(ul);
-  const det=document.createElement('details'),sum=document.createElement('summary');sum.textContent=`浏览器模拟回归：${result.tests.filter(t=>t.passed).length}/${result.tests.length}通过`;det.append(sum);
+  const det=document.createElement('details'),sum=document.createElement('summary');sum.textContent=`${result.source==='local-c'?'原本地真实C回归':'浏览器模拟回归'}：${result.tests.filter(t=>t.passed).length}/${result.tests.length}通过`;det.append(sum);
   for(const t of result.tests){const p=document.createElement('p');p.className=t.passed?'pass':'fail';p.textContent=`${t.passed?'✓':'✗'} ${t.name}`;det.append(p);}$('result').append(det);
 }
 $('quiz').onsubmit=async e=>{e.preventDefault();if(busy)return;busy=true;const b=$('gradeButton');b.disabled=true;b.textContent='正在检查答案与浏览器模拟测试…';
