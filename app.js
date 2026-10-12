@@ -1,6 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 let state=null,lesson=null,day=1,saveTimer=null,saveChain=Promise.resolve(),dirty=false,busy=false;
+let codeView='original';
 const draftKey=d=>'asw-pages-draft:'+location.pathname+':'+d;
 const message=text=>{$('message').textContent=text;};
 async function api(url,data){
@@ -16,23 +17,24 @@ for(const n of ['learn','run','test'])$('tab-'+n).onclick=()=>tab(n);
 $('goRun').onclick=()=>{tab('run');$('tab-run').focus();};
 $('goTest').onclick=()=>{tab('test');$('tab-test').focus();};
 function rememberDraft(){
-  try{localStorage.setItem(draftKey(day),JSON.stringify({notes:$('notes').value,feedback:$('feedback').value}));}catch(e){}
+  try{localStorage.setItem(draftKey(day),JSON.stringify({notes:$('notes').value,feedback:$('feedback').value,code_notes:$('codeNotes').value}));}catch(e){}
   dirty=true;$('saveStatus').textContent='正在等待自动保存…';
   clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveNotes().catch(e=>message(e.message)),650);
 }
 async function saveNotes(){
   clearTimeout(saveTimer);if(!lesson||!dirty)return saveChain;
-  const d=day,notes=$('notes').value,feedback=$('feedback').value;
+  const d=day,notes=$('notes').value,feedback=$('feedback').value,code_notes=$('codeNotes').value;
   const job=saveChain.catch(()=>{}).then(async()=>{
-    await api('/api/notes',{day:d,notes,feedback});
-    if(day===d&&$('notes').value===notes&&$('feedback').value===feedback){
+    await api('/api/notes',{day:d,notes,feedback,code_notes});
+    if(day===d&&$('notes').value===notes&&$('feedback').value===feedback&&$('codeNotes').value===code_notes){
       dirty=false;$('saveStatus').textContent='已保存到当前浏览器 · '+new Date().toLocaleTimeString('zh-CN');
       try{localStorage.removeItem(draftKey(d));}catch(e){}
     }
   });saveChain=job;
   try{return await job;}catch(e){$('saveStatus').textContent='保存失败，草稿仍保留；请重试。';throw e;}
 }
-for(const id of ['notes','feedback'])$(id).addEventListener('input',rememberDraft);
+for(const id of ['notes','feedback','codeNotes'])$(id).addEventListener('input',rememberDraft);
+$('codeNotes').addEventListener('input',resizeCodeNotes);
 $('saveNotes').onclick=()=>saveNotes().then(()=>message('笔记和流程反馈已保存。')).catch(e=>message(e.message));
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 
@@ -60,7 +62,8 @@ function coloredCode(target,source,firstLine=1){
   target.replaceChildren();let line,content,lineNo=firstLine;
   function newLine(){line=document.createElement('span');line.className='code-line';line.dataset.line=lineNo;const n=document.createElement('span');n.className='line-number';n.textContent=lineNo++;n.setAttribute('aria-hidden','true');content=document.createElement('span');line.append(n,content);target.append(line);}newLine();
   // 先识别完整注释和字符串，再识别语法；不使用innerHTML，用户文本不会变成HTML。
-  const token=/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:0x[\da-fA-F]+|\d+(?:\.\d+)?)(?:[uUfF])?\b|\b[a-zA-Z_]\w*\b|[^\w]/g;
+  // L/UL/ULL等后缀也必须保留；最后一项逐字符兜底，未知语法不能被丢弃。
+  const token=/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:0[xX][\da-fA-F]+|\b(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)[uUlLfF]*|\b[a-zA-Z_]\w*\b|[\s\S]/g;
   for(const match of source.matchAll(token)){const t=match[0];let cls='';
     if(t.startsWith('/*')||t.startsWith('//'))cls='syntax-comment';else if(t[0]==='"'||t[0]==="'")cls='syntax-string';else if(/^\d/.test(t))cls='syntax-number';
     else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process)$/.test(t))cls='syntax-function';
@@ -79,12 +82,27 @@ function showStep(index){
 $('prevStep').onclick=()=>showStep(stepIndex-1);$('nextStep').onclick=()=>showStep(stepIndex+1);
 function renderCode(){
   coloredCode($('code'),lesson.code);
+  codeView='original';$('code').hidden=false;$('codeNotesLabel').hidden=true;
+  $('architectureFlow').textContent=lesson.flow_text||'main入口 → 输入 → 业务函数 → 状态返回 → main决定是否显示结果';
+  $('architectureTable').replaceChildren(makeTable(lesson.architecture?.headers||['角色','职责','输入／输出'],lesson.architecture?.rows||[['main','读取输入、调用函数、检查状态','参数进来；日志出去'],['业务函数','先校验，再计算或编码','参数和数组地址；状态码与输出数据'],['打印函数／界面','展示结果','只展示，不决定数据是否合法']]));
   $('executionFlow').textContent=lesson.flow_text||'main创建变量 → 读输入 → 调用业务函数（main暂停）→ 校验与计算 → 返回main → 检查状态后使用结果';
   $('remediationTitle').textContent=lesson.remediation_title||'开课补习 · 先看本课所需基础';
   $('walkthrough').hidden=!lesson.code_sections;$('codeSteps').replaceChildren();
   if(lesson.code_sections){$('remediationText').replaceChildren();paragraphs($('remediationText'),lesson.reading[0].text);if(lesson.protocol)$('remediationText').append(makeTable(lesson.protocol.headers,lesson.protocol.rows));lesson.code_sections.forEach((s,i)=>{const b=document.createElement('button');b.textContent=s.title;b.onclick=()=>showStep(i);$('codeSteps').append(b);});showStep(0);}
-  $('codeFile').textContent='C17 · '+lesson.source;$('code').classList.remove('expanded');$('expandCode').textContent='展开全部';$('expandCode').setAttribute('aria-expanded','false');
+  $('codeFile').textContent='C17 · '+lesson.source;$('code').classList.add('expanded');$('expandCode').textContent='折叠长代码';$('expandCode').setAttribute('aria-expanded','true');
+  $('codeIntegrity').textContent=`课程原版共 ${lesson.code.split('\n').length} 行，已默认展开到最后一行；使用页面滚动查看。下载源码与这里的课程原版一致。`;
 }
+function resizeCodeNotes(){const el=$('codeNotes');if(!el||el.closest('[hidden]'))return;el.style.height='auto';el.style.height=Math.max(500,el.scrollHeight+6)+'px';}
+function showCodeView(view){
+  codeView=view;$('codeNotesLabel').hidden=view!=='edit';$('code').hidden=view==='edit';
+  if(view==='edit')resizeCodeNotes();
+  else coloredCode($('code'),view==='personal'?$('codeNotes').value:lesson.code);
+  $('codeIntegrity').textContent=view==='original'?`课程原版共 ${lesson.code.split('\n').length} 行。完整源码，默认展开；运行使用这一版。`:`我的注释代码共 ${$('codeNotes').value.split('\n').length} 行。停止输入后自动保存；云同步保留历史版本。`;
+}
+$('originalCode').onclick=()=>showCodeView('original');
+$('editCodeNotes').onclick=()=>{showCodeView('edit');$('codeNotes').focus();};
+$('previewCodeNotes').onclick=()=>showCodeView('personal');
+$('downloadCodeNotes').onclick=async()=>{try{await saveNotes();download($('codeNotes').value,`D${String(day).padStart(2,'0')}-我的注释.c`,'text/plain;charset=utf-8');}catch(e){message(e.message);}};
 function renderBitLab(){
   const target=$('bitLab');target.replaceChildren();target.hidden=day!==4;if(day!==4)return;
   const title=document.createElement('h3');title.textContent='点一下bit，就能看见移位、合并与提取';target.append(title);
@@ -132,15 +150,17 @@ async function selectDay(d){
   $('goals').replaceChildren();for(const goal of lesson.goals){const li=document.createElement('li');li.textContent=goal;$('goals').append(li);}
   renderCode();renderBitLab();$('reading').replaceChildren();
   for(const r of (lesson.code_sections?lesson.reading.slice(1):lesson.reading)){const section=document.createElement('section'),h=document.createElement('h3');h.textContent=r.title;section.append(h);for(const text of r.text.split('\n')){const p=document.createElement('p');p.textContent=text;section.append(p);}if(r.table)section.append(makeTable(r.table.headers,r.table.rows));for(const source of r.sources||[]){const p=document.createElement('p'),a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';p.append(a);section.append(p);}$('reading').append(section);}
+  for(const asset of lesson.assets||[]){const section=document.createElement('section'),h=document.createElement('h3'),pre=document.createElement('pre'),button=document.createElement('button');h.textContent='完整协议文件 · '+asset.name;pre.textContent=asset.text;pre.style.maxHeight='none';button.textContent='下载 '+asset.name;button.onclick=()=>download(asset.text,asset.name,'text/plain;charset=utf-8');section.append(h,pre,button);$('reading').append(section);}
+  if(lesson.reference){const section=document.createElement('section'),h=document.createElement('h3'),p=document.createElement('p');h.textContent='独立工具实测参考 · 不是浏览器现场运行';p.textContent=`工具cantools ${lesson.reference.version}，实际读取DBC；每行同时与手工C和协议向量一致。`;section.append(h,p,makeTable(['输入速度／模式／雷达','factor／offset／width','工具编码字节','工具解码速度'],lesson.reference.vectors.map(v=>[v.values.slice(0,3).join(' / '),`${v.factor} / ${v.offset} / ${v.width}`,v.frame.map(x=>x.toString(16).toUpperCase().padStart(2,'0')).join(' '),v.decoded])));$('reading').append(section);}
   renderFields('runFields',lesson.run_fields);renderFields('answerFields',lesson.practice.fields,'answer-');
   steps('labSteps',lesson.lab_steps);steps('testSteps',lesson.test_steps);steps('practiceSteps',lesson.practice.steps);
   $('presets').replaceChildren();for(const e of lesson.experiments){const b=document.createElement('button');b.textContent=e.name;b.onclick=()=>setInputs(e.values,e.hint,e.steps);$('presets').append(b);}
   setInputs(lesson.experiments[0].values,lesson.experiments[0].hint,lesson.experiments[0].steps);drawChecklist(result.experiments);
-  $('notes').value=record.notes;$('feedback').value=record.feedback;dirty=false;
-  try{const draft=JSON.parse(localStorage.getItem(draftKey(day))||'null');if(draft){$('notes').value=draft.notes;$('feedback').value=draft.feedback;dirty=true;}}catch(e){}
+  $('notes').value=record.notes;$('feedback').value=record.feedback;$('codeNotes').value=record.code_notes||lesson.code;dirty=false;
+  try{const draft=JSON.parse(localStorage.getItem(draftKey(day))||'null');if(draft){$('notes').value=draft.notes;$('feedback').value=draft.feedback;$('codeNotes').value=draft.code_notes??record.code_notes??lesson.code;dirty=true;}}catch(e){}
   $('saveStatus').textContent=dirty?'已恢复未保存草稿，请立即保存。':record.updated?'已从电脑读取笔记':'尚无笔记';
   $('passRule').textContent=lesson.pass_rule;$('practiceText').textContent=lesson.practice.text;
-  $('questions').replaceChildren();for(const q of lesson.questions){const f=document.createElement('fieldset'),leg=document.createElement('legend');f.className='question';leg.textContent=q.text;f.append(leg);q.options.forEach((o,i)=>{const label=document.createElement('label'),input=document.createElement('input'),span=document.createElement('span');input.type='radio';input.name=q.id;input.value=i;span.textContent=o;label.append(input,span);f.append(label);});$('questions').append(f);}
+  $('questions').replaceChildren();for(const [qi,q] of lesson.questions.entries()){const f=document.createElement('fieldset'),leg=document.createElement('legend');f.className='question';leg.textContent=`第${qi+1}题（${q.id}） · ${q.text}`;f.append(leg);q.options.forEach((o,i)=>{const label=document.createElement('label'),input=document.createElement('input'),span=document.createElement('span');input.type='radio';input.name=q.id;input.value=i;span.textContent=`${String.fromCharCode(65+i)}. ${o}`;label.append(input,span);f.append(label);});$('questions').append(f);}
   $('output').replaceChildren();const empty=document.createElement('p');empty.className='muted';empty.textContent='选一个场景，点击运行。';$('output').append(empty);
   $('engine').textContent='';$('runStatus').textContent='';$('prediction').value='';$('overrideReason').value='';$('result').replaceChildren();$('requestFallback').hidden=true;
   if(record.attempt){const answers=JSON.parse(record.attempt.answers);for(const q of lesson.questions){const value=answers[q.id];const input=$('quiz').querySelector(`input[name="${q.id}"][value="${value}"]`);if(input)input.checked=true;}for(const f of lesson.practice.fields)$('answer-'+f.id).value=answers[f.id]??'';const priorResult=JSON.parse(record.attempt.result);if(record.attempt.source==='local-c')priorResult.source='local-c';showResult(priorResult);}
@@ -155,7 +175,13 @@ $('runButton').onclick=async()=>{
   try{const values=lesson.run_fields.map(f=>$(f.id).value.trim());const result=await api('/api/run',{day,values});
     $('output').replaceChildren();const grid=document.createElement('div');grid.className='output-grid';
     let explanation,summaryText;
-    if(lesson.runner==='bits_day04'){
+    if(lesson.runner==='dbc_day05'){
+      grid.append(item('编码status',result.status,result.valid?'good':'bad'),item('编码valid',result.valid));
+      if(result.factor!==undefined)grid.append(item('发送factor / offset',`${result.factor} / ${result.offset}`),item('字段位宽bit',result.width),item('raw最大可表示值',result.raw_limit));
+      if(result.valid){grid.append(item('原始刻度raw',result.raw),item('控制字节',result.control),item('接收factor / offset',`${result.receive_factor} / ${result.receive_offset}`),item('解码status',result.decode_status,result.decode_valid?'good':'bad'));if(result.decode_valid)grid.append(item('还原速度km/h',result.decoded_speed.toFixed(2),'good'));}
+      explanation=!result.valid?(result.status===-1?'载荷长度必须8，编码前拒绝。':`输入或位宽不满足约束：先检查车速0—250，再检查raw=round((speed-offset)/factor)是否能装入字段；${Number(values[4])===8?'8bit最多255，不能把大数截成一个字节发送。':'非法值拒绝，不显示帧。'}`):!result.decode_valid?'接收模式3或保留位污染，协议检查拒绝；不消费旧输出。':`发送raw=round((${values[0]}-(${result.offset}))/${result.factor})=${result.raw}；接收${result.raw}×${result.receive_factor}+(${result.receive_offset})=${result.decoded_speed.toFixed(2)}km/h。${Number(values[5])===3?'接收误用另一配置，即使status0也会得到错误物理值；核对DBC版本。':''}`;
+      summaryText=`status=${result.status}${result.valid?`，raw${result.raw}，decode_status${result.decode_status}${result.decode_valid?'，车速'+result.decoded_speed+'km/h':''}`:''}`;
+    }else if(lesson.runner==='bits_day04'){
       grid.append(item('编码状态status',result.status,result.valid?'good':'bad'),item('编码valid',result.valid));
       if(result.valid){grid.append(item('有符号刻度R',result.raw_signed),item('16位编码整数U',result.raw_unsigned),item('发送控制bit',result.control_bits),item('接收控制bit',result.received_bits),item('提取模式',result.extracted_mode),item('提取雷达0/1',result.extracted_radar),item('保留位检查值',result.reserved),item('解码状态',result.decode_status,result.decode_valid?'good':'bad'),item('错误无符号算法（℃，不能用）',result.unsigned_wrong.toFixed(1),'bad'));if(result.decode_valid)grid.append(item('有效还原温度（℃）',result.decoded_temperature.toFixed(1),'good'));}
       explanation=!result.valid?(result.status===-1?'长度不等于8，编码前拒绝；没有载荷。':'温度须有限且在-40—125℃，模式0—2，雷达0/1；编码拒绝。'):result.reserved!==0?`接收控制${result.received_control}&248=${result.reserved}，保留位污染；不输出有效温度。`:result.extracted_mode>2?'接收最低两位为11，模式3非法，解码拒绝。':!result.decode_valid?`接收整数U=${result.received_raw}；按补码还原R=${result.received_raw>=32768?result.received_raw-65536:result.received_raw}，超出-400—1250，拒绝。`:`接收U=${result.received_raw}；${result.received_raw>=32768?'减65536得到负刻度':'低于32768，刻度直接等于U'}；乘0.1得到${result.decoded_temperature.toFixed(1)}℃。${Number(values[3])===3?'本次位翻转仍通过，说明合法字段检查会漏检数值变化。':''}${result.extracted_radar===0?'雷达位0合法，但应用需要知道雷达数据无效。':''}`;
@@ -177,8 +203,8 @@ $('runButton').onclick=async()=>{
       summaryText=`${mode}，status=${result.status}，valid=${result.valid}${result.valid?`，期望=${result.desired}m，误差=${result.error}m`:''}`;
     }
     $('output').append(grid);const p=document.createElement('p');p.textContent=explanation;$('output').append(p);
-    if(lesson.runner==='bits_day04'&&result.frame){
-      for(const [label,frame] of [['发送载荷 · 故障修改前',result.frame],['接收载荷 · 故障修改后',result.received_frame]]){const h=document.createElement('h4');h.textContent=label;$('output').append(h,makeTable(['字节下标','十进制','十六进制','8位二进制','职责'],frame.map((v,i)=>[i,v,v.toString(16).toUpperCase().padStart(2,'0'),v.toString(2).padStart(8,'0'),i<2?(Number(values[4])===1?(i===0?'温度高8位':'温度低8位'):(i===0?'温度低8位':'温度高8位')):i===2?'bit0—1模式、bit2雷达':'保留0'])));}
+    if(['bits_day04','dbc_day05'].includes(lesson.runner)&&result.frame){
+      for(const [label,frame] of [['发送载荷 · 故障修改前',result.frame],['接收载荷 · 故障修改后',result.received_frame]]){const h=document.createElement('h4');h.textContent=label;$('output').append(h,makeTable(['字节下标','十进制','十六进制','8位二进制','职责'],frame.map((v,i)=>[i,v,v.toString(16).toUpperCase().padStart(2,'0'),v.toString(2).padStart(8,'0'),i<2?(lesson.runner==='dbc_day05'?(i===0?'车速低8位':Number(values[4])===8?'8位配置时保留0':'车速高8位'):Number(values[4])===1?(i===0?'温度高8位':'温度低8位'):(i===0?'温度低8位':'温度高8位')):i===2?'bit0—1模式、bit2雷达':'保留0'])));}
     }
     if(lesson.runner==='can_day03'&&result.frame){const caption=document.createElement('p');caption.textContent='发送前的8字节载荷（内存模拟；不连接实车）。损坏开关会在显示后修改接收控制位。';$('output').append(caption,makeTable(['字节下标','十进制','十六进制','二进制','职责'],result.frame.map((v,i)=>[i,v,v.toString(16).toUpperCase().padStart(2,'0'),v.toString(2).padStart(8,'0'),['车速低8位','车速高8位','模式bit0—1；雷达bit2'][i]||'保留，必须0'])));}
     if(lesson.runner==='array_day02'){
@@ -194,7 +220,7 @@ $('runButton').onclick=async()=>{
 function showResult(result){
   $('result').replaceChildren();const h=document.createElement('h3');h.className=result.passed?'pass':'fail';h.textContent=result.passed?(result.source==='local-c'?'✓ 原本地真实C检测已通过':'✓ 今日检测通过（在线练习）'):'还没有通关：按下面提示补齐，再试一次';$('result').append(h);
   const names={q1:'地址',q2:'状态与输出',q3:'间距计算',q4:'const输入',q5:'无效结果',speed_ms:'迁移速度',desired:'迁移间距',error:'迁移误差',mode:'迁移模式',normal:'正常实验',fault:'故障实验',transfer:'迁移实验'};
-  const ul=document.createElement('ul');ul.className='test-checks';for(const c of result.checks){const li=document.createElement('li');li.className=c.passed?'pass':'fail';li.textContent=`${c.passed?'✓':'✗'} ${c.label||names[c.id]||c.id}：${c.passed?'通过':c.message}`;if(!c.passed&&c.values){const b=document.createElement('button');b.type='button';b.textContent='去运行';b.className='small';b.onclick=()=>{setInputs(c.values,`补齐实验：${c.label}；输入已填好，请点击运行案例。`);tab('run');$('runButton').focus();};li.append(document.createTextNode(' '),b);}ul.append(li);}$('result').append(ul);
+  const ul=document.createElement('ul');ul.className='test-checks';for(const c of result.checks){const li=document.createElement('li');li.className=c.passed?'pass':'fail';const qi=lesson.questions.findIndex(q=>q.id===c.id);li.textContent=`${c.passed?'✓':'✗'} ${qi>=0?'第'+(qi+1)+'题（'+c.id+'） · ':''}${c.label||names[c.id]||c.id}：${c.passed?'通过':c.message}`;if(!c.passed&&c.values){const b=document.createElement('button');b.type='button';b.textContent='去运行';b.className='small';b.onclick=()=>{setInputs(c.values,`补齐实验：${c.label}；输入已填好，请点击运行案例。`);tab('run');$('runButton').focus();};li.append(document.createTextNode(' '),b);}ul.append(li);}$('result').append(ul);
   const det=document.createElement('details'),sum=document.createElement('summary');sum.textContent=`${result.source==='local-c'?'原本地真实C回归':'浏览器模拟回归'}：${result.tests.filter(t=>t.passed).length}/${result.tests.length}通过`;det.append(sum);
   for(const t of result.tests){const p=document.createElement('p');p.className=t.passed?'pass':'fail';p.textContent=`${t.passed?'✓':'✗'} ${t.name}`;det.append(p);}$('result').append(det);
 }
@@ -208,14 +234,15 @@ async function copy(text,fallback){try{await navigator.clipboard.writeText(text)
 $('copyCode').onclick=()=>copy(lesson.code);
 $('downloadCode').onclick=()=>download(lesson.code,lesson.source,'text/plain;charset=utf-8');
 $('downloadLesson').onclick=()=>{
-  const parts=['# '+lesson.title,'\n'+lesson.summary,'\n'+lesson.time,'## 完整中文源码','```c\n'+lesson.code+'```','## 执行链',lesson.flow_text||$('executionFlow').textContent];
+  const parts=['# '+lesson.title,'\n'+lesson.summary,'\n'+lesson.time,'## 整体架构',lesson.flow_text||$('executionFlow').textContent,JSON.stringify(lesson.architecture||{},null,2),'## 完整中文源码','```c\n'+lesson.code+'```'];
+  for(const asset of lesson.assets||[])parts.push('## '+asset.name,'```\n'+asset.text+'\n```');
   for(const r of lesson.reading){parts.push('## '+r.title,r.text);for(const source of r.sources||[])parts.push(`[${source.title}](${source.url})`);if(r.table)parts.push(JSON.stringify(r.table,null,2));}
   for(const s of lesson.code_sections||[]){const start=lesson.code.indexOf(s.start),end=lesson.code.indexOf(s.end,start+s.start.length),finish=s.end.startsWith('    return 0;')?end+'    return 0;\n}'.length:end;parts.push('## '+s.title,'```c\n'+lesson.code.slice(start,finish)+'\n```','通用语法：'+s.pattern,s.text,'具体值：'+s.trace);}
   for(const e of lesson.experiments)parts.push('## 实验：'+e.name,'输入：'+e.values.join(' '),...e.steps);
   parts.push('## 迁移任务',lesson.practice.text,...lesson.practice.steps,'## 自测题（不附答案）',...lesson.questions.map(q=>q.text+'\n'+q.options.map((o,i)=>`${i+1}. ${o}`).join('\n')));
   download(parts.join('\n\n'),`D${String(day).padStart(2,'0')}-完整讲义.md`,'text/markdown;charset=utf-8');
 };
-$('copyRequest').onclick=async()=>{try{await saveNotes();const status=state.progress.find(p=>p.day===day);const request=`我完成了D${String(day).padStart(2,'0')}的在线练习（${status?.method==='test'?'浏览器练习通过':'尚未检测或自定义通关'}；不是本地真实C通关）。请根据以下笔记检查薄弱项，制作下一课，并更新Pages课程。\n\n我的笔记：\n${$('notes').value.slice(0,8000)}\n\n希望优化：\n${$('feedback').value||'暂未填写'}\n\n保持：完整中文代码、执行链、代码旁解释、详细实作、真实C在本地完成。`;await copy(request,$('requestFallback'));}catch(e){message(e.message);}};
+$('copyRequest').onclick=async()=>{try{await saveNotes();const status=state.progress.find(p=>p.day===day);const request=`我完成了D${String(day).padStart(2,'0')}的在线练习（${status?.method==='test'?'浏览器练习通过':'尚未检测或自定义通关'}；不是本地真实C通关）。请根据以下笔记检查薄弱项，制作下一课，并更新Pages课程。\n\n我的笔记：\n${$('notes').value.slice(0,8000)}\n\n希望优化：\n${$('feedback').value||'暂未填写'}\n\n我的源码注释（个人副本）：\n${$('codeNotes').value===lesson.code?'未修改':$('codeNotes').value.slice(0,20000)}\n\n保持：整体架构、完整中文代码、执行链、代码旁解释、代码注释自动保存、题号、详细实作、真实C在本地完成。`;await copy(request,$('requestFallback'));}catch(e){message(e.message);}};
 function download(text,name,type){const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 async function exportReport(){await saveNotes();const text=await api('/api/report?day='+day);download(text,`D${String(day).padStart(2,'0')}-在线练习报告.md`,'text/markdown;charset=utf-8');}
 for(const id of ['exportReport','reportSide'])$(id).onclick=()=>exportReport().catch(e=>message(e.message));

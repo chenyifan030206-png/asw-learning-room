@@ -12,6 +12,8 @@ function cloudClean(input){
   for(const t of Object.keys(result))for(const row of data[t]){
     if(!row||!Number.isInteger(row.day)||row.day<1||row.day>84)throw Error('记录里的学习日无效。');
     if(t==='notes'&&(typeof row.notes!=='string'||typeof row.feedback!=='string'||row.notes.length+row.feedback.length>100000))throw Error('笔记格式或长度不正确。');
+    if(t==='notes'&&row.code_notes!==undefined&&(typeof row.code_notes!=='string'||row.code_notes.length>200000))throw Error('源码注释格式或长度不正确。');
+    if(t==='notes'&&row.history!==undefined&&(!Array.isArray(row.history)||row.history.some(v=>v.code_notes!==undefined&&(typeof v.code_notes!=='string'||v.code_notes.length>200000))))throw Error('源码注释历史格式不正确。');
     if(t==='progress'&&!['test','manual'].includes(row.method))throw Error('通关方式无效。');
     if(t==='runs'&&(typeof row.inputs!=='string'||typeof row.output!=='string'))throw Error('运行记录格式无效。');
     if(t==='attempts'&&(typeof row.answers!=='string'||typeof row.result!=='string'))throw Error('检测记录格式无效。');
@@ -22,14 +24,17 @@ function cloudClean(input){
 }
 function cloudVersions(note){
   const items=[...(note.history||[]),note];
-  return items.filter(n=>typeof n.notes==='string'&&typeof n.feedback==='string').map(n=>({day:note.day,notes:n.notes,feedback:n.feedback,updated:n.updated||'',source:n.source||'browser'}));
+  return items.filter(n=>typeof n.notes==='string'&&typeof n.feedback==='string').map(n=>({day:note.day,notes:n.notes,feedback:n.feedback,...(n.code_notes!==undefined?{code_notes:n.code_notes}:{}),updated:n.updated||'',source:n.source||'browser'}));
 }
 function cloudMerge(a,b){
   a=cloudClean(a);b=cloudClean(b);const out={notes:[],progress:[],runs:[],attempts:[]};
   for(const day of [...new Set([...a.notes,...b.notes].map(n=>n.day))].sort((x,y)=>x-y)){
     const versions=new Map();for(const note of [...a.notes,...b.notes].filter(n=>n.day===day))for(const v of cloudVersions(note))versions.set(cloudCanonical(v),v);
     const history=[...versions.values()].sort((x,y)=>cloudTime(x)-cloudTime(y)||cloudCanonical(x).localeCompare(cloudCanonical(y)));
-    const current=history.pop();out.notes.push({...current,history});
+    const current=history.pop();
+    // 较旧客户端未发送code_notes时，也不能抹掉另一设备保存的个人源码。
+    if(current.code_notes===undefined){const annotated=history.findLast(v=>v.code_notes!==undefined);if(annotated)current.code_notes=annotated.code_notes;}
+    out.notes.push({...current,history});
   }
   for(const day of [...new Set([...a.progress,...b.progress].map(n=>n.day))].sort((x,y)=>x-y)){
     const rank=p=>p.method==='test'?(p.source==='local-c'?3:2):1;
@@ -61,8 +66,8 @@ async function cloudRefresh(jump=false){
   if(typeof state==='undefined'||!state)return;
   state=await api('/api/state');drawRoute();completeUI();
   if(jump){const ready=state.courses.filter(c=>c.unlocked&&c.published),next=ready.find(c=>!c.completed)||ready.at(-1);if(next)await selectDay(next.day);}
-  else if(!dirty&&!['notes','feedback'].includes(document.activeElement?.id)){
-    const n=pagesLoad().notes.find(n=>n.day===day);if(n){$('notes').value=n.notes;$('feedback').value=n.feedback;}
+  else if(!dirty&&!['notes','feedback','codeNotes'].includes(document.activeElement?.id)){
+    const n=pagesLoad().notes.find(n=>n.day===day);if(n){$('notes').value=n.notes;$('feedback').value=n.feedback;$('codeNotes').value=n.code_notes||lesson.code;resizeCodeNotes();if(codeView==='personal')coloredCode($('code'),$('codeNotes').value);}
   }
   cloudHistory();
 }
@@ -70,7 +75,7 @@ function cloudHistory(){
   const target=document.getElementById('cloudHistory');if(!target)return;target.replaceChildren();
   for(const note of pagesLoad().notes){const versions=cloudVersions(note);if(versions.length<2)continue;
     const section=document.createElement('details'),heading=document.createElement('summary');heading.textContent=`D${String(note.day).padStart(2,'0')} · ${versions.length}个笔记版本（全部保留）`;section.append(heading);
-    for(const v of versions){const p=document.createElement('p');p.textContent=`${v.updated} · ${v.source==='local-c'?'原本地记录':'浏览器记录'}`;const pre=document.createElement('pre');pre.textContent=`笔记：\n${v.notes}\n\n反馈：\n${v.feedback}`;section.append(p,pre);}target.append(section);
+    for(const v of versions){const p=document.createElement('p');p.textContent=`${v.updated} · ${v.source==='local-c'?'原本地记录':'浏览器记录'}`;const pre=document.createElement('pre');pre.textContent=`笔记：\n${v.notes}\n\n反馈：\n${v.feedback}\n\n源码注释：\n${v.code_notes||'该版本没有源码注释'}`;section.append(p,pre);}target.append(section);
   }
   if(!target.children.length)target.textContent='出现不同设备的笔记版本时，会在这里保留完整历史。';
 }

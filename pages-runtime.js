@@ -74,6 +74,14 @@ function pagesSimulate(day,values){
       Object.assign(result,{raw_signed,raw_unsigned,low,high,control,raw_bits:raw_unsigned.toString(2).padStart(16,'0'),control_bits:control.toString(2).padStart(8,'0'),frame,received_frame,received_bits:received_control.toString(2).padStart(8,'0'),received_control,extracted_mode,extracted_radar,reserved,received_raw,unsigned_wrong:Number(f(f(received_raw)*f(0.1)).toFixed(1)),decode_status,decode_valid:Number(decode_status===0)});
       if(decode_status===0)result.decoded_temperature=Number(f(f(signed)*f(0.1)).toFixed(1));
     }
+  }else if(day===5){
+    const v=pagesNumbers(values,7),speed=f(v[0]),[mode,radar,profile,width,damage,length]=v.slice(1);
+    if(!v.slice(1).every(n=>Number.isInteger(n)&&n>=-100&&n<=100)||![0,1,2].includes(profile)||![8,16].includes(width)||![0,1,2,3].includes(damage))throw Error('配置0—2、位宽8/16、修改0—3，其余整数须在输入范围内。');
+    result={};const factor=f(profile===1?0.01:0.1),offset=profile===2?-10:0,raw_limit=width===8?255:65535;
+    const scaled=Math.round(f(f(speed-offset)/factor)),status=length!==8?-1:!Number.isFinite(speed)||speed<0||speed>250||mode<0||mode>2||radar<0||radar>1||!Number.isFinite(scaled)||scaled<0||scaled>raw_limit?-2:0;
+    if(length===8)Object.assign(result,{factor:profile===1?0.01:0.1,offset,width,raw_limit});
+    Object.assign(result,{status,valid:Number(status===0)});
+    if(status===0){const raw=scaled,control=mode|(radar<<2),frame=[raw&255,(raw>>>8)&255,control,0,0,0,0,0],received_frame=[...frame];if(damage===1)received_frame[2]|=3;if(damage===2)received_frame[2]|=8;const receive_factor=damage===3?0.01:result.factor,receive_offset=damage===3?0:offset,physical=f(f(raw*f(receive_factor))+receive_offset),received_control=received_frame[2],decode_status=(received_control&248)!==0||(received_control&3)>2||physical<0||physical>250?-2:0;Object.assign(result,{raw,control,frame,received_frame,receive_factor,receive_offset,received_control,decode_status,decode_valid:Number(decode_status===0)});if(decode_status===0)result.decoded_speed=Number(physical.toFixed(2));}
   }else throw Error('在线模拟模块尚未发布。');
   result.stdout='浏览器模拟结果（不是C程序stdout）\n'+Object.entries(result).map(([k,v])=>`${k}=${Array.isArray(v)?v.join(','):v}`).join('\n');
   result.engine='在线版 · JavaScript浏览器模拟；没有编译或执行C';return result;
@@ -95,11 +103,12 @@ function pagesRegression(day){
     ['零',[0,0,0,0,0,8],{frame:[0,0,0,0,0,0,0,0],decoded_temperature:0}],
     ['下界',[-40,1,1,0,0,8],{decoded_temperature:-40}],['上界',[125,1,1,0,0,8],{decoded_temperature:125}],
     ['负半数',[-12.25,1,1,0,0,8],{raw_signed:-123}],['越界',[-40.1,1,1,0,0,8],{status:-2}],['短帧',[-12.3,1,1,0,0,7],{status:-1}],['NaN',['nan',1,1,0,0,8],{status:-2}]];
+  cases[5]=[['标准',[72.5,1,1,0,16,0,8],{frame:[213,2,5,0,0,0,0,0],decoded_speed:72.5}],['第二',[100,2,0,0,16,0,8],{frame:[232,3,2,0,0,0,0,0]}],['精细',[72.5,1,1,1,16,0,8],{raw:7250,frame:[82,28,5,0,0,0,0,0]}],['偏移',[72.5,1,1,2,16,0,8],{raw:825,decoded_speed:72.5}],['溢出',[72.5,1,1,0,8,0,8],{status:-2}],['模式',[72.5,1,1,0,16,1,8],{decode_status:-2}],['配置错',[72.5,1,1,0,16,3,8],{decoded_speed:7.25}],['迁移',[54.3,2,1,2,16,0,8],{raw:643,frame:[131,2,6,0,0,0,0,0],decoded_speed:54.3}],['8位边界',[25.5,1,1,0,8,0,8],{raw:255}],['精细边界',[2.55,1,1,1,8,0,8],{raw:255,decoded_speed:2.55}],['非法',['nan',1,1,0,16,0,8],{status:-2}]];
   return cases[day].map(([name,input,expected])=>{const actual=pagesSimulate(day,input),passed=Object.entries(expected).every(([k,v])=>Array.isArray(v)?JSON.stringify(actual[k])===JSON.stringify(v):Math.abs(actual[k]-v)<0.001);return {name:'浏览器模拟 · '+name,passed,expected,actual};});
 }
 function pagesReport(day,bundle,db){
   const note=db.notes.find(n=>n.day===day),progress=db.progress.find(p=>p.day===day),attempt=db.attempts.filter(a=>a.day===day).at(-1);
-  return `# D${String(day).padStart(2,'0')} 在线练习报告\n\n当前实验是浏览器模拟。恢复的原本地真实C成绩保留来源标记，不把新在线模拟当成真实C检测。\n课程：${bundle.lessons[day].title}\n完成方式：${progress?.method==='test'&&progress?.source==='local-c'?'本地真实C已通过（从原记录恢复）':progress?.method==='test'?'在线练习通过':progress?'自定义通关':'未完成'}\n\n## 我的笔记\n${note?.notes||''}\n\n## 希望优化\n${note?.feedback||''}\n\n## 最近检测\n${attempt?.result||'未提交'}\n\n## 运行记录\n${JSON.stringify(db.runs.filter(r=>r.day===day).slice(-12),null,2)}\n`;
+  return `# D${String(day).padStart(2,'0')} 在线练习报告\n\n当前实验是浏览器模拟。恢复的原本地真实C成绩保留来源标记，不把新在线模拟当成真实C检测。\n课程：${bundle.lessons[day].title}\n完成方式：${progress?.method==='test'&&progress?.source==='local-c'?'本地真实C已通过（从原记录恢复）':progress?.method==='test'?'在线练习通过':progress?'自定义通关':'未完成'}\n\n## 我的笔记\n${note?.notes||''}\n\n## 我的源码注释\n\`\`\`c\n${note?.code_notes||''}\n\`\`\`\n\n## 希望优化\n${note?.feedback||''}\n\n## 最近检测\n${attempt?.result||'未提交'}\n\n## 运行记录\n${JSON.stringify(db.runs.filter(r=>r.day===day).slice(-12),null,2)}\n`;
 }
 window.pagesAPI=async function(url,obj){
   const bundle=await pagesReady,db=pagesLoad(),route=new URL(url,'https://local.invalid'),day=obj?.day??Number(route.searchParams.get('day'));
@@ -114,9 +123,11 @@ window.pagesAPI=async function(url,obj){
   if(route.pathname==='/api/notes'){
     if(typeof obj.notes!=='string'||typeof obj.feedback!=='string'||obj.notes.length+obj.feedback.length>100000)throw Error('笔记格式或长度不正确。');
     const previous=db.notes.find(n=>n.day===day);
+    const code_notes=obj.code_notes??previous?.code_notes??'';
+    if(typeof code_notes!=='string'||code_notes.length>200000)throw Error('源码注释格式或长度不正确。');
     const history=[...(previous?.history||[])];
-    if(previous&&(previous.notes!==obj.notes||previous.feedback!==obj.feedback))history.push({day,notes:previous.notes,feedback:previous.feedback,updated:previous.updated||'',source:previous.source||'browser'});
-    db.notes=db.notes.filter(n=>n.day!==day);db.notes.push({day,notes:obj.notes,feedback:obj.feedback,updated,source:'browser',history});pagesStore(db);return {saved:true,updated};
+    if(previous&&(previous.notes!==obj.notes||previous.feedback!==obj.feedback||(previous.code_notes||'')!==code_notes))history.push({day,notes:previous.notes,feedback:previous.feedback,code_notes:previous.code_notes||'',updated:previous.updated||'',source:previous.source||'browser'});
+    db.notes=db.notes.filter(n=>n.day!==day);db.notes.push({day,notes:obj.notes,feedback:obj.feedback,code_notes,updated,source:'browser',history});pagesStore(db);return {saved:true,updated};
   }
   if(route.pathname==='/api/run'){const output=pagesSimulate(day,obj.values);db.runs.push({id:db.runs.length+1,day,inputs:JSON.stringify(obj.values),output:JSON.stringify(output),created:updated});pagesStore(db);return output;}
   if(route.pathname==='/api/grade'){

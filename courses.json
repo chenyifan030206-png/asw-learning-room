@@ -1916,6 +1916,864 @@
       },
       "pass_rule": "本浏览器内判定题目、指定实验和模拟回归。此结果只表示在线练习通过；真实C与正式通关请在本地完成。",
       "code": "/* D04：温度信号编解码。自定义教学协议，不连接CAN设备。\n * 前2字节：16位补码整数，每刻度0.1摄氏度；第3字节：模式和雷达位。\n * 第4—8字节保留为0。这里只模拟载荷，不实现CAN驱动或安全控制器。 */\n#include <stdio.h>   /* scanf读输入；printf将观察结果打印出来。 */\n#include <stdint.h>  /* uint8_t是8位无符号整数；uint32_t是32位无符号整数。 */\n#include <stddef.h>  /* size_t用于长度；NULL表示没有可用地址。 */\n#include <math.h>    /* isfinite检查有限数；roundf对float四舍五入。 */\n\n/* 函数声明：先告诉编译器名字、参数和返回类型；实现放在main后面。\n * const限制通过该指针写数据；没有const的输出指针允许写回结果。\n * EncodeTemp/DecodeTemp：0成功，-1接口错误，-2数值或协议错误。 */\nint EncodeTemp(float temperature, int mode, int radar, int big,\n               uint8_t *data, size_t length);\nint DecodeTemp(const uint8_t *data, size_t length, int big, float *temperature);\nvoid PrintFrame(const char *name, const uint8_t *data);\nvoid PrintBits(const char *name, uint32_t value, unsigned int width);\n\nint main(void) {\n    /* [入口变量] main从这里开始。数组8格，下标0—7；{0}初始化全部格子。\n     * main里的对象通常在栈或寄存器中；C标准不强制具体存储位置。 */\n    float temperature = 0.0f, decoded = 0.0f;\n    int mode = 0, radar = 0, damage = 0, order = 0, length_input = 8;\n    uint8_t data[8] = {0};\n\n    /* [读取输入] 输入顺序：温度 模式 雷达 故障 字节顺序 长度。\n     * &temperature是变量地址；scanf成功写入6个变量才返回6。\n     * order：0双方小端；1双方大端；2发送小端但接收误用大端。 */\n    if (scanf(\"%f %d %d %d %d %d\", &temperature, &mode, &radar,\n              &damage, &order, &length_input) != 6) {\n        printf(\"status=-3\\nvalid=0\\n\");\n        return 0; /* 结束main；业务错误已经打印，进程正常结束。 */\n    }\n    if (length_input != 8) {\n        printf(\"status=-1\\nvalid=0\\n\");\n        return 0; /* 长度错误时不访问任何载荷元素。 */\n    }\n    if (damage < 0 || damage > 4 || order < 0 || order > 2) {\n        printf(\"status=-2\\nvalid=0\\n\");\n        return 0;\n    }\n\n    /* [进入编码] 比较表达式order==1得到0或1，作为发送字节顺序。\n     * 调用时main暂停；EncodeTemp写data，return状态再赋给status。 */\n    int status = EncodeTemp(temperature, mode, radar, order == 1, data, 8);\n    printf(\"status=%d\\nvalid=%d\\n\", status, status == 0);\n    if (status != 0) return 0;\n\n    /* [观察发送] 仅为解释重算raw，不把诊断值当正式接收结果。\n     * 先用int保存正负刻度，再用65536+负刻度取得16位补码的数值。\n     * -12.3×10=-123；65536-123=65413=0xFF85。 */\n    int raw_signed = (int)roundf(temperature * 10.0f);\n    uint32_t raw_unsigned = (uint32_t)(raw_signed < 0 ? 65536 + raw_signed : raw_signed);\n    printf(\"raw_signed=%d\\nraw_unsigned=%u\\nlow=%u\\nhigh=%u\\n\",\n           raw_signed, (unsigned int)raw_unsigned,\n           (unsigned int)(raw_unsigned & 255u), (unsigned int)((raw_unsigned >> 8) & 255u));\n    printf(\"control=%u\\n\", (unsigned int)data[2]);\n    PrintBits(\"raw_bits\", raw_unsigned, 16u);\n    PrintBits(\"control_bits\", (uint32_t)data[2], 8u);\n    PrintFrame(\"frame\", data);\n\n    /* [故障注入] 顺序：先打印发送帧，再改内存，再解码接收帧。\n     * |置1；&加反掩码清0；^翻转。先升到uint32_t，位运算使用无符号数。\n     * 3u=00000011；8u=00001000；4u=00000100（这里只画低8位）。 */\n    if (damage == 1) data[2] = (uint8_t)((uint32_t)data[2] | 3u);\n    if (damage == 2) data[2] = (uint8_t)((uint32_t)data[2] | 8u);\n    if (damage == 3) data[0] = (uint8_t)((uint32_t)data[0] ^ 1u);\n    if (damage == 4) data[2] = (uint8_t)((uint32_t)data[2] & ~4u);\n    PrintFrame(\"received_frame\", data);\n    PrintBits(\"received_bits\", (uint32_t)data[2], 8u);\n    printf(\"received_control=%u\\nextracted_mode=%u\\nextracted_radar=%u\\nreserved=%u\\n\",\n           (unsigned int)data[2], (unsigned int)((uint32_t)data[2] & 3u),\n           (unsigned int)(((uint32_t)data[2] >> 2) & 1u),\n           (unsigned int)((uint32_t)data[2] & 248u));\n\n    /* [回到接收] order!=0表示接收方用大端，order2故意与发送方不一致。\n     * unsigned_wrong是故意忽略符号的错误算法，不能当有效温度消费。 */\n    uint32_t received_raw;\n    if (order != 0) received_raw = ((uint32_t)data[0] << 8) | (uint32_t)data[1];\n    else received_raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    printf(\"received_raw=%u\\nunsigned_wrong=%.1f\\n\",\n           (unsigned int)received_raw, (double)((float)received_raw * 0.1f));\n    status = DecodeTemp(data, 8, order != 0, &decoded);\n    printf(\"decode_status=%d\\ndecode_valid=%d\\n\", status, status == 0);\n    if (status == 0) printf(\"decoded_temperature=%.1f\\n\", (double)decoded);\n    return 0;\n}\n\nint EncodeTemp(float temperature, int mode, int radar, int big,\n               uint8_t *data, size_t length) {\n    /* [编码校验] 先查地址和长度，再查数值；全通过才开始改data。\n     * !表示逻辑取反；||表示任一条件成立就拒绝，不是合并bit的|。 */\n    if (data == NULL || length != 8) return -1;\n    if (!isfinite(temperature) || temperature < -40.0f || temperature > 125.0f\n        || mode < 0 || mode > 2 || radar < 0 || radar > 1\n        || big < 0 || big > 1) return -2;\n\n    /* [量化与符号] 本例刻度范围-400—1250，C的int至少能容纳。\n     * 65536是2的16次方。负刻度加65536得到0—65535内的16位编码。\n     * 不对负数移位；不依赖超范围uint16_t转int16_t的实现行为。 */\n    int signed_raw = (int)roundf(temperature * 10.0f);\n    uint32_t raw = (uint32_t)(signed_raw < 0 ? 65536 + signed_raw : signed_raw);\n\n    /* [拆字节] &255只保留低8位；>>8让高字节来到最低位置。\n     * 小端低字节先写；大端高字节先写。这是协议选择，独立于CPU端序。 */\n    uint8_t low = (uint8_t)(raw & 255u);\n    uint8_t high = (uint8_t)((raw >> 8) & 255u);\n    if (big == 0) { data[0] = low; data[1] = high; }\n    else { data[0] = high; data[1] = low; }\n\n    /* [打包控制] mode占bit0—1，radar占bit2；字段不重叠才这样组合。\n     * mode2=00000010；radar1<<2=00000100；OR得到00000110，即6。\n     * uint8_t运算前通常会整数提升；显式转uint32_t固定无符号移位。 */\n    data[2] = (uint8_t)((uint32_t)mode | ((uint32_t)radar << 2));\n    for (size_t i = 3; i < 8; i++) data[i] = 0;\n    /* 状态经return输出，8字节经data指针写回。 */\n    return 0;\n}\n\nint DecodeTemp(const uint8_t *data, size_t length, int big, float *temperature) {\n    /* [解码校验] 模式3非法；bit3—7和后5字节必须为0。\n     * (data[2]&3)提取模式；(data[2]&248)挑出保留位。\n     * 雷达0是合法协议值，表示无效；上层是否使用它需要另行判断。 */\n    if (data == NULL || temperature == NULL || length != 8) return -1;\n    if (big < 0 || big > 1 || ((uint32_t)data[2] & 248u) != 0\n        || ((uint32_t)data[2] & 3u) > 2u) return -2;\n    for (size_t i = 3; i < 8; i++) if (data[i] != 0) return -2;\n\n    /* [拼回16位] 先转uint32_t再移位。高字节进入bit8—15，低字节留bit0—7。\n     * |逐位合并，不进位；0xFF00 | 0x0085 = 0xFF85 = 65413。 */\n    uint32_t raw;\n    if (big == 0) raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    else raw = ((uint32_t)data[0] << 8) | (uint32_t)data[1];\n\n    /* [还原负刻度] raw的bit15权重32768；它为1时，此补码协议表示负数。\n     * raw先转long（至少32位，能装65413），再减65536，避免无符号下溢。\n     * 65413-65536=-123；-123×0.1=-12.3摄氏度。 */\n    long signed_raw = (long)raw;\n    if (raw >= 32768u) signed_raw = signed_raw - 65536L;\n    if (signed_raw < -400L || signed_raw > 1250L) return -2;\n    *temperature = (float)signed_raw * 0.1f; /* *访问调用者的decoded并写值。 */\n    return 0;\n}\n\nvoid PrintFrame(const char *name, const uint8_t *data) {\n    /* [打印帧] name是文字如\"frame\"；%s打印文字；%02X打印至少2位大写十六进制。\n     * ?:只选择本次要打印的分隔符。最后i7用换行，前7次用空格。\n     * PrintFrame返回void：只打印，不向调用者返回数值。 */\n    printf(\"%s=\", name);\n    for (size_t i = 0; i < 8; i++) {\n        printf(\"%02X%s\", (unsigned int)data[i], i == 7 ? \"\\n\" : \" \");\n    }\n}\n\nvoid PrintBits(const char *name, uint32_t value, unsigned int width) {\n    /* [打印位] 从高位到低位：width8时依次检查bit7、6、5、4、3、2、1、0。\n     * i从8减到1；i-1作为位号，避免unsigned i减到0后继续变成大数。\n     * (value>>(i-1))&1把这一位移到bit0再取出，只可能0或1。\n     * 本程序只用width8/16，不允许任意外部移位量。 */\n    printf(\"%s=\", name);\n    for (unsigned int i = width; i > 0u; i--) {\n        printf(\"%u\", (unsigned int)((value >> (i - 1u)) & 1u));\n    }\n    printf(\"\\n\");\n}\n"
+    },
+    "5": {
+      "day": 5,
+      "revision": "2026-10-12-dbc-v1",
+      "title": "读懂DBC：先看架构，再按协议表核对车速字节",
+      "source": "day05.c",
+      "runner": "dbc_day05",
+      "summary": "在线练习版：浏览器模拟，不执行C、不进行服务端检测。复习long、完整范围判断和逻辑或；先给程序架构与数据流，再看全部源码。在个人代码副本里直接加中文注释。用DBC、固定版本cantools与手写C交叉核对，区分位宽、比例、偏移和协议版本不一致。",
+      "time": "约180分钟：架构和语法补习35分钟；完整代码与逐段追踪50分钟；DBC逐项阅读25分钟；8个实验40分钟；检测和注释30分钟。陌生语法先回补习，不用猜。",
+      "goals": [
+        "解释long与int的关系；把一个范围判断拆成两个比较再用||连接",
+        "从main追踪配置→PackSignals→字节→UnpackSignals→物理值，分清职责",
+        "读懂0|16@1+、factor、offset、单位与物理范围",
+        "用手算、C和cantools确认至少3个标准向量；理解工具不是全部业务校验",
+        "在完整代码副本里写注释、自动保存、刷新恢复和云同步；按题号复盘"
+      ],
+      "flow_text": "main读7项 → 选择factor/offset与位宽 → PackSignals先校验 → 反推raw并检查能否装下 → 写8字节 → 返回main显示 → 可选修改字段或接收DBC配置 → UnpackSignals检查协议 → raw×factor+offset → 成功写回 → main显示",
+      "remediation_title": "先补清long、范围判断、||，再读DBC",
+      "architecture": {
+        "headers": [
+          "模块／对象",
+          "单一职责",
+          "谁传入、谁取回"
+        ],
+        "rows": [
+          [
+            "main（启动入口）",
+            "接输入、选择配置、调用、打印",
+            "7个输入；status和decoded_speed"
+          ],
+          [
+            "factor／offset／width",
+            "对应DBC配置，不是载荷字段",
+            "main选好后传给打包和解包"
+          ],
+          [
+            "PackSignals",
+            "检查输入，再把信号变成字节",
+            "speed/mode/radar + 输出数组地址 → 状态与data"
+          ],
+          [
+            "data[8]",
+            "发送／接收载荷的内存缓存",
+            "8字节，bit0—15车速，bit16—18状态"
+          ],
+          [
+            "UnpackSignals",
+            "检查载荷，再还原物理车速",
+            "只读data + 配置 + 输出地址 → 状态与新车速"
+          ],
+          [
+            "DBC与cantools",
+            "独立描述与核对布局",
+            "协议文件 → 工具字节；不用本C函数生成工具答案"
+          ]
+        ]
+      },
+      "run_fields": [
+        {
+          "id": "speed",
+          "label": "物理车速（km/h）",
+          "kind": "text",
+          "value": 72.5
+        },
+        {
+          "id": "mode",
+          "label": "模式（0—2）",
+          "kind": "select",
+          "value": 1,
+          "options": [
+            [
+              "0",
+              "0速度"
+            ],
+            [
+              "1",
+              "1间距"
+            ],
+            [
+              "2",
+              "2故障"
+            ],
+            [
+              "3",
+              "3非法"
+            ]
+          ]
+        },
+        {
+          "id": "radar",
+          "label": "雷达有效位",
+          "kind": "select",
+          "value": 1,
+          "options": [
+            [
+              "0",
+              "0无效"
+            ],
+            [
+              "1",
+              "1有效"
+            ]
+          ]
+        },
+        {
+          "id": "profile",
+          "label": "DBC比例／偏移配置",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "0 · factor0.1 / offset0"
+            ],
+            [
+              "1",
+              "1 · factor0.01 / offset0"
+            ],
+            [
+              "2",
+              "2 · factor0.1 / offset-10"
+            ]
+          ]
+        },
+        {
+          "id": "width",
+          "label": "车速字段位宽（bit）",
+          "kind": "select",
+          "value": 16,
+          "options": [
+            [
+              "16",
+              "16位：raw0—65535"
+            ],
+            [
+              "8",
+              "8位：raw0—255"
+            ]
+          ]
+        },
+        {
+          "id": "damage",
+          "label": "接收修改／协议不一致",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "0 · 不修改"
+            ],
+            [
+              "1",
+              "1 · 模式改成3"
+            ],
+            [
+              "2",
+              "2 · 保留位污染"
+            ],
+            [
+              "3",
+              "3 · 接收错用factor0.01 / offset0"
+            ]
+          ]
+        },
+        {
+          "id": "length",
+          "label": "载荷总长度（字节，要求8）",
+          "kind": "number",
+          "value": 8
+        }
+      ],
+      "reading": [
+        {
+          "title": "语法补习 · 不再把新词一笔带过",
+          "text": "long是C的有符号整数类型，完整名字是long int，写long就够了。它至少能表示-2147483647—2147483647；常见平台上至少32位，但不能认为永远是64位。int至少能表示-32767—32767。当前WSL的int通常32位、long64位，Windows编译环境的long可能32位。类型的保证与某台机器实际位数是两回事。\nD04把raw=65413转long，再减65536，是因为需要一个能容纳65413并能存负数的中间类型；(long)raw不会改变raw本身的uint32_t声明。65536L中的L指定long常量。D05最大raw65535，沿用uint32_t拼位，不把long作为“任何地方都要用”的规则。\n你写的“signed_raw < - || signed_raw >”缺少界限值，不是合法完整代码。D04原句是if (signed_raw < -400L || signed_raw > 1250L) return -2;。左半问是否小于-400，右半问是否大于1250；||表示任意一个回答是“是”，就执行拒绝。\n逐组算：signed_raw=-401，左真，拒绝；-400，左假右假，允许；-123，左假右假，允许；1250，两边假，允许；1251，右真，拒绝。边界包含在内，因为用<与>，不是<=与>=。-400L是一个负的long常量；减号不是“负无穷”。\nif(条件)在条件非0时执行后面的语句。比较<、>、==、!=的结果是0或1。||是逻辑或，结果也是0或1；|逐位合并数据。&&是逻辑与，两个条件都真才真；&是位与或一元取地址。括号可以把一个小条件分组，阅读时先拆组，不要一次吞整行。\n函数声明给出名字、输入类型和返回类型；函数调用传具体值；函数定义包含具体语句。int status=PackSignals(...)先执行调用，再把return值装入status。float *speed允许通过地址写输出；return0仅报告成功。printf只是展示，不负责修复数据。\n类型与常量再查一遍：float存带小数信号，double常见精度更高；printf变参中的float会提升为double，源码显式(double)主要帮助看清格式匹配。uint8_t存字节，uint32_t用于无符号拼位，size_t用于非负长度。f、u、L分别指定float、无符号整数、long常量；不是变量名的一部分。"
+        },
+        {
+          "title": "1 · 修正端序理解：同一数值，不同字节位置",
+          "text": "大端小端不是随意选择“从左读或从右读”。它规定一个多字节信号的高、低字节分别放在哪里。数值725是0x02D5，小端data0=D5、data1=02；大端data0=02、data1=D5。接收方按约定拼回725，不是把十进制字符串倒着读。\n协议端序与CPU内存端序分开。逐字节赋值的编码器可以在小端CPU生成大端报文；CAN总线不会替你推断车速的字节顺序。不同协议会选择不同布局，读取实际接口时必须查文档或DBC。\n本课只写字节对齐的小端车速，DBC的@1明确此约定。DBC的@0表示Motorola大端布局，但跨字节的start-bit编号不能只靠“交换两字节”概括；等你熟悉小端后再专门学习。"
+        },
+        {
+          "title": "2 · DBC是什么：把口头协议变成机器能读取的表",
+          "text": "DBC是一种描述CAN报文和信号布局的文本文件。它不是驱动，不是要发到总线的载荷，也不是C语法。你把载荷看成8格缓存，DBC告诉工具每个字段从哪一bit开始、占几位、是否有符号、如何换成物理值。\nBO_ 291 AswSignals: 8 Learner 表示：报文ID十进制291（十六进制0x123），名字AswSignals，总载荷8字节，发送节点Learner。ID不是data[0]，本课C只处理8字节，不包含帧ID。此ID是教学自定义，不对应实际车辆。\nSG_ Speed : 0|16@1+ (0.1,0) [0|250] \"km/h\" Receiver逐项读：SG_信号；Speed名字；0起始bit；16长度bit；@1小端；+无符号；(0.1,0)比例和偏移；[0|250]物理范围；单位km/h；Receiver接收节点。\n注意这里0|16里的|是DBC字段分隔符，不是C按位或；[0|250]中的|也不是逻辑判断。不同文件语言里同一个符号含义不同。@与冒号都属于DBC格式，不要拿来写C算式。\nMode从整帧bit16开始，占2bit，也就是data[2]里的bit0—1；RadarValid从bit18开始，占1bit，即data[2]的bit2。整帧bit号与某个字节内部的bit号不是同一编号。模式实际允许0—2，雷达允许0/1；其它位置在我们手工编码里清0。"
+        },
+        {
+          "title": "3 · 先反推raw，再编码；解码最后加offset",
+          "text": "physical=raw×factor+offset。physical是物理车速km/h，raw是无单位整数，factor单位是km/h每刻度，offset单位km/h。反推先移项：physical-offset=raw×factor，再除factor：raw=(physical-offset)/factor。实际编码还需按本协议量化到整数。\n默认factor0.1、offset0：72.5→(72.5-0)/0.1=725→D5 02；还原725×0.1+0=72.5。不是先把车速乘0.1再发。\n改factor0.01、offset0：同一个72.5→7250→52 1C；还原7250×0.01=72.5。分辨率更细，需要更大的整数，同样位宽下可表示的最大物理值更小。\n改offset-10、factor0.1：72.5→(72.5-(-10))/0.1=825→39 03；还原825×0.1+(-10)=72.5。负偏移的作用是平移物理范围，不是把byte按补码解释；此Speed信号仍为无符号。\n本课C用roundf就近量化；工具对不落整数刻度的输入可能有自己的取整细节，不能假设都一致。因此独立标准向量选择精确刻度；非整刻度实验另标为C量化行为，不用半数点偷换工具行为。"
+        },
+        {
+          "title": "4 · 位宽与业务范围必须分别检查",
+          "text": "16位无符号raw有65536个取值，即0—65535。factor0.1/offset0可表示0—6553.5km/h；改0.01后是0—655.35km/h。DBC业务范围仍只有0—250km/h，所以655.35可表示却不允许作为本业务车速。\n8位raw只有0—255；factor0.1/offset0的表示范围0—25.5km/h，装不下72.5对应raw725。我们先算raw并检查，再返回-2；不能直接(uint8_t)725得到213后当正确值发送。\nfactor0.01配8位最大2.55km/h；输入2.56需要raw256，越界。比例更细不会给已有位宽增加格子。factor0.1/offset-10配8位可表示-10—15.5，业务只接收0—250，所以可用交集0—15.5。\n载荷总长度8字节等于64bit，但Speed字段不一定用64bit。width8时byte1是未用位置，仍清0；Mode依旧从bit16开始，不能擅自把模式挪到bit8。"
+        },
+        {
+          "title": "5 · 为什么需要独立核对，不能只做往返",
+          "text": "如果编码与解码都把比例错写成同一个值，它们仍可能互相往返正确，但发出的载荷不符合真实协议。独立检查至少包括：协议表手算、独立工具、手工C。三者需要比较具体字节，而不只比较最终速度。\n本课固定cantools44.2.1，并保存依赖锁定列表；用day05.dbc交给工具，工具不会调用我们的PackSignals。标准向量：72.5/模式1/雷达1→D5 02 05；100/2/0→E8 03 02；54.3/2/1→1F 02 06。工具实际核对后，页面列出参考字节。\n工具生成C也是常见工作流，但今天先读短手写版，把字段位置与缩放看清，再查看生成的.h/.c角色。cantools生成的pack/unpack主要做布局，不能认为它自动实现项目所有保留位、模式、超时和业务合理性校验。\nDBC文件的min/max不等同于所有接收API都会拒绝越界值。本手工UnpackSignals显式检查范围和保留位；独立工具用于确认协议映射，不代替这些业务约束。",
+          "sources": [
+            {
+              "title": "cantools官方：DBC与C源码生成",
+              "url": "https://cantools.readthedocs.io/en/stable/"
+            },
+            {
+              "title": "固定版本源码：cantools v44.2.1",
+              "url": "https://github.com/cantools/cantools/tree/44.2.1"
+            }
+          ]
+        },
+        {
+          "title": "6 · 工程案例：帧没有变，仪表读数却缩小10倍",
+          "text": "发送方DBC用factor0.1，72.5编码raw725。接收端误用factor0.01，仍从同样的D5 02取出725，却解成7.25km/h。控制字段合法，车速也在0—250，所以decode_status依然0；合法范围检查无法识别这类DBC版本不一致。\n排查顺序：保留原始字节与帧ID；确认是哪版DBC；对照start、length、byte order、signed、factor、offset；用协议标准向量验证；最后再查应用是否读错信号。不要先调控制算法，把协议解析错误当车辆响应问题。\n本课damage3只改接收配置，不改字节。damage1/2才改控制字节，因此页面分别显示发送与接收。后面看真实生成代码时也要分清raw结构成员与物理值函数；不能把信号名相同当成单位相同。"
+        },
+        {
+          "title": "7 · 每个陌生函数与符号：按职责查，不用背长行",
+          "text": "PackSignals是本课自己写的函数，不是C标准库；输入物理信号和配置，返回状态并写data。UnpackSignals同理，读data、还原physical、写*speed。参数多时先按“信号／配置／缓冲区／长度”分组看，调用与声明位置逐个对应。\nroundf来自math.h，返回离输入最近的整数float，半数远离零；(uint32_t)把已检查的非负整数值转成无符号整数。isfinite判断普通有限数；!isfinite表示不是有限数。scanf返回转换成功项数；printf返回打印字符数，本课不使用它的返回值。\n?:是三目表达式，只选一个值。width==8 ? 255u : 65535u在width8时选255，否则选65535；不是同时赋两个数。if/else只执行命中的分支；没有else的if条件假时继续下一句。\nlong疑问已经在本课开头补习；D05没有强行引入struct、enum、宏或模板。后续要引入这些语法时，会先给通用形式，再给本程序具体作用。"
+        },
+        {
+          "title": "8 · 源码显示和直接注释怎么用",
+          "text": "本次完整代码默认展开全部行，不再要求在580像素框里寻找后半段。“折叠长代码”只是可选阅读功能；页面显示总行数，下载.c可独立核对。每个执行步骤展示的是选定片段，完整程序以“课程原版”为准。\n先看上方架构表，再点击“在完整代码中写注释”。你可以在行末加// 我的理解，或在上方加/* 我的疑问 */；这是个人代码副本，原版与运行模块不被修改。停止输入自动保存；“查看我的注释配色”把你的副本按语法上色；“查看课程原版”随时对照。\n个人代码注释与右侧文字笔记都保留，不相互覆盖。连接云同步后一起合并、保留历史；若授权失效，先保存在本浏览器，重连后再同步。下载我的注释代码可做额外备份；实际本地编译自己的修改前要确认注释符号合法。\n题目显示第N题与qN，选项A/B/C；检测结果也沿用相同题号。迁移字段和实验仍有明确名称，避免把第3题和第3个实验混为一项。"
+        },
+        {
+          "title": "9 · 本地真实C与DBC核对命令",
+          "text": "本地完整服务运行day05.c；正式进度仍要先完成本地D04或自己选择手动通关。我不会把这次在线D04写成真实成绩。源码独立编译：gcc -std=c17 -Wall -Wextra -Wpedantic -Wconversion -Werror -g -O0 day05.c -lm -o day05。\n运行./day05，输入72.5 1 1 0 16 0 8，得到raw725、frame D5 02 05 00 00 00 00 00、decoded_speed72.50。输入72.5 1 1 1 16 0 8改用0.01，得到raw7250、52 1C 05。\n本项目独立工具环境在learning_app/tools/dbc-venv，固定cantools44.2.1；reference脚本会实际读DBC并核对字节。你无需安装它才能在Pages学习，网页模拟不会假装现场运行Python工具。提供的参考数据来自本地工具实测。\n若自己建立新工具环境，先python -m venv dbc-env，再用该环境python -m pip install cantools==44.2.1；运行python -m cantools dump day05.dbc查看布局。工具安装与C运行是两条流程，不要拿Python错误当C编译错误。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "1 · main入口：7项输入与3类对象",
+          "start": "    /* [入口]",
+          "end": "    /* [选配置]",
+          "pattern": "类型 名称=初值；scanf格式占位对应写入地址；if非法条件成立就return。",
+          "text": "speed、mode、radar是信号；profile、width是协议配置；damage、length是实验条件。decoded_speed是输出，data8是缓存。scanf成功转换7项才返回7，负数格式成功不代表业务合法。长度先验证8；配置越界先拒绝。width8/16与length8不是同一单位。",
+          "trace": "72.5 1 1 0 16 0 8 → 7项读成功，length8，profile0，width16 → 继续。"
+        },
+        {
+          "title": "2 · 选择比例和偏移：数字来自DBC",
+          "start": "    /* [选配置]",
+          "end": "    /* [调用打包]",
+          "pattern": "if条件真执行；else if在前条件假时再检查；?:只选择一个值。",
+          "text": "factor默认0.1，offset默认0；profile1改factor为0.01，profile2改offset为-10。limit按width决定原始整数最大值。printf的%.2f/%.1f只控制展示小数位，不改变变量数值。uint32_t固定用于拼位，unsigned int cast匹配%u。",
+          "trace": "profile0 → factor0.1 offset0 limit65535；profile1 → factor0.01；profile2 → offset-10。"
+        },
+        {
+          "title": "3 · 调用PackSignals：先去函数里面",
+          "start": "    /* [调用打包]",
+          "end": "    /* [发送观察]",
+          "pattern": "status=函数(值、配置、输出地址、长度)；数组调用时转首元素指针。",
+          "text": "main暂停；顺序传speed72.5 mode1 radar1 factor0.1 offset0 width16 data地址 length8。返回状态赋给status后打印，非0就停。数据通过地址写回，与return状态分工。先看下面打包3段，再回main。",
+          "trace": "PackSignals return0 → status0 valid1 → main继续发送观察；return-2 → main结束且没有帧。"
+        },
+        {
+          "title": "4 · 打包先校验：把长条件拆成小问句",
+          "start": "    /* [打包校验]",
+          "end": "    /* [反推原始值]",
+          "pattern": "A||B：任一真就拒绝；A&&B：两者真才成立；括号分组。",
+          "text": "data是否空？length是否8？speed是否有限且0—250？factor是否有限且>0？offset是否有限？mode0—2、radar0/1？width是否8或16？每个问题独立。width!=8 && width!=16表示两者都不是才错；若错用||，任何值都会被拒绝。",
+          "trace": "width16：!=8真，!=16假，真&&假为假，不拒绝。speed-1：<0真，||整组真，return-2。"
+        },
+        {
+          "title": "5 · 反推raw：先检查能否装下",
+          "start": "    /* [反推原始值]",
+          "end": "    /* [写载荷]",
+          "pattern": "scaled=roundf((speed-offset)/factor)；检查后再转uint32_t。",
+          "text": "先减偏移，再除比例，再量化。scaled还是float；检查有限、非负、<=limit，才安全转无符号。raw是编码刻度，不是物理速度。不能先截成一个字节再找溢出。",
+          "trace": "72.5、offset0、factor0.1 → scaled725；width16能装，raw725。width8 limit255 → 725>255，返回-2。"
+        },
+        {
+          "title": "6 · 写入固定位置：清零后再打包",
+          "start": "    /* [写载荷]",
+          "end": "    return 0;\n}\n\nint UnpackSignals",
+          "pattern": "raw&255取低字节；raw>>8取高字节；mode|(radar<<2)组合控制位。",
+          "text": "先清全部8格，避免保留位未初始化。低高各放data0/1；mode固定bit16，也就是data2 bit0—1；radar固定bit18，也就是data2 bit2。width8时data1仍0，模式不会挪位置。return0后main拿到状态，数组已写好。",
+          "trace": "raw725=2×256+213 → D5 02；mode1|(radar1<<2)=05；后5格00。"
+        },
+        {
+          "title": "7 · 回main打印：原始刻度与载荷",
+          "start": "    /* [发送观察]",
+          "end": "    /* [接收修改]",
+          "pattern": "printf占位与参数配对；for循环i0—7；?:选择最后的换行。",
+          "text": "先拼raw只是为了观察，表达式高字节转uint32_t后移8位，与低字节合并。frame输出按数组顺序，不按十进制字符串顺序。打印不修改data；%02X显示十六进制字节，%s显示空格或换行。",
+          "trace": "data0 D5=213，data1 02=2；raw213|512=725；循环最后i7打印00和换行。"
+        },
+        {
+          "title": "8 · 修改接收配置：帧不一定变",
+          "start": "    /* [接收修改]",
+          "end": "    /* [调用解包]",
+          "pattern": "damage1/2修改字节；damage3用?:选择接收方比例和偏移。",
+          "text": "|3置mode为11，|8污染保留bit3；damage3不写数组，只有receive_factor改0.01、receive_offset改0。接收帧与发送帧相同也可能解释不同，因为双方协议版本不一致。数据与解释数据的配置要分开看。",
+          "trace": "默认发送raw725；damage3接收仍D5 02 05，但接收physical=725×0.01=7.25。"
+        },
+        {
+          "title": "9 · 进入UnpackSignals：接口与协议检查",
+          "start": "    /* [解包校验]",
+          "end": "    /* [还原车速]",
+          "pattern": "const指针只读输入；return错误前不写输出；&掩码检查指定bit。",
+          "text": "先检查data、输出speed地址及长度。再检查factor、offset、width，模式最低2位与保留bit3—7。width8下data1非零表示未用字节被占，拒绝；data3—7也必须0。本课这些约束由手工C实施，DBC工具解码不保证等价拒绝。",
+          "trace": "正常05&248=0，05&3=1，保留字节0 → 继续；07&3=3 → return-2，decoded_speed不变。"
+        },
+        {
+          "title": "10 · 解码公式：最后加offset",
+          "start": "    /* [还原车速]",
+          "end": "    return 0;\n}",
+          "pattern": "raw=low|(high<<8)；physical=raw×factor+offset；合法后*speed写回。",
+          "text": "先拼回整数raw，再做物理换算；physical为局部变量，检查范围后才能写输出对象。offset-10意味着加(-10)，不是在raw里随意减一个字节。解析成功只说明当前配置下合法，不证明配置与发送方相同。",
+          "trace": "正常725×0.1=72.5；偏移825×0.1-10=72.5；错误接收factor0.01得到7.25仍合法。"
+        },
+        {
+          "title": "11 · 回main：状态与输出各看各的",
+          "start": "    /* [调用解包]",
+          "end": "    return 0;\n}\n\nint PackSignals",
+          "pattern": "status接return；if(status==0)输出新车速；main return0结束进程。",
+          "text": "把&decoded_speed传给UnpackSignals，输出函数里*speed写的就是main这个变量。解包return-2不会写温度或车速，所以main不显示decoded_speed。业务status不同于进程退出状态。数据源不一致时decode可成功，需靠独立标准向量和配置校验定位。",
+          "trace": "正常decode_status0 valid1 decoded_speed72.50；模式非法decode_status-2 valid0，没有decoded_speed。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "默认DBC标准向量",
+          "values": [
+            72.5,
+            1,
+            1,
+            0,
+            16,
+            0,
+            8
+          ],
+          "hint": "raw725，D5 02 05；接收72.50km/h。",
+          "steps": [
+            "点击“默认DBC标准向量”，自动填写7项。",
+            "逐项确认profile、width与length各自单位，先写预测；场景按钮不会运行。",
+            "点击“运行案例”，等记录已保存。",
+            "检查factor/offset/raw_limit和status；编码成功才有发送表。",
+            "对比发送与接收两张表，再看receive_factor、decode_status与还原速度。",
+            "核对：raw725，D5 02 05；接收72.50km/h。",
+            "把卡住的代码行直接注释到个人源码副本，停笔自动保存。"
+          ]
+        },
+        {
+          "name": "第二标准向量",
+          "values": [
+            100,
+            2,
+            0,
+            0,
+            16,
+            0,
+            8
+          ],
+          "hint": "raw1000，E8 03 02；接收100。",
+          "steps": [
+            "点击“第二标准向量”，自动填写7项。",
+            "逐项确认profile、width与length各自单位，先写预测；场景按钮不会运行。",
+            "点击“运行案例”，等记录已保存。",
+            "检查factor/offset/raw_limit和status；编码成功才有发送表。",
+            "对比发送与接收两张表，再看receive_factor、decode_status与还原速度。",
+            "核对：raw1000，E8 03 02；接收100。",
+            "把卡住的代码行直接注释到个人源码副本，停笔自动保存。"
+          ]
+        },
+        {
+          "name": "精细比例0.01",
+          "values": [
+            72.5,
+            1,
+            1,
+            1,
+            16,
+            0,
+            8
+          ],
+          "hint": "raw7250，52 1C 05；接收72.5。",
+          "steps": [
+            "点击“精细比例0.01”，自动填写7项。",
+            "逐项确认profile、width与length各自单位，先写预测；场景按钮不会运行。",
+            "点击“运行案例”，等记录已保存。",
+            "检查factor/offset/raw_limit和status；编码成功才有发送表。",
+            "对比发送与接收两张表，再看receive_factor、decode_status与还原速度。",
+            "核对：raw7250，52 1C 05；接收72.5。",
+            "把卡住的代码行直接注释到个人源码副本，停笔自动保存。"
+          ]
+        },
+        {
+          "name": "偏移-10",
+          "values": [
+            72.5,
+            1,
+            1,
+            2,
+            16,
+            0,
+            8
+          ],
+          "hint": "raw825，39 03 05；825×0.1-10=72.5。",
+          "steps": [
+            "点击“偏移-10”，自动填写7项。",
+            "逐项确认profile、width与length各自单位，先写预测；场景按钮不会运行。",
+            "点击“运行案例”，等记录已保存。",
+            "检查factor/offset/raw_limit和status；编码成功才有发送表。",
+            "对比发送与接收两张表，再看receive_factor、decode_status与还原速度。",
+            "核对：raw825，39 03 05；825×0.1-10=72.5。",
+            "把卡住的代码行直接注释到个人源码副本，停笔自动保存。"
+          ]
+        },
+        {
+          "name": "8位溢出拒绝",
+          "values": [
+            72.5,
+            1,
+            1,
+            0,
+            8,
+            0,
+            8
+          ],
+          "hint": "需要raw725，但8位最多255，status-2，无发送帧。",
+          "steps": [
+            "点击“8位溢出拒绝”，自动填写7项。",
+            "逐项确认profile、width与length各自单位，先写预测；场景按钮不会运行。",
+            "点击“运行案例”，等记录已保存。",
+            "检查factor/offset/raw_limit和status；编码成功才有发送表。",
+            "对比发送与接收两张表，再看receive_factor、decode_status与还原速度。",
+            "核对：需要raw725，但8位最多255，status-2，无发送帧。",
+            "把卡住的代码行直接注释到个人源码副本，停笔自动保存。"
+          ]
+        },
+        {
+          "name": "模式非法",
+          "values": [
+            72.5,
+            1,
+            1,
+            0,
+            16,
+            1,
+            8
+          ],
+          "hint": "发送05，接收07；mode3非法，解码拒绝。",
+          "steps": [
+            "点击“模式非法”，自动填写7项。",
+            "逐项确认profile、width与length各自单位，先写预测；场景按钮不会运行。",
+            "点击“运行案例”，等记录已保存。",
+            "检查factor/offset/raw_limit和status；编码成功才有发送表。",
+            "对比发送与接收两张表，再看receive_factor、decode_status与还原速度。",
+            "核对：发送05，接收07；mode3非法，解码拒绝。",
+            "把卡住的代码行直接注释到个人源码副本，停笔自动保存。"
+          ]
+        },
+        {
+          "name": "DBC版本不一致",
+          "values": [
+            72.5,
+            1,
+            1,
+            0,
+            16,
+            3,
+            8
+          ],
+          "hint": "字节没变；接收错误比例0.01，解码7.25仍合法。",
+          "steps": [
+            "点击“DBC版本不一致”，自动填写7项。",
+            "逐项确认profile、width与length各自单位，先写预测；场景按钮不会运行。",
+            "点击“运行案例”，等记录已保存。",
+            "检查factor/offset/raw_limit和status；编码成功才有发送表。",
+            "对比发送与接收两张表，再看receive_factor、decode_status与还原速度。",
+            "核对：字节没变；接收错误比例0.01，解码7.25仍合法。",
+            "把卡住的代码行直接注释到个人源码副本，停笔自动保存。"
+          ]
+        },
+        {
+          "name": "迁移：54.3偏移-10",
+          "values": [
+            54.3,
+            2,
+            1,
+            2,
+            16,
+            0,
+            8
+          ],
+          "hint": "先算raw、低高字节、控制值与物理还原，填检测再运行。",
+          "steps": [
+            "点击“迁移：54.3偏移-10”，自动填写7项。",
+            "逐项确认profile、width与length各自单位，先写预测；场景按钮不会运行。",
+            "点击“运行案例”，等记录已保存。",
+            "检查factor/offset/raw_limit和status；编码成功才有发送表。",
+            "对比发送与接收两张表，再看receive_factor、decode_status与还原速度。",
+            "核对：先算raw、低高字节、控制值与物理还原，填检测再运行。",
+            "把卡住的代码行直接注释到个人源码副本，停笔自动保存。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "先看架构表，把main、配置、data、打包和解包的职责各用一句话写在代码注释里。",
+        "按8个场景逐个点击，然后每次点运行按钮；清单打勾才算有记录。",
+        "前4例对比比例和偏移；第5例看位宽拒绝；第6例看协议拒绝；第7例看配置错误可漏检。",
+        "最后迁移例先手算后运行；所有数值填写十进制。在线为浏览器模拟，工具参考另有实测标注。"
+      ],
+      "test_steps": [
+        "确认8个指定实验均已运行；缺哪个用该项“去运行”补齐。",
+        "按第1—10题选择A/B/C；错误结果显示相同题号，方便回到相应代码段。",
+        "完成54.3km/h、factor0.1、offset-10、width16、mode2、radar1的5项迁移值。",
+        "提交检测，错误项会给推导过程；改正可重试，个人代码注释不被清空。",
+        "通过后D06仍等待你反馈制作；自定义通关保持标为手动。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "D04范围判断signed_raw < -400L || signed_raw > 1250L，哪个值会被拒绝？",
+          "options": [
+            "-123",
+            "-401",
+            "1250"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "long是什么？",
+          "options": [
+            "有符号整数类型，至少能表示本例65413及负刻度，不保证永远64位",
+            "所有平台都恰好64位",
+            "只表示非负数"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "DBC的0|16@1+里|的意思是什么？",
+          "options": [
+            "C的按位或",
+            "C的逻辑或",
+            "DBC起始bit与长度的分隔符"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "Mode起始bit16、长度2对应哪？",
+          "options": [
+            "data[2]内部bit0—1",
+            "data[16]和data[17]",
+            "data[0]的bit16"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "physical=raw×factor+offset，反推raw怎么写？",
+          "options": [
+            "physical×factor+offset",
+            "(physical-offset)/factor",
+            "physical/factor-offset"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "7250对应factor0.01/offset0，物理车速是多少？",
+          "options": [
+            "725km/h",
+            "7.25km/h",
+            "72.5km/h"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "8位raw最多255，factor0.1/offset0能否装72.5？",
+          "options": [
+            "不能，需要raw725，先拒绝而不是截断",
+            "能，载荷总长8字节就总能装",
+            "能，直接转uint8_t就是正确编码"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "发送factor0.1，接收误用0.01，同样raw725且解码成功说明什么？",
+          "options": [
+            "字节一定变了",
+            "配置错会得到合法但错误的7.25，需独立协议核对",
+            "成功说明两边DBC完全一致"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "为何只做编码再解码不够？",
+          "options": [
+            "因为解码总不可靠",
+            "因为C无法处理小数",
+            "两边同一个错误可能互相抵消，需独立工具和标准向量"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "width!=8 && width!=16在width16时是否拒绝？",
+          "options": [
+            "不拒绝：真&&假为假",
+            "拒绝：真&&假为真",
+            "不看width只看profile"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "54.3km/h，profile2（factor0.1、offset-10），width16、mode2、radar1、不修改、长度8。填写十进制值。",
+        "values": [
+          54.3,
+          2,
+          1,
+          2,
+          16,
+          0,
+          8
+        ],
+        "fields": [
+          {
+            "id": "raw",
+            "label": "P1 · 原始整数raw",
+            "kind": "number"
+          },
+          {
+            "id": "low",
+            "label": "P2 · 低字节（十进制）",
+            "kind": "number"
+          },
+          {
+            "id": "high",
+            "label": "P3 · 高字节（十进制）",
+            "kind": "number"
+          },
+          {
+            "id": "control",
+            "label": "P4 · 控制字节",
+            "kind": "number"
+          },
+          {
+            "id": "physical",
+            "label": "P5 · 解码物理车速（km/h）",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "raw=round((54.3-(-10))/0.1)，先减偏移。",
+          "high=raw除256的整数商；low=raw-high×256。",
+          "control=mode|(radar<<2)。",
+          "解码raw×0.1+(-10)，最后加offset。",
+          "先填写，再点击带到运行区核对；解释错误时指出P1—P5哪项。"
+        ]
+      },
+      "pass_rule": "本浏览器内判定题目、指定实验和模拟回归。此结果只表示在线练习通过；真实C与正式通关请在本地完成。",
+      "assets": [
+        {
+          "name": "day05.dbc",
+          "language": "dbc",
+          "text": "VERSION \"D05 teaching protocol 2026-10\"\nNS_ :\nBS_:\nBU_: Learner Receiver\n\nBO_ 291 AswSignals: 8 Learner\n SG_ Speed : 0|16@1+ (0.1,0) [0|250] \"km/h\" Receiver\n SG_ Mode : 16|2@1+ (1,0) [0|2] \"\" Receiver\n SG_ RadarValid : 18|1@1+ (1,0) [0|1] \"\" Receiver\n\nCM_ BO_ 291 \"Teaching payload only; no physical CAN transmission.\";\n"
+        }
+      ],
+      "reference": {
+        "version": "44.2.1",
+        "kind": "actual-local-independent-tool-check",
+        "dbc_sha256": "31fca4a9dd752e370b62851daf1b7d2c76688bca316d8d1e1a602df663e17231",
+        "vectors": [
+          {
+            "values": [
+              72.5,
+              1,
+              1,
+              0,
+              16,
+              0,
+              8
+            ],
+            "factor": 0.1,
+            "offset": 0,
+            "width": 16,
+            "frame": [
+              213,
+              2,
+              5,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "decoded": 72.5
+          },
+          {
+            "values": [
+              100,
+              2,
+              0,
+              0,
+              16,
+              0,
+              8
+            ],
+            "factor": 0.1,
+            "offset": 0,
+            "width": 16,
+            "frame": [
+              232,
+              3,
+              2,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "decoded": 100.0
+          },
+          {
+            "values": [
+              54.3,
+              2,
+              1,
+              0,
+              16,
+              0,
+              8
+            ],
+            "factor": 0.1,
+            "offset": 0,
+            "width": 16,
+            "frame": [
+              31,
+              2,
+              6,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "decoded": 54.300000000000004
+          },
+          {
+            "values": [
+              72.5,
+              1,
+              1,
+              1,
+              16,
+              0,
+              8
+            ],
+            "factor": 0.01,
+            "offset": 0,
+            "width": 16,
+            "frame": [
+              82,
+              28,
+              5,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "decoded": 72.5
+          },
+          {
+            "values": [
+              72.5,
+              1,
+              1,
+              2,
+              16,
+              0,
+              8
+            ],
+            "factor": 0.1,
+            "offset": -10,
+            "width": 16,
+            "frame": [
+              57,
+              3,
+              5,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "decoded": 72.5
+          },
+          {
+            "values": [
+              54.3,
+              2,
+              1,
+              2,
+              16,
+              0,
+              8
+            ],
+            "factor": 0.1,
+            "offset": -10,
+            "width": 16,
+            "frame": [
+              131,
+              2,
+              6,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "decoded": 54.3
+          },
+          {
+            "values": [
+              25.5,
+              1,
+              1,
+              0,
+              8,
+              0,
+              8
+            ],
+            "factor": 0.1,
+            "offset": 0,
+            "width": 8,
+            "frame": [
+              255,
+              0,
+              5,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "decoded": 25.5
+          },
+          {
+            "values": [
+              2.55,
+              1,
+              1,
+              1,
+              8,
+              0,
+              8
+            ],
+            "factor": 0.01,
+            "offset": 0,
+            "width": 8,
+            "frame": [
+              255,
+              0,
+              5,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "decoded": 2.5500000000000003
+          }
+        ]
+      },
+      "code": "/* D05：根据DBC信号表写一个最小手工编码器。不是CAN驱动，不连接实车。\n * 车速start0、小端、unsigned，width8或16；模式start16 length2；雷达start18 length1。\n * profile0：factor0.1 offset0；profile1：0.01/0；profile2：0.1/-10。\n * DBC与cantools是独立核对依据；这份C是教学手写版，不是生成代码。 */\n#include <stdio.h>  /* scanf读数据，printf打印；返回值约定见main。 */\n#include <stdint.h> /* uint8_t字节；uint32_t无符号中间值。 */\n#include <stddef.h> /* size_t非负长度；NULL表示无地址。 */\n#include <math.h>   /* isfinite有限数检查；roundf取最近整数，半数远离零。 */\n\n/* 函数声明：参数位置一一对应；返回int是状态，不是车速。\n * factor是每个raw刻度对应的km/h；offset是解码最后加的km/h。 */\nint PackSignals(float speed, int mode, int radar, float factor, float offset,\n                int width, uint8_t *data, size_t length);\nint UnpackSignals(const uint8_t *data, size_t length, float factor,\n                  float offset, int width, float *speed);\n\nint main(void) {\n    /* [入口] 输入7项：车速 模式 雷达 DBC配置 位宽 修改开关 载荷长度。\n     * profile是配置编号，不是CAN字节；width是车速字段位数，不是8字节帧长。 */\n    float speed = 0.0f, decoded_speed = 0.0f;\n    int mode = 0, radar = 0, profile = 0, width = 16, damage = 0, length_input = 8;\n    uint8_t data[8] = {0};\n    if (scanf(\"%f %d %d %d %d %d %d\", &speed, &mode, &radar, &profile,\n              &width, &damage, &length_input) != 7) {\n        printf(\"status=-3\\nvalid=0\\n\"); return 0;\n    }\n    if (length_input != 8) { printf(\"status=-1\\nvalid=0\\n\"); return 0; }\n    if (profile < 0 || profile > 2 || (width != 8 && width != 16)\n        || damage < 0 || damage > 3) {\n        printf(\"status=-2\\nvalid=0\\n\"); return 0;\n    }\n\n    /* [选配置] if/else选因子和偏移。=赋值，==比较，||任一越界就拒绝。\n     * 先默认0.1/0；只有profile1、2覆盖默认。f后缀声明float常量。 */\n    float factor = 0.1f, offset = 0.0f;\n    if (profile == 1) factor = 0.01f;\n    else if (profile == 2) offset = -10.0f;\n    uint32_t limit = width == 8 ? 255u : 65535u;\n    printf(\"factor=%.2f\\noffset=%.1f\\nwidth=%d\\nraw_limit=%u\\n\",\n           (double)factor, (double)offset, width, (unsigned int)limit);\n\n    /* [调用打包] 暂停main，进入PackSignals；data指向main原数组。\n     * length先验证为8，避免把负长度转无符号；函数内还会再次检查。 */\n    int status = PackSignals(speed, mode, radar, factor, offset, width, data, 8);\n    printf(\"status=%d\\nvalid=%d\\n\", status, status == 0);\n    if (status != 0) return 0;\n\n    /* [发送观察] 低字节先，高字节后；拼回非负raw只是展示。\n     * for初值i0，条件i<8，打印后i++；最后一格换行，其余空格。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    printf(\"raw=%u\\ncontrol=%u\\nframe=\", (unsigned int)raw, (unsigned int)data[2]);\n    for (size_t i = 0; i < 8; i++) {\n        printf(\"%02X%s\", (unsigned int)data[i], i == 7 ? \"\\n\" : \" \");\n    }\n\n    /* [接收修改] 1模式非法，2保留位非法，3接收端误用另一份DBC的比例。\n     * damage3不改帧：同样的字节、不同的factor会产生不同物理值。 */\n    if (damage == 1) data[2] = (uint8_t)((uint32_t)data[2] | 3u);\n    if (damage == 2) data[2] = (uint8_t)((uint32_t)data[2] | 8u);\n    float receive_factor = damage == 3 ? 0.01f : factor;\n    float receive_offset = damage == 3 ? 0.0f : offset;\n    printf(\"receive_factor=%.2f\\nreceive_offset=%.1f\\nreceived_control=%u\\n\",\n           (double)receive_factor, (double)receive_offset, (unsigned int)data[2]);\n    printf(\"received_frame=\");\n    for (size_t i = 0; i < 8; i++) {\n        printf(\"%02X%s\", (unsigned int)data[i], i == 7 ? \"\\n\" : \" \");\n    }\n\n    /* [调用解包] &decoded_speed传地址；只有成功才打印有效新车速。\n     * DBC不一致有时仍能过范围检查；decode_status0不证明配置正确。 */\n    status = UnpackSignals(data, 8, receive_factor, receive_offset, width, &decoded_speed);\n    printf(\"decode_status=%d\\ndecode_valid=%d\\n\", status, status == 0);\n    if (status == 0) printf(\"decoded_speed=%.2f\\n\", (double)decoded_speed);\n    return 0;\n}\n\nint PackSignals(float speed, int mode, int radar, float factor, float offset,\n                int width, uint8_t *data, size_t length) {\n    /* [打包校验] ||是逻辑或，任一非法条件成立就return-2。\n     * speed<0与speed>250是两项完整比较；缺少界限数字是不能编译的语法。 */\n    if (data == NULL || length != 8) return -1;\n    if (!isfinite(speed) || speed < 0.0f || speed > 250.0f\n        || !isfinite(factor) || factor <= 0.0f || !isfinite(offset)\n        || mode < 0 || mode > 2 || radar < 0 || radar > 1\n        || (width != 8 && width != 16)) return -2;\n\n    /* [反推原始值] physical=raw*factor+offset，反推raw=(physical-offset)/factor。\n     * 先检查浮点刻度可表示，再转整数；不能先转uint8_t让高位被丢掉。 */\n    uint32_t limit = width == 8 ? 255u : 65535u;\n    float scaled = roundf((speed - offset) / factor);\n    if (!isfinite(scaled) || scaled < 0.0f || scaled > (float)limit) return -2;\n    uint32_t raw = (uint32_t)scaled;\n\n    /* [写载荷] 每次先清全部8格，确保DBC未用位置为0。\n     * 位宽8时raw<=255，高字节自动为0；模式位置仍从bit16开始。 */\n    for (size_t i = 0; i < 8; i++) data[i] = 0;\n    data[0] = (uint8_t)(raw & 255u);\n    data[1] = (uint8_t)((raw >> 8) & 255u);\n    data[2] = (uint8_t)((uint32_t)mode | ((uint32_t)radar << 2));\n    return 0;\n}\n\nint UnpackSignals(const uint8_t *data, size_t length, float factor,\n                  float offset, int width, float *speed) {\n    /* [解包校验] const输入只读；输出指针speed允许写回。\n     * DBC说信号在哪，不自动替你实施“模式3非法”和“保留位零”业务约束。 */\n    if (data == NULL || speed == NULL || length != 8) return -1;\n    if (!isfinite(factor) || factor <= 0.0f || !isfinite(offset)\n        || (width != 8 && width != 16) || ((uint32_t)data[2] & 248u) != 0\n        || ((uint32_t)data[2] & 3u) > 2u || (width == 8 && data[1] != 0)) return -2;\n    for (size_t i = 3; i < 8; i++) if (data[i] != 0) return -2;\n\n    /* [还原车速] 按DBC拼raw，再乘factor，最后加offset。\n     * 局部变量physical先计算；合法后才通过*speed写main的decoded_speed。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    float physical = (float)raw * factor + offset;\n    if (!isfinite(physical) || physical < 0.0f || physical > 250.0f) return -2;\n    *speed = physical;\n    return 0;\n}\n"
     }
   },
   "rules": {
@@ -2418,6 +3276,177 @@
           ],
           "lab7",
           "迁移：-20.5℃"
+        ]
+      ]
+    },
+    "5": {
+      "correct": {
+        "q1": 1,
+        "q2": 0,
+        "q3": 2,
+        "q4": 0,
+        "q5": 1,
+        "q6": 2,
+        "q7": 0,
+        "q8": 1,
+        "q9": 2,
+        "q10": 0
+      },
+      "explanations": {
+        "q1": "-401<-400为真，||任一真即拒绝；-123与1250允许。",
+        "q2": "long是有符号整数类型，至少能容纳本课范围，不保证永远64位。",
+        "q3": "DBC的|分隔起始bit和长度，不是C位运算。",
+        "q4": "整帧bit16=第3字节的bit0，所以Mode占data2内部bit0—1。",
+        "q5": "先把偏移移到左边，再除比例：raw=(physical-offset)/factor。",
+        "q6": "7250×0.01=72.5km/h。",
+        "q7": "8位最多255，725超限；先拒绝，截断会丢高位。",
+        "q8": "同raw725换factor0.01得到7.25，仍在范围内但错误；需核对配置。",
+        "q9": "编码和解码的同一错误可能互相抵消，需工具与独立标准字节。",
+        "q10": "width16时!=8真、!=16假，真&&假为假，不拒绝。"
+      },
+      "numeric": {
+        "raw": [
+          643,
+          "(54.3-(-10))/0.1=643。"
+        ],
+        "low": [
+          131,
+          "643=2×256+131，低83。"
+        ],
+        "high": [
+          2,
+          "643除256整数商2，02。"
+        ],
+        "control": [
+          6,
+          "mode2|(radar1<<2)=2|4=6。"
+        ],
+        "physical": [
+          54.3,
+          "643×0.1-10=54.3。"
+        ]
+      },
+      "labels": {
+        "q1": "范围与逻辑或",
+        "q2": "long类型",
+        "q3": "DBC分隔符",
+        "q4": "整帧位号",
+        "q5": "反推公式",
+        "q6": "比例换算",
+        "q7": "位宽拒绝",
+        "q8": "DBC版本",
+        "q9": "独立判定",
+        "q10": "逻辑与",
+        "raw": "P1 · 迁移raw",
+        "low": "P2 · 迁移low",
+        "high": "P3 · 迁移high",
+        "control": "P4 · 迁移control",
+        "physical": "P5 · 迁移physical"
+      },
+      "needed": [
+        [
+          [
+            72.5,
+            1,
+            1,
+            0,
+            16,
+            0,
+            8
+          ],
+          "lab0",
+          "默认DBC标准向量"
+        ],
+        [
+          [
+            100,
+            2,
+            0,
+            0,
+            16,
+            0,
+            8
+          ],
+          "lab1",
+          "第二标准向量"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            1,
+            16,
+            0,
+            8
+          ],
+          "lab2",
+          "精细比例0.01"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            2,
+            16,
+            0,
+            8
+          ],
+          "lab3",
+          "偏移-10"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            0,
+            8,
+            0,
+            8
+          ],
+          "lab4",
+          "8位溢出拒绝"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            0,
+            16,
+            1,
+            8
+          ],
+          "lab5",
+          "模式非法"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            0,
+            16,
+            3,
+            8
+          ],
+          "lab6",
+          "DBC版本不一致"
+        ],
+        [
+          [
+            54.3,
+            2,
+            1,
+            2,
+            16,
+            0,
+            8
+          ],
+          "lab7",
+          "迁移：54.3偏移-10"
         ]
       ]
     }
