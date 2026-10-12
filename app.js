@@ -63,7 +63,7 @@ function coloredCode(target,source,firstLine=1){
   const token=/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:0x[\da-fA-F]+|\d+(?:\.\d+)?)(?:[uUfF])?\b|\b[a-zA-Z_]\w*\b|[^\w]/g;
   for(const match of source.matchAll(token)){const t=match[0];let cls='';
     if(t.startsWith('/*')||t.startsWith('//'))cls='syntax-comment';else if(t[0]==='"'||t[0]==="'")cls='syntax-string';else if(/^\d/.test(t))cls='syntax-number';
-    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|main|AnalyzeSpeeds|Acc_Process)$/.test(t))cls='syntax-function';
+    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process)$/.test(t))cls='syntax-function';
     t.split('\n').forEach((part,i)=>{if(i)newLine();if(part){const span=document.createElement('span');span.className=cls;span.textContent=part;content.append(span);}});
   }
 }
@@ -79,9 +79,35 @@ function showStep(index){
 $('prevStep').onclick=()=>showStep(stepIndex-1);$('nextStep').onclick=()=>showStep(stepIndex+1);
 function renderCode(){
   coloredCode($('code'),lesson.code);
+  $('executionFlow').textContent=lesson.flow_text||'main创建变量 → 读输入 → 调用业务函数（main暂停）→ 校验与计算 → 返回main → 检查状态后使用结果';
+  $('remediationTitle').textContent=lesson.remediation_title||'开课补习 · 先看本课所需基础';
   $('walkthrough').hidden=!lesson.code_sections;$('codeSteps').replaceChildren();
   if(lesson.code_sections){$('remediationText').replaceChildren();paragraphs($('remediationText'),lesson.reading[0].text);if(lesson.protocol)$('remediationText').append(makeTable(lesson.protocol.headers,lesson.protocol.rows));lesson.code_sections.forEach((s,i)=>{const b=document.createElement('button');b.textContent=s.title;b.onclick=()=>showStep(i);$('codeSteps').append(b);});showStep(0);}
   $('codeFile').textContent='C17 · '+lesson.source;$('code').classList.remove('expanded');$('expandCode').textContent='展开全部';$('expandCode').setAttribute('aria-expanded','false');
+}
+function renderBitLab(){
+  const target=$('bitLab');target.replaceChildren();target.hidden=day!==4;if(day!==4)return;
+  const title=document.createElement('h3');title.textContent='点一下bit，就能看见移位、合并与提取';target.append(title);
+  const intro=document.createElement('p');intro.textContent='先选模式和雷达，看它们如何组合。再点下面某一位，将0/1翻转；每个位号、权重和职责都列出来。本演示帮助理解，不计入通关运行记录。';target.append(intro);
+  const fields=document.createElement('div');fields.className='input-grid';
+  function select(id,label,options,value){const l=document.createElement('label'),s=document.createElement('select');l.textContent=label;s.id=id;for(const [v,text] of options){const o=document.createElement('option');o.value=v;o.textContent=text;s.append(o);}s.value=value;l.append(s);fields.append(l);return s;}
+  const mode=select('bitMode','模式：占bit0—1',[[0,'0 · 00'],[1,'1 · 01'],[2,'2 · 10']],1);
+  const radar=select('bitRadar','雷达：先是0/1，后移到bit2',[[0,'0 · 无效'],[1,'1 · 有效']],1);
+  target.append(fields);
+  const pack=document.createElement('div'),buttons=document.createElement('div'),summary=document.createElement('p'),calcs=document.createElement('div');buttons.className='bit-buttons';buttons.id='bitButtons';summary.id='bitSummary';summary.setAttribute('aria-live','polite');target.append(pack,buttons,summary);
+  let control=5;const binary=n=>(n&255).toString(2).padStart(8,'0');
+  const op=select('bitOperation','对当前控制字节再做一项操作',[[0,'| 3：强制模式两位为1'],[1,'| 8：保留bit3置1'],[2,'^ 4：翻转雷达bit2'],[3,'& ~4：清除雷达bit2']],0);
+  const apply=document.createElement('button'),reset=document.createElement('button'),operationTrace=document.createElement('pre');apply.textContent='执行这项位操作';apply.id='bitApply';reset.textContent='恢复所选模式和雷达';reset.id='bitReset';operationTrace.id='bitTrace';operationTrace.textContent='执行操作后，这里会保留“操作前 → 掩码 → 操作后”的逐位对照。';
+  const row=document.createElement('div');row.className='row';row.append(apply,reset);target.append(row,operationTrace,calcs);
+  function draw(){
+    const m=Number(mode.value),r=Number(radar.value),shift=r<<2;pack.replaceChildren(makeTable(['阶段','8位展示（左bit7，右bit0）','十进制／含义'],[['mode',binary(m),m],['radar未移位',binary(r),r],['radar << 2',binary(shift),shift+'：移到权重4的位置'],['mode | (radar << 2)',binary(m|shift),m|shift]]));
+    buttons.replaceChildren();for(let bit=7;bit>=0;bit--){const b=document.createElement('button'),value=(control>>>bit)&1;b.className=bit>2?'bit-reserved':bit===2?'bit-radar':'bit-mode';b.textContent=`bit${bit}\n${value}\n权重${2**bit}\n${bit>2?'保留':bit===2?'雷达':'模式'}`;b.setAttribute('aria-label',`bit${bit} 当前${value} 点击翻转`);b.setAttribute('aria-pressed',String(value===1));b.onclick=()=>{const before=control;control^=1<<bit;operationTrace.textContent=`翻转bit${bit}：\n  ${binary(before)} (${before})\n^ ${binary(1<<bit)} (${1<<bit})\n= ${binary(control)} (${control})`;draw();};buttons.append(b);}
+    const extracted=control&3,valid=(control&248)===0&&extracted<=2;summary.textContent=`当前控制：${binary(control)} = 十进制${control} = 十六进制${control.toString(16).toUpperCase().padStart(2,'0')}。${valid?'布局合法':'布局非法：'+((control&248)!==0?'保留位非零':'模式3未定义')}。雷达0表示无效，但它本身是合法协议值。`;summary.className=valid?'pass':'fail';
+    calcs.replaceChildren(makeTable(['要回答的问题','实际位运算','结果'],[['模式是多少？',`${binary(control)} & 00000011`,extracted],['雷达0/1？',`(${binary(control)} >> 2) & 00000001`,(control>>>2)&1],['保留位是否污染？',`${binary(control)} & 11111000`,control&248]]));
+  }
+  function restore(){control=Number(mode.value)|(Number(radar.value)<<2);operationTrace.textContent='已按所选模式与雷达重新组合；现在可以点某一bit或执行位操作。';draw();}
+  mode.onchange=restore;radar.onchange=restore;reset.onclick=restore;
+  apply.onclick=()=>{const before=control,choice=Number(op.value),mask=[3,8,4,251][choice],symbol=['|','|','^','&'][choice];control=[()=>control|3,()=>control|8,()=>control^4,()=>control&~4][choice]()&255;operationTrace.textContent=`${choice===3?'~4仅展示低8位；实际取反按参与类型宽度执行。\n':''}  ${binary(before)} (${before})\n${symbol} ${binary(mask)} (${mask})\n= ${binary(control)} (${control})`;draw();};draw();
 }
 $('expandCode').onclick=()=>{const expanded=$('code').classList.toggle('expanded');$('expandCode').textContent=expanded?'收起代码高度':'展开全部';$('expandCode').setAttribute('aria-expanded',String(expanded));};
 $('jumpMain').onclick=()=>{const index=lesson.code.split('\n').findIndex(line=>line.startsWith('int main('));const line=$('code').querySelector(`[data-line="${index+1}"]`);$('code').querySelectorAll('.selected-line').forEach(l=>l.classList.remove('selected-line'));if(line){line.classList.add('selected-line');line.scrollIntoView({block:'center'});}};
@@ -104,7 +130,7 @@ async function selectDay(d){
   $('waiting').hidden=true;$('workspace').hidden=false;$('dayTag').textContent=`D${String(day).padStart(2,'0')} · 第${c.week}周 · ${c.stage}`;
   $('title').textContent=lesson.title;$('summary').textContent=lesson.summary;$('time').textContent=lesson.time;
   $('goals').replaceChildren();for(const goal of lesson.goals){const li=document.createElement('li');li.textContent=goal;$('goals').append(li);}
-  renderCode();$('reading').replaceChildren();
+  renderCode();renderBitLab();$('reading').replaceChildren();
   for(const r of (lesson.code_sections?lesson.reading.slice(1):lesson.reading)){const section=document.createElement('section'),h=document.createElement('h3');h.textContent=r.title;section.append(h);for(const text of r.text.split('\n')){const p=document.createElement('p');p.textContent=text;section.append(p);}if(r.table)section.append(makeTable(r.table.headers,r.table.rows));for(const source of r.sources||[]){const p=document.createElement('p'),a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';p.append(a);section.append(p);}$('reading').append(section);}
   renderFields('runFields',lesson.run_fields);renderFields('answerFields',lesson.practice.fields,'answer-');
   steps('labSteps',lesson.lab_steps);steps('testSteps',lesson.test_steps);steps('practiceSteps',lesson.practice.steps);
@@ -129,7 +155,12 @@ $('runButton').onclick=async()=>{
   try{const values=lesson.run_fields.map(f=>$(f.id).value.trim());const result=await api('/api/run',{day,values});
     $('output').replaceChildren();const grid=document.createElement('div');grid.className='output-grid';
     let explanation,summaryText;
-    if(lesson.runner==='can_day03'){
+    if(lesson.runner==='bits_day04'){
+      grid.append(item('编码状态status',result.status,result.valid?'good':'bad'),item('编码valid',result.valid));
+      if(result.valid){grid.append(item('有符号刻度R',result.raw_signed),item('16位编码整数U',result.raw_unsigned),item('发送控制bit',result.control_bits),item('接收控制bit',result.received_bits),item('提取模式',result.extracted_mode),item('提取雷达0/1',result.extracted_radar),item('保留位检查值',result.reserved),item('解码状态',result.decode_status,result.decode_valid?'good':'bad'),item('错误无符号算法（℃，不能用）',result.unsigned_wrong.toFixed(1),'bad'));if(result.decode_valid)grid.append(item('有效还原温度（℃）',result.decoded_temperature.toFixed(1),'good'));}
+      explanation=!result.valid?(result.status===-1?'长度不等于8，编码前拒绝；没有载荷。':'温度须有限且在-40—125℃，模式0—2，雷达0/1；编码拒绝。'):result.reserved!==0?`接收控制${result.received_control}&248=${result.reserved}，保留位污染；不输出有效温度。`:result.extracted_mode>2?'接收最低两位为11，模式3非法，解码拒绝。':!result.decode_valid?`接收整数U=${result.received_raw}；按补码还原R=${result.received_raw>=32768?result.received_raw-65536:result.received_raw}，超出-400—1250，拒绝。`:`接收U=${result.received_raw}；${result.received_raw>=32768?'减65536得到负刻度':'低于32768，刻度直接等于U'}；乘0.1得到${result.decoded_temperature.toFixed(1)}℃。${Number(values[3])===3?'本次位翻转仍通过，说明合法字段检查会漏检数值变化。':''}${result.extracted_radar===0?'雷达位0合法，但应用需要知道雷达数据无效。':''}`;
+      summaryText=`编码status=${result.status}${result.valid?`，发送${result.frame.join(' ')}，接收${result.received_frame.join(' ')}，解码status=${result.decode_status}${result.decode_valid?'，温度'+result.decoded_temperature+'℃':''}`:''}`;
+    }else if(lesson.runner==='can_day03'){
       grid.append(item('编码状态',result.status,result.valid?'good':'bad'),item('编码valid',result.valid));
       if(result.valid){grid.append(item('原始整数raw',result.raw),item('解码状态',result.decode_status,result.decode_valid?'good':'bad'),item('接收控制字节（十进制）',result.received_control));if(result.decode_valid)grid.append(item('还原车速（km/h）',result.decoded_speed.toFixed(1)));}
       explanation=!result.valid?(result.status===-1?'长度必须等于8，已在编码前拒绝；没有发送帧。':'车速须有限且在0—250，模式0—2，雷达0或1；编码拒绝，输出不可消费。'):!result.decode_valid?'编码成功，但接收模式位变为3，Decode拒绝；不使用解码输出。':`raw=round(${values[0]}×10)=${result.raw}；低字节=${result.raw}%256=${result.frame[0]}；高字节=取整(${result.raw}/256)=${result.frame[1]}；控制=${values[1]}+${values[2]}×4=${result.frame[2]}；还原=${result.raw}×0.1=${result.decoded_speed} km/h。`;
@@ -146,6 +177,9 @@ $('runButton').onclick=async()=>{
       summaryText=`${mode}，status=${result.status}，valid=${result.valid}${result.valid?`，期望=${result.desired}m，误差=${result.error}m`:''}`;
     }
     $('output').append(grid);const p=document.createElement('p');p.textContent=explanation;$('output').append(p);
+    if(lesson.runner==='bits_day04'&&result.frame){
+      for(const [label,frame] of [['发送载荷 · 故障修改前',result.frame],['接收载荷 · 故障修改后',result.received_frame]]){const h=document.createElement('h4');h.textContent=label;$('output').append(h,makeTable(['字节下标','十进制','十六进制','8位二进制','职责'],frame.map((v,i)=>[i,v,v.toString(16).toUpperCase().padStart(2,'0'),v.toString(2).padStart(8,'0'),i<2?(Number(values[4])===1?(i===0?'温度高8位':'温度低8位'):(i===0?'温度低8位':'温度高8位')):i===2?'bit0—1模式、bit2雷达':'保留0'])));}
+    }
     if(lesson.runner==='can_day03'&&result.frame){const caption=document.createElement('p');caption.textContent='发送前的8字节载荷（内存模拟；不连接实车）。损坏开关会在显示后修改接收控制位。';$('output').append(caption,makeTable(['字节下标','十进制','十六进制','二进制','职责'],result.frame.map((v,i)=>[i,v,v.toString(16).toUpperCase().padStart(2,'0'),v.toString(2).padStart(8,'0'),['车速低8位','车速高8位','模式bit0—1；雷达bit2'][i]||'保留，必须0'])));}
     if(lesson.runner==='array_day02'){
       if(result.visited?.length){let sum=0;const rows=result.visited.map((value,i)=>{sum+=value;return [String(i),String(value),String(sum)];});const intro=document.createElement('p');intro.textContent='按浏览器模拟读取的列表展开累加过程（不是额外读取数组）：';$('output').append(intro,makeTable(['下标i','读取车速（km/h）','累加后总和'],rows));}
@@ -172,6 +206,15 @@ $('quiz').onsubmit=async e=>{e.preventDefault();if(busy)return;busy=true;const b
 $('overrideButton').onclick=async()=>{if(busy){message('检测或运行正在进行，请等待结束。');return;}try{await saveNotes();await api('/api/override',{day,reason:$('overrideReason').value});state=await api('/api/state');drawRoute();completeUI();message('已记录为自定义通关。后续仍可补做检测，升级为在线练习通过。');}catch(e){message(e.message);}};
 async function copy(text,fallback){try{await navigator.clipboard.writeText(text);message('已复制，可粘贴到聊天。');}catch(e){if(fallback){fallback.hidden=false;fallback.value=text;fallback.select();message('请复制下方已选中的文本。');}else message('复制失败，请直接选择代码复制。');}}
 $('copyCode').onclick=()=>copy(lesson.code);
+$('downloadCode').onclick=()=>download(lesson.code,lesson.source,'text/plain;charset=utf-8');
+$('downloadLesson').onclick=()=>{
+  const parts=['# '+lesson.title,'\n'+lesson.summary,'\n'+lesson.time,'## 完整中文源码','```c\n'+lesson.code+'```','## 执行链',lesson.flow_text||$('executionFlow').textContent];
+  for(const r of lesson.reading){parts.push('## '+r.title,r.text);for(const source of r.sources||[])parts.push(`[${source.title}](${source.url})`);if(r.table)parts.push(JSON.stringify(r.table,null,2));}
+  for(const s of lesson.code_sections||[]){const start=lesson.code.indexOf(s.start),end=lesson.code.indexOf(s.end,start+s.start.length),finish=s.end.startsWith('    return 0;')?end+'    return 0;\n}'.length:end;parts.push('## '+s.title,'```c\n'+lesson.code.slice(start,finish)+'\n```','通用语法：'+s.pattern,s.text,'具体值：'+s.trace);}
+  for(const e of lesson.experiments)parts.push('## 实验：'+e.name,'输入：'+e.values.join(' '),...e.steps);
+  parts.push('## 迁移任务',lesson.practice.text,...lesson.practice.steps,'## 自测题（不附答案）',...lesson.questions.map(q=>q.text+'\n'+q.options.map((o,i)=>`${i+1}. ${o}`).join('\n')));
+  download(parts.join('\n\n'),`D${String(day).padStart(2,'0')}-完整讲义.md`,'text/markdown;charset=utf-8');
+};
 $('copyRequest').onclick=async()=>{try{await saveNotes();const status=state.progress.find(p=>p.day===day);const request=`我完成了D${String(day).padStart(2,'0')}的在线练习（${status?.method==='test'?'浏览器练习通过':'尚未检测或自定义通关'}；不是本地真实C通关）。请根据以下笔记检查薄弱项，制作下一课，并更新Pages课程。\n\n我的笔记：\n${$('notes').value.slice(0,8000)}\n\n希望优化：\n${$('feedback').value||'暂未填写'}\n\n保持：完整中文代码、执行链、代码旁解释、详细实作、真实C在本地完成。`;await copy(request,$('requestFallback'));}catch(e){message(e.message);}};
 function download(text,name,type){const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 async function exportReport(){await saveNotes();const text=await api('/api/report?day='+day);download(text,`D${String(day).padStart(2,'0')}-在线练习报告.md`,'text/markdown;charset=utf-8');}

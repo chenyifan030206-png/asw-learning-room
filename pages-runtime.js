@@ -57,6 +57,23 @@ function pagesSimulate(day,values){
     const status=length!==8?-1:!Number.isFinite(speed)||speed<0||speed>250||mode<0||mode>2||radar<0||radar>1?-2:0;
     result={status,valid:Number(status===0),stage:1};
     if(status===0){const raw=Math.round(f(speed*10)),frame=[raw&255,(raw>>>8)&255,mode|(radar<<2),0,0,0,0,0],received_control=damage===1?frame[2]|3:frame[2];const decode_status=(received_control&3)>2?-2:0;Object.assign(result,{raw,frame,received_control,decode_status,decode_valid:Number(decode_status===0)});if(decode_status===0)result.decoded_speed=Number(f(raw*f(0.1)).toFixed(1));}
+  }else if(day===4){
+    const v=pagesNumbers(values,6),temperature=f(v[0]),[mode,radar,damage,order,length]=v.slice(1);
+    if(!v.slice(1).every(n=>Number.isInteger(n)&&n>=-100&&n<=100)||![0,1,2,3,4].includes(damage)||![0,1,2].includes(order))throw Error('模式、雷达、故障、端序和长度必须为范围内整数。');
+    const status=length!==8?-1:!Number.isFinite(temperature)||temperature< -40||temperature>125||mode<0||mode>2||radar<0||radar>1?-2:0;
+    result={status,valid:Number(status===0)};
+    if(status===0){
+      // C roundf在半数时远离零；JS Math.round对负半数不同，必须显式处理。
+      const x=f(temperature*10),raw_signed=x<0?-Math.round(-x):Math.round(x),raw_unsigned=raw_signed<0?65536+raw_signed:raw_signed;
+      const low=raw_unsigned&255,high=(raw_unsigned>>>8)&255,control=mode|(radar<<2);
+      const frame=order===1?[high,low,control,0,0,0,0,0]:[low,high,control,0,0,0,0,0],received_frame=[...frame];
+      if(damage===1)received_frame[2]|=3;if(damage===2)received_frame[2]|=8;if(damage===3)received_frame[0]^=1;if(damage===4)received_frame[2]&=~4;
+      const received_control=received_frame[2],extracted_mode=received_control&3,extracted_radar=(received_control>>>2)&1,reserved=received_control&248;
+      const received_raw=order!==0?(received_frame[0]<<8)|received_frame[1]:received_frame[0]|(received_frame[1]<<8);
+      const signed=received_raw>=32768?received_raw-65536:received_raw,decode_status=reserved!==0||extracted_mode>2||signed< -400||signed>1250?-2:0;
+      Object.assign(result,{raw_signed,raw_unsigned,low,high,control,raw_bits:raw_unsigned.toString(2).padStart(16,'0'),control_bits:control.toString(2).padStart(8,'0'),frame,received_frame,received_bits:received_control.toString(2).padStart(8,'0'),received_control,extracted_mode,extracted_radar,reserved,received_raw,unsigned_wrong:Number(f(f(received_raw)*f(0.1)).toFixed(1)),decode_status,decode_valid:Number(decode_status===0)});
+      if(decode_status===0)result.decoded_temperature=Number(f(f(signed)*f(0.1)).toFixed(1));
+    }
   }else throw Error('在线模拟模块尚未发布。');
   result.stdout='浏览器模拟结果（不是C程序stdout）\n'+Object.entries(result).map(([k,v])=>`${k}=${Array.isArray(v)?v.join(','):v}`).join('\n');
   result.engine='在线版 · JavaScript浏览器模拟；没有编译或执行C';return result;
@@ -66,6 +83,18 @@ function pagesRegression(day){
     1:[['正常',[72,45,10,1.4],{status:0,mode:0,desired:38,error:7}],['间距',[72,35,10,1.4],{mode:1,error:-3}],['边界',[72,38,10,1.4],{mode:0,error:0}],['拒绝负距离',[72,-1,10,1.4],{status:-2,valid:0}],['拒绝NaN',['nan',45,10,1.4],{status:-2,valid:0}],['迁移',[90,40,10,1.4],{desired:45,error:-5,mode:1}]],
     2:[['全部',[72,73,75,74,70,5,0],{sum:364,average:72.8}],['部分',[72,73,75,74,70,3,0],{sum:220,count:3}],['空片段',[72,73,75,74,70,0,0],{valid:1,has_data:0}],['超容量',[72,73,75,74,70,6,0],{status:-2}],['负数量',[72,73,75,74,70,-1,0],{status:-2}],['NULL',[72,73,75,74,70,3,1],{status:-1}],['迁移',[10,20,30,40,50,3,0],{sum:60,average:20}]],
     3:[['独立标准字节',[72.5,1,1,8,0],{raw:725,frame:[213,2,5,0,0,0,0,0]}],['零值',[0,0,0,8,0],{frame:[0,0,0,0,0,0,0,0]}],['上限',[250,2,1,8,0],{raw:2500,frame:[196,9,6,0,0,0,0,0]}],['迁移',[54.3,2,1,8,0],{raw:543,frame:[31,2,6,0,0,0,0,0]}],['量化',[72.24,1,0,8,0],{raw:722,decoded_speed:72.2}],['短帧',[72.5,1,1,2,0],{status:-1}],['负车速',[-1,1,1,8,0],{status:-2}],['NaN',['nan',1,1,8,0],{status:-2}],['接收损坏',[72.5,1,1,8,1],{status:0,decode_status:-2,decode_valid:0}]]};
+  cases[4]=[
+    ['负温度独立向量',[-12.3,1,1,0,0,8],{frame:[133,255,5,0,0,0,0,0],raw_unsigned:65413,decoded_temperature:-12.3,unsigned_wrong:6541.3}],
+    ['大端',[-12.3,1,1,0,1,8],{frame:[255,133,5,0,0,0,0,0],decoded_temperature:-12.3}],
+    ['模式损坏',[-12.3,1,1,1,0,8],{received_control:7,extracted_mode:3,decode_status:-2}],
+    ['保留位',[-12.3,1,1,2,0,8],{reserved:8,decode_status:-2}],
+    ['合法变化漏检',[-12.3,1,1,3,0,8],{received_frame:[132,255,5,0,0,0,0,0],decoded_temperature:-12.4,decode_status:0}],
+    ['清雷达',[-12.3,1,1,4,0,8],{extracted_radar:0,received_control:1,decode_status:0}],
+    ['错误端序',[-12.3,1,1,0,2,8],{received_raw:34303,decode_status:-2}],
+    ['迁移',[-20.5,2,1,0,0,8],{raw_signed:-205,raw_unsigned:65331,low:51,high:255,control:6,decoded_temperature:-20.5}],
+    ['零',[0,0,0,0,0,8],{frame:[0,0,0,0,0,0,0,0],decoded_temperature:0}],
+    ['下界',[-40,1,1,0,0,8],{decoded_temperature:-40}],['上界',[125,1,1,0,0,8],{decoded_temperature:125}],
+    ['负半数',[-12.25,1,1,0,0,8],{raw_signed:-123}],['越界',[-40.1,1,1,0,0,8],{status:-2}],['短帧',[-12.3,1,1,0,0,7],{status:-1}],['NaN',['nan',1,1,0,0,8],{status:-2}]];
   return cases[day].map(([name,input,expected])=>{const actual=pagesSimulate(day,input),passed=Object.entries(expected).every(([k,v])=>Array.isArray(v)?JSON.stringify(actual[k])===JSON.stringify(v):Math.abs(actual[k]-v)<0.001);return {name:'浏览器模拟 · '+name,passed,expected,actual};});
 }
 function pagesReport(day,bundle,db){

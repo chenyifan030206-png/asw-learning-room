@@ -1250,6 +1250,672 @@
         ]
       },
       "code": "/* D03：教学用 CAN 数据布局。不是某款车的协议，不连接实车。\n * 8字节载荷：0、1号字节存车速；2号字节存模式与雷达有效位；其余为0。\n * 车速单位km/h，分辨率0.1，偏移0；低字节先放（Intel小端）。 */\n#include <stdio.h>   /* scanf读输入，printf输出；网页把参数交给这个程序。 */\n#include <stdint.h>  /* uint8_t为8位无符号数，uint32_t为32位无符号数。 */\n#include <stddef.h>  /* size_t表示长度，NULL表示没有可用地址。 */\n#include <math.h>    /* isfinite检查有限数，roundf四舍五入float。 */\n\n/* [接口] 先声明函数：编译器读到main调用时，就知道参数和返回类型。\n * int返回状态：0成功，-1地址/长度错，-2数值/协议错。\n * 真正的帧与解码车速经指针写到调用方变量，不能把状态当车速。 */\nint Encode(float speed, int mode, int radar, uint8_t *data, size_t length);\nint Decode(const uint8_t *data, size_t length, float *speed);\n\nint main(void)\n{\n    /* [入口] 创建本次输入和输出容器。数组如8个小格，每格只能装0到255。\n     * {0}使所有格子从0开始；单独的变量用=0初始化。\n     * mode=0速度模式，1间距模式，2故障模式；由上游决定，本课只传输。 */\n    float speed = 0.0f;\n    int mode = 0, radar = 0, length_input = 0, damage = 0;\n    uint8_t data[8] = {0};\n    float decoded_speed = 0.0f;\n    /* [输入] %f读float，%d读int；&给scanf可写的变量地址。\n     * 返回5表示5项都读到了。它与Encode返回0是不同函数的不同约定。 */\n    if (scanf(\"%f %d %d %d %d\", &speed, &mode, &radar, &length_input, &damage) != 5) {\n        printf(\"status=-3\\nvalid=0\\nstage=0\\n\");\n        return 0; /* 结束main；0表示进程正常结束，不表示输入正确。 */\n    }\n    /* [调用编码] 先查int长度，避免负数转成无符号的巨大正数。\n     * 这里8是本协议的固定长度，不是靠指针推测出来的。 */\n    if (length_input != 8) {\n        printf(\"status=-1\\nvalid=0\\nstage=1\\n\");\n        return 0;\n    }\n    int status = Encode(speed, mode, radar, data, (size_t)length_input);\n    printf(\"status=%d\\nvalid=%d\\nstage=1\\n\", status, status == 0);\n    if (status != 0) return 0; /* 失败就停止，不把未完成的帧交给下游。 */\n    /* [观察帧] %02X按十六进制显示，至少两位；十进制213显示为D5。\n     * printf的%X需要unsigned int，所以做明确转换；不改变数值。 */\n    printf(\"raw=%u\\n\", (unsigned int)((uint32_t)data[0] | ((uint32_t)data[1] << 8)));\n    printf(\"frame=\");\n    for (size_t i = 0; i < 8; i++) {\n        printf(\"%02X%s\", (unsigned int)data[i], i == 7 ? \"\\n\" : \" \");\n        /* 条件 ? A : B：条件为真选A，否则选B；最后一格换行，其余加空格。 */\n    }\n    /* [接收实验] 模拟传输中模式位损坏：把低2位改成二进制11（值3）。\n     * 不连接CAN设备；页面显示的是发送前的帧，解码读取这里修改后的帧。 */\n    if (damage == 1) data[2] = (uint8_t)(data[2] | 3u);\n    status = Decode(data, 8, &decoded_speed);\n    printf(\"decode_status=%d\\ndecode_valid=%d\\nreceived_control=%u\\n\", status, status == 0, (unsigned int)data[2]);\n    if (status == 0) printf(\"decoded_speed=%.1f\\n\", (double)decoded_speed);\n    return 0;\n}\n\nint Encode(float speed, int mode, int radar, uint8_t *data, size_t length)\n{\n    /* [编码守门] 先拒绝，后写输出：失败时不产生半个新帧。\n     * ||是“任一成立”；isfinite返回非0表示有限，!把真变假、假变真。\n     * NaN不是普通负数；它不适合只用<0、>250检测。 */\n    if (data == NULL || length != 8) return -1;\n    if (!isfinite(speed) || speed < 0.0f || speed > 250.0f) return -2;\n    if (mode < 0 || mode > 2 || radar < 0 || radar > 1) return -2;\n    /* [量化] 物理量=原始整数×0.1，所以原始整数=车速÷0.1。\n     * 写×10减少小数除法；roundf先取最近整数，再转uint32_t。\n     * 72.5×10=725。u表示无符号整数常量；f表示float常量。 */\n    uint32_t raw = (uint32_t)roundf(speed * 10.0f);\n    /* [拆字节] &是按位与，不是这里的取地址：保留掩码为1的位置。\n     * 255=0xFF=低8位全1。raw&255取低8位；raw>>8丢掉低8位。\n     * 725=2×256+213，所以byte0=213(D5)，byte1=2(02)。 */\n    data[0] = (uint8_t)(raw & 255u);\n    data[1] = (uint8_t)((raw >> 8) & 255u);\n    /* [合控制位] |为按位或；<<2把雷达位移到bit2（权重4）。\n     * 模式占bit0、bit1；雷达占bit2。mode1、radar1 => 1|4=5。\n     * 已校验范围，两部分不重叠，所以本课也可用mode+radar×4验算。 */\n    data[2] = (uint8_t)((uint32_t)mode | ((uint32_t)radar << 2));\n    for (size_t i = 3; i < 8; i++) data[i] = 0;\n    return 0;\n}\n\nint Decode(const uint8_t *data, size_t length, float *speed)\n{\n    /* [解码守门] const表示只读载荷；speed是要写回的车速地址。\n     * 指针自身不含数组长度，length由调用方传入。\n     * 248=11111000，检查bit3到bit7这些保留位；&3提取低2位模式。 */\n    if (data == NULL || speed == NULL || length != 8) return -1;\n    if ((data[2] & 248u) != 0 || (data[2] & 3u) > 2u) return -2;\n    for (size_t i = 3; i < 8; i++) if (data[i] != 0) return -2;\n    /* [拼回车速] 先把高字节提升到32位再左移8位，相当于乘256。\n     * 高低位不重叠，按位或拼成原始数。D5 02 => 213+2×256=725。\n     * *speed放在赋值左边表示写入指针指向的位置，不是乘号。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    if (raw > 2500u) return -2;\n    *speed = (float)raw * 0.1f;\n    return 0;\n}\n"
+    },
+    "4": {
+      "day": 4,
+      "revision": "2026-10-12-bits-v1",
+      "title": "把bit看清楚：位运算、负温度与16位端序",
+      "source": "day04.c",
+      "runner": "bits_day04",
+      "summary": "在线练习版：浏览器模拟，不执行C、不进行服务端检测。先补清D03的模式与雷达位、printf循环和函数返回，再用-12.3℃追踪16位有符号温度。完整注释代码、按入口执行的讲解、可点击bit演示、故障注入与迁移检测。教学载荷只在内存模拟，不连接实车。",
+      "time": "约180分钟：完整代码与入口15分钟；bit与硬件基础40分钟；逐段追踪50分钟；8个实验40分钟；迁移与检测25分钟；笔记10分钟。看不懂时停在该段，次日继续，不以赶完为目标。",
+      "goals": [
+        "说清1 bit、1 byte、地址、数组下标和位号的区别",
+        "逐位计算&、|、^、~、<<、>>，区分取地址&和逻辑||",
+        "能解释模式为何用2位、雷达为何放bit2；从控制字节提取各字段",
+        "从main追踪编码、打印、修改、解码、返回，分清发送帧与接收帧",
+        "手算负温度16位补码、大小端字节与错误无符号解释",
+        "理解类型提升和无符号移位，知道协议校验无法发现所有错误"
+      ],
+      "flow_text": "main创建变量 → scanf读取6项 → EncodeTemp校验 → 量化与补码 → 拆字节与组合控制位 → 返回main → PrintBits/PrintFrame打印发送数据 → 故障修改内存 → 打印接收数据 → DecodeTemp校验、拼字节、还原符号 → 返回main → 成功才打印有效温度",
+      "remediation_title": "开课基础 · bit在哪、为什么分3位、如何一步步算",
+      "run_fields": [
+        {
+          "id": "temperature",
+          "label": "温度（℃，允许nan/inf做拒绝实验）",
+          "kind": "text",
+          "value": -12.3
+        },
+        {
+          "id": "mode",
+          "label": "模式（信号值，不由本课计算）",
+          "kind": "select",
+          "value": 1,
+          "options": [
+            [
+              "0",
+              "0 · 速度模式"
+            ],
+            [
+              "1",
+              "1 · 间距模式"
+            ],
+            [
+              "2",
+              "2 · 故障模式"
+            ],
+            [
+              "3",
+              "3 · 协议非法"
+            ]
+          ]
+        },
+        {
+          "id": "radar",
+          "label": "雷达有效位（0无效，1有效）",
+          "kind": "select",
+          "value": 1,
+          "options": [
+            [
+              "0",
+              "0 · 无效"
+            ],
+            [
+              "1",
+              "1 · 有效"
+            ]
+          ]
+        },
+        {
+          "id": "damage",
+          "label": "接收前故障／修改",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "0 · 不修改"
+            ],
+            [
+              "1",
+              "1 · 将模式两位设成11"
+            ],
+            [
+              "2",
+              "2 · 将保留bit3置1"
+            ],
+            [
+              "3",
+              "3 · 翻转第0字节bit0"
+            ],
+            [
+              "4",
+              "4 · 清除雷达bit2"
+            ]
+          ]
+        },
+        {
+          "id": "order",
+          "label": "发送／接收字节顺序",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "0 · 双方小端"
+            ],
+            [
+              "1",
+              "1 · 双方大端"
+            ],
+            [
+              "2",
+              "2 · 发送小端，接收误用大端"
+            ]
+          ]
+        },
+        {
+          "id": "length",
+          "label": "载荷长度（字节，要求8）",
+          "kind": "number",
+          "value": 8
+        }
+      ],
+      "protocol": {
+        "headers": [
+          "位置",
+          "字段",
+          "明确约定"
+        ],
+        "rows": [
+          [
+            "data[0]、data[1]",
+            "温度原始整数",
+            "16位补码；分辨率0.1℃，偏移0；物理范围-40—125℃；order决定高低字节位置"
+          ],
+          [
+            "data[2] bit0—1",
+            "模式",
+            "00速度、01间距、10故障；11非法"
+          ],
+          [
+            "data[2] bit2",
+            "雷达有效位",
+            "0无效，1有效；不是距离或速度"
+          ],
+          [
+            "data[2] bit3—7",
+            "保留位",
+            "必须全部0"
+          ],
+          [
+            "data[3]—data[7]",
+            "保留字节",
+            "必须全部0"
+          ]
+        ]
+      },
+      "reading": [
+        {
+          "title": "开课基础 · 从存储格子到bit",
+          "text": "bit是binary digit的缩写，即一位二进制数，只能为0或1。byte是字节；本课uint8_t的1字节包含8 bit。一个字节可以装2×2×2×2×2×2×2×2=256种组合，所以无符号数值范围是0—255。这里讲的是uint8_t存在的8-bit环境；普通C中的CHAR_BIT未必永远为8。\n先把data想成8个连续的小格子，每格1字节。假设首地址为1000（只为画图，不是真实地址），data[0]在1000，data[1]在1001，data[2]在1002。&data[2]取第三格的地址。data[2]取第三格的内容，比如5。格子里还可细看8个bit，但普通C无法对其中一个bit直接取地址；需要读这个字节，再用掩码取出某一位。\n位号从右向左：bit0最右，bit7最左。它们的权重依次是1、2、4、8、16、32、64、128。例如00000101表示bit2和bit0为1，数值为4+1=5。左边补0只为展示，不会改变数值。00000101、十进制5、十六进制05是同一个数的不同写法。\n为什么模式用2位？1位只有0/1两种组合，装不下0、1、2三种模式；2位有00、01、10、11四种组合，其中11留作非法值。雷达只需有效/无效两种状态，用1位足够。总共用3个bit，但不是3个字节，也不是把模式和雷达各写3次。\n协议把模式放bit0—1，把雷达放bit2。所以mode1写为00000001；radar1原来也是00000001，先<<2移动两位成为00000100，再按位或：00000001 | 00000100 = 00000101，得到控制字节5。雷达移位是给它指定位置，而不是让雷达的物理数值变成4。\n这里协议布局由发送和接收双方共同约定，不是CPU规定的。实际工程需要查信号表或DBC，不能猜雷达永远在bit2。本课温度协议独立于D03车速协议，不能把两种解码器混用。"
+        },
+        {
+          "title": "1 · 必要硬件：代码中的bit与车上信号如何相连",
+          "text": "编译器把C变成机器指令，CPU执行读数据、计算和写数据。RAM保存运行中的对象；CPU寄存器临时承载运算数据；Flash通常保存程序。bit是信息的表示单位，底层用可区分的电路状态表达0/1，不是一颗独立的“bit芯片”。\ndata[8]是main里的自动存储期对象，进入main后存在，main结束后生命周期结束。在当前调试编译中通常会放在栈内存，但优化可能使用寄存器或消除某些对象，C不保证每个变量都有固定RAM位置。局部数组、硬件寄存器、CPU寄存器是不同概念。\n车上路径：应用信号 → 编码为RAM中的载荷 → 驱动把载荷交给CAN控制器 → 控制器处理总线协议 → 收发器处理电气信号 → CAN_H/CAN_L → 对端收发器、控制器和驱动 → 解码 → 应用使用。\ndata[2]是普通数组，不是CAN控制器寄存器；改变它只改本进程内存，不会自动发出CAN报文。真实硬件寄存器可能有写1清零、只读等特殊规则，不能照搬普通数组的清位代码。也不能只加volatile就解决并发、原子性或驱动同步问题。\nSocketCAN是Linux用于CAN访问的网络接口体系；今天不要求搭总线。先学会稳定解析字节，之后才能看驱动或ROS 2接收到的载荷。",
+          "sources": [
+            {
+              "title": "Linux内核官方：SocketCAN",
+              "url": "https://docs.kernel.org/networking/can.html"
+            }
+          ]
+        },
+        {
+          "title": "2 · 六种位操作：不要混用符号",
+          "text": "按位与A&B：对应位置两边都为1，结果才为1。按位或A|B：任一边为1，结果就是1。异或A^B：两边不同为1，相同为0。取反~A：把参与运算类型中的每一位反过来；uint32_t的~4u应按实际类型宽度理解，本课只展示低8位11111011。\n单个位真值表：输入00时&0、|0、^0；输入01时&0、|1、^1；输入10时&0、|1、^1；输入11时&1、|1、^0。~0为1，~1为0。把表用于每一列，就能算整个字节。\n例：5=00000101；3=00000011。5&3=00000001=1，挑出模式；5|3=00000111=7，强制低两位为1；5^4=00000001=1，翻转雷达位；5&~4=00000001=1，强制清雷达。异或两次回到原值，清位两次仍是0。\n左移A<<n：向高位方向移动n个位置，低位补0；本课无符号且未溢出时相当于乘2的n次方。1<<2=4。右移A>>n：本课无符号向低位移动n个位置，高位补0；5>>2=1。不是把十进制的“5”挪到另一个格子。\n|与+不同：1|1=1，1+1=2，因为加法会进位。mode字段与radar字段不重叠时，mode|(radar<<2)与mode+radar×4碰巧相等，但表达的意图不同。|也不同于||：2|4=6，2||4=1；||只问条件真不真。\n&有两种语法：&decoded只有一个操作数，取变量地址；data[2]&3有两个操作数，按位与。*也不同：float *p中的*声明指针；*p=...访问指针指向的对象；a*b做乘法。先看所处位置和操作数，不能见到同一个符号就按同一含义解释。"
+        },
+        {
+          "title": "3 · 掩码：选哪些位，保留哪些位",
+          "text": "掩码是普通整数，1所在的位置表示我们想处理的位，不是新语法。模式占2位，掩码是00000011=3；雷达占bit2，掩码是00000100=4；保留位bit3—7的掩码11111000=248。\n提取mode：control&3。control6=00000110，与00000011，得到00000010=2。提取radar：(control>>2)&1。6>>2=1，再&1还是1。写control&4得到4而不是归一化的1；如果只用于非零判断可用，若接口要求0/1则需要右移或比较。\n检查保留位：(control&248)!=0。control13=00001101，&11111000得到00001000=8，非零，拒绝。它不检查bit0—2，所以还要独立检查mode是否为3。一个掩码通常只回答一个问题。\n通用字段提取：先右移start位，再与低width位全1的掩码。宽度2时掩码(1u<<2)-1u=3；宽度1时1。通用替换字段要先清旧位置，再放新值；单用OR不能把原来的1改成0。本课雷达清位展示了这个区别。\n通用公式只适用于移位量、字段宽度和输入值已经检查合法的情况；不能用(1u<<32)来创建32位全1掩码。C的移位数为负或不小于提升后左操作数宽度时行为未定义。"
+        },
+        {
+          "title": "4 · uint8_t为什么还要先转换：整数提升",
+          "text": "uint8_t告诉你对象占8位，不表示每个算式都在8位里面完成。在本课GCC环境中，8位无符号数的0—255都能装入int，所以算术前常被提升成int。变量本身仍为8位，临时计算类型却变成int。\n假设data[1]=255，写data[1]<<8在当前32位int环境可得到65280，但左边的临时类型是int。移植到更窄的int环境或更大移位量时就不能照猜。先写(uint32_t)data[1]，明确让它在32位无符号类型参与移位，8小于32且值可表示。\n强制转换写作(目标类型)表达式。例如(uint32_t)data[1]产生一个转换后的值，不改变数组元素的声明类型，也不改变data[1]的地址。最后(uint8_t)...把已确认0—255的字节值存回数组。\nu是无符号整数常量后缀，如3u；f是float常量后缀，如0.1f；L是long常量后缀，如65536L。unsigned int的具体宽度由实现决定，不能看到u就认为固定32位。这里uint32_t固定32位，long至少能表示本课-65536—65535的诊断计算。\n不要对负数左移，不要依赖C17负数右移如何补位；本课将符号数先按协议转为非负编码值，再移位。相关规则不是记口号，而是每次先确认“操作数类型、值范围、移位量”。",
+          "sources": [
+            {
+              "title": "SEI CERT：无符号位运算",
+              "url": "https://cmu-sei.github.io/secure-coding-standards/sei-cert-c-coding-standard/recommendations/integers-int/int13-c/"
+            },
+            {
+              "title": "SEI CERT：移位量边界",
+              "url": "https://wiki.sei.cmu.edu/confluence/pages/viewpage.action?pageId=88014861"
+            }
+          ]
+        },
+        {
+          "title": "5 · 从-12.3℃算出FF85：不要直接把负号塞进字节",
+          "text": "分辨率0.1℃表示1个整数刻度代表0.1℃。温度T=刻度R×0.1+偏移0，因此R=round(T×10)。-12.3×10=-123，roundf后仍为-123。温度不是车速，允许负数由本课业务范围-40—125℃决定。\n16位补码是双方约定的编码：非负R直接用R；负R用65536+R。因为16位有65536种组合，用其上半区表示负数。-123编码为65536-123=65413。65413=255×256+133，所以高字节255=FF、低字节133=85。\n也可以核对补码：+123的16位是00000000 01111011；逐位取反11111111 10000100；再加1得到11111111 10000101，也就是FF85。不是把负号放进某一字节，也不是简单将最高位设1。\n16位有符号刻度范围-32768—32767，但本协议业务只用-400—1250，所以能表示不等于允许。-40℃编码65136=FE70，125℃编码1250=04E2。超出物理范围时先拒绝，不能截断后悄悄发送。\n接收先拼出非负整数U。U<32768时R=U；U>=32768时R=U-65536。65413-65536=-123，再×0.1=-12.3℃。这里先将U转long再相减，避免无符号相减得到巨大正数。\n若遗漏符号还原，65413×0.1=6541.3℃，这是unsigned_wrong演示值，绝不能当作有效温度。编码位串没有自己宣布“有符号”，接收方必须知道协议约定。"
+        },
+        {
+          "title": "6 · 大小端：字节的位置与bit权重是两件事",
+          "text": "小端把低字节放较小下标：-12.3℃的data[0]=85，data[1]=FF。大端把高字节放较小下标：data[0]=FF，data[1]=85。位串的数学数值仍是FF85，不会因字节顺序改变。\n小端解码U=data[0]|(data[1]<<8)=133|(255×256)=65413。大端解码U=(data[0]<<8)|data[1]=255×256+133=65413。两者都需双方一致。本程序逐字节赋值，不通过强转数组指针解释CPU内存，所以协议端序不依赖运行CPU端序。\n发送85 FF但接收误用大端时，U=133×256+255=34303；符号还原34303-65536=-31233刻度，即-3123.3℃，超出本协议范围，被拒绝。这个例子能检测出来，不代表所有端序错误都能靠范围判断发现，例如全零时反序仍为零。\nDBC中存在Intel/Motorola字段布局约定。本课只有字节对齐的16位例子，不能用它概括Motorola跨字节start-bit规则。实际项目要查数据库的bit numbering、signed、scale、offset和byte order，最好用工具的标准向量交叉验证。"
+        },
+        {
+          "title": "7 · 你提出的D03难段：printf与循环逐句重走",
+          "text": "原句printf(\"raw=%u\\n\", (unsigned int)((uint32_t)data[0] | ((uint32_t)data[1] << 8)));从最里面算起：data[1]=2，转uint32_t还是2；<<8得到512；data[0]=213，转uint32_t还是213；213|512=725；转unsigned int匹配%u；printf打印raw=725并换行。转换没有让它多加8，也没有取数组地址。\nprintf(\"frame=\")先输出文字，不换行。for(size_t i=0;i<8;i++)有3部分：先i=0只执行一次；每次打印前检查i<8；打印后执行i++让下标加1。i依次0—7，i变8时条件为假，跳到循环后面。\nprintf(\"%02X%s\", (unsigned int)data[i], i==7 ? \"\\n\" : \" \")里有2个格式占位，必须对应2个参数。%02X：大写十六进制，最少2位，不够用0补；5打印05，213打印D5。%s：打印后面的字符串。?:条件真选左值、假选右值，只为选择分隔符。\n具体i0：data[0]=D5，0==7为假，打印D5加空格。i1打印02加空格；i2打印05加空格；i3—6打印00加空格；i7的7==7为真，打印00加换行。因此只有最后一格换行，不是只有最后一格被打印。\ndamage1时data[2]|3将05变07。注意这发生在frame打印之后，文字输出不会随内存改变自动更新。所以发送输出仍05，Decode实际读07。本课额外打印received_frame，直接对照修改前后，不再让你猜。\nstatus=Decode(...,&decoded_speed)时main暂停，Decode检查到mode3，return -2，main继续下一行，把-2打印为decode_status。status==0为假，if不打印decoded_speed。最后main return0只报告进程结束，不把前面的解码失败变成成功。"
+        },
+        {
+          "title": "8 · 真实工程如何排查，而不是只背运算符",
+          "text": "案例：温度监控界面突然显示6541.3℃。先保留原始载荷85 FF 05，查协议signed=true、scale0.1、offset0，再检查解码是否只做了unsigned×scale。定位符号还原遗漏，而不是马上认为传感器坏了。\n案例：发送端记录控制05，对端报告mode3。对照接收帧07；用05^07=02定位bit1变化。然后检查打包、内存写入、协议版本和收发链，不仅盯着业务模式判断。^可以帮你找到哪些位不同，但不能证明变化的硬件原因。\n数据链通常分为字节解析、信号数值转换、业务有效性判断和应用决策。今天的EncodeTemp/DecodeTemp属于前两层；模式和雷达标志合法也不等于可以执行驾驶控制。本课没有传感器融合、控制闭环或安全评估。\n真实项目常用DBC和工具生成／验证编码器。可以从cantools生成的C源码或单元测试继续读；这节先手写最小实现，把bit行为看透。下节再根据你的反馈决定是否进入DBC生成代码与接口拆分，不提前跳到复杂算法。",
+          "sources": [
+            {
+              "title": "cantools官方仓库与C源码生成用法",
+              "url": "https://github.com/cantools/cantools"
+            }
+          ]
+        },
+        {
+          "title": "9 · 失败不是都一样：协议错误、业务无效与漏检",
+          "text": "status是编码状态，decode_status是解码状态，valid和decode_valid分别由status==0算出0/1。模式3或保留bit3为1会解码失败，不输出decoded_temperature。雷达0本身是合法载荷，所以decode_valid可为1；应用仍要知道雷达数据无效。\n翻转第0字节bit0时，85变84，原始整数FF85变FF84，温度-12.3变-12.4。模式、保留位和范围仍合法，Decode会成功。这是故意演示的漏检；字段检查不是CRC/E2E，也不是所有通信故障的检测器。\n故障模拟发生在应用数组中，不等同于CAN线上翻转bit：真实CAN链路自身也有CRC等机制。有效范围内的陈旧帧、错误协议、发送前软件错误等，需要按工程需求考虑计数器、超时、E2E和上层合理性检查。今天只验证本教学协议声明的约束。\n当函数失败时，输出指针没有写入新温度。decoded初值0不代表本次收到0℃，必须看decode_status；这沿用D01/D02的“失败不消费旧输出”规则。"
+        },
+        {
+          "title": "10 · 本地运行与调试：准确复现这组字节",
+          "text": "网页在线实验是JavaScript模拟，不是C编译器。下载day04.c后可在本机WSL Ubuntu运行：gcc -std=c17 -Wall -Wextra -Wpedantic -Wconversion -Werror -g -O0 day04.c -lm -o day04。-lm链接数学库，-g保留调试信息，-O0减少优化对单步观察的影响。\n终端输入./day04，再输入一行“-12.3 1 1 0 0 8”并回车。查看frame=85 FF 05 00 00 00 00 00，decode_status=0，decoded_temperature=-12.3。异常路径输入“-12.3 1 1 1 0 8”，看到received_frame控制07、decode_status=-2且没有decoded_temperature。\n如果已安装GDB：gdb ./day04；输入break main；run；next走到scanf并输入6项。编码调用处用step进入EncodeTemp，再用next逐句看。print raw查看补码整数，x/8bx data查看8字节；finish回main，继续走到故障行，前后各看一次data。不要对尚未进入作用域的raw求值。\n本地学习服务也提供同一C程序运行和服务端检测，但D04仍要求本地D03真实通关或你自行选择手动通关后解锁；我不会把在线D03写成真实成绩。若GDB没安装，可先用本程序逐阶段打印观察，不影响在线学习。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "1 · main：先分清输入、缓存和输出",
+          "start": "    /* [入口变量]",
+          "end": "    /* [读取输入]",
+          "pattern": "类型 名字=初值；类型 名字[数量]={0}；int a=0,b=0是分别创建两个变量。",
+          "text": "temperature是输入温度，decoded是接收输出，data是8字节缓存。mode、radar、damage、order、length_input负责协议字段或实验开关。0.0f里的f表示float；8是数组格数；data[2]是第三格，因为下标从0开始。变量先初始化是防止读取未初始化值，但decoded=0不能替代成功检查。完整声明创建存储；后续赋值修改已有对象。",
+          "trace": "起点temperature0、decoded0、data全部00。成功读输入后temperature=-12.3，mode1、radar1、damage0、order0、length8。"
+        },
+        {
+          "title": "2 · scanf：写变量与提前返回",
+          "start": "    /* [读取输入]",
+          "end": "    /* [进入编码]",
+          "pattern": "scanf(\"格式\", &变量...)返回成功转换数量；if(条件){语句}；return立刻结束当前函数。",
+          "text": "%f匹配float地址，%d匹配int地址。&temperature不是温度本身，而是允许scanf写值的位置。!=6说明未完成6项转换；输入负温度可以成功转换，是否允许负值由EncodeTemp范围检查决定。length不等8时返回-1业务信息，main return0是进程结束状态。两个状态属于不同接口，不矛盾。网页还会先校验输入完整数字，不能让“1abc”部分解析悄悄通过。",
+          "trace": "读6项返回6 → 6!=6假 → 继续。长度7 → 7!=8真 → 打印status-1 valid0 → main结束，data没有被编码。"
+        },
+        {
+          "title": "3 · 调用EncodeTemp：main暂停在这里",
+          "start": "    /* [进入编码]",
+          "end": "    /* [观察发送]",
+          "pattern": "int status=函数(实参...)；函数返回值赋给status；数组在调用处转成首元素指针。",
+          "text": "先算order==1，order0得到假0，意味着发送小端。再把温度、模式、雷达、0、data首地址和长度8传给EncodeTemp。形参是另一个变量，但data指针指向main原来的8格，所以能写回。此时别继续读printf，应进入下面EncodeTemp实现。实现完成return0之后，main才把0装入status，打印状态。失败时if(status!=0)return0结束。",
+          "trace": "main停在调用处 → 进入编码的校验、量化、拆字节、打包 → return0 → status0 valid1 → main继续观察发送。"
+        },
+        {
+          "title": "4 · EncodeTemp：所有检查在写数据之前",
+          "start": "    /* [编码校验]",
+          "end": "    /* [量化与符号]",
+          "pattern": "if(A || B) return -1；!是逻辑取反；isfinite由math.h提供。",
+          "text": "NULL是没有可用目标地址；length8确保本接口约定的长度，调用者仍有责任保证实际对象够大。第二项判断检查有限温度-40—125、mode0—2、radar0/1以及字节顺序0/1。NaN与数值大小比较通常都为假，所以先用!isfinite拒绝。||短路：左边已经为真时可以不求右边，结果是逻辑真假，不是在拼bit。先检查完再写数组，避免留下半个新帧。",
+          "trace": "-12.3有限，在范围内；mode1、radar1、big0全部合法 → 不return，进入量化。126℃ → return-2 → main拒绝发送。"
+        },
+        {
+          "title": "5 · 量化与补码：两个值的职责不同",
+          "start": "    /* [量化与符号]",
+          "end": "    /* [拆字节]",
+          "pattern": "(类型)表达式是显式转换；条件 ? 真值 : 假值选其中一个；roundf返回float。",
+          "text": "signed_raw保存有正负的温度刻度；raw保存准备拆字节的非负16位编码数。温度×10把0.1℃一格转换成整数；roundf处理量化；最后转int。signed_raw<0时选65536+signed_raw，否则选它本身。65536=2^16，所以负数在16位补码空间对应上半区。不要把(raw_unsigned×0.1)当正确负温度。",
+          "trace": "-12.3×10=-123 → roundf=-123 → signed_raw=-123 → 小于0 → 65536-123=65413 → raw=65413=FF85。"
+        },
+        {
+          "title": "6 · 拆字节：一个16位值分成两格",
+          "start": "    /* [拆字节]",
+          "end": "    /* [打包控制]",
+          "pattern": "low=raw&255u；high=(raw>>8)&255u；if/else只选一种字节布局。",
+          "text": "255二进制低8位全1，与它相与只留下低8位。65413除256商255余133；低值133=85，高值255=FF。uint8_t转换在取8位后进行，结果都在0—255。big0时写低高，big1时写高低。赋值data[0]=low修改的是main里的第一格，不是在指针后增加新格。",
+          "trace": "FF85 & 00FF = 0085 → low133；FF85>>8=00FF → high255；小端data[0]85 data[1]FF，大端相反。"
+        },
+        {
+          "title": "7 · 打包控制位：从单bit真值表算到6",
+          "start": "    /* [打包控制]",
+          "end": "    return 0;\n}\n\nint DecodeTemp",
+          "pattern": "A|B逐bit只要任一是1就为1；radar<<2定位；for(初始;条件;变化)重复。",
+          "text": "mode最多2，需要2位；radar只有0/1，只需1位并放bit2。先转uint32_t再运算，避免把8位对象的整数提升误认为8位计算。mode1是00000001；radar1移位为00000100；逐列OR得到00000101。这里用3个bit而不是3字节。for从i3到7清零后5格。return0交还状态，同时data指向的内容已经改变。",
+          "trace": "mode1 radar1 → 控制05；若mode2 → 00000010 | 00000100 = 00000110=06。循环i3、4、5、6、7各写0，i8终止。"
+        },
+        {
+          "title": "8 · 回main：诊断值和发送载荷",
+          "start": "    /* [观察发送]",
+          "end": "    /* [故障注入]",
+          "pattern": "printf(\"格式\",参数...)打印；每个格式占位对应一个参数；普通函数调用执行后回到下一句。",
+          "text": "raw_signed/unsigned在main中重算只是帮助观察，不替代接收方解码。%d打印int，%u打印unsigned int；cast确保变参类型匹配。PrintBits打印位串，PrintFrame打印8格。代码物理位置在文件下面，不影响本次从调用处进入。raw_bits是16位数的书写顺序，frame是字节发送布局，两者显示顺序可以不同。",
+          "trace": "raw_signed-123、raw_unsigned65413、low133、high255、control5；raw_bits1111111110000101；小端frame85 FF 05 00 00 00 00 00。"
+        },
+        {
+          "title": "9 · PrintBits：为什么右移再&1",
+          "start": "    /* [打印位]",
+          "end": "    printf(\"\\n\");",
+          "pattern": "void函数只做事不返回数值；i--减1；(value>>(i-1))&1提取一个bit。",
+          "text": "width8时i从8到1，位号是i-1从7到0。先把想看的位移到最右，再&1丢掉其它位；%u打印0或1。i0时循环条件i>0为假，不再计算i-1，所以不会发生无符号减一后变大。value5的bit7—3是0，bit2是1，bit1是0，bit0是1，拼成00000101。width只由本程序传8或16，不用任意用户移位量。",
+          "trace": "value5、i3：5>>(3-1)=1，1&1=1；i2：5>>1=2，2&1=0；i1：5>>0=5，5&1=1。最后调用后返回main。"
+        },
+        {
+          "title": "10 · PrintFrame：逐项打印，最后换行",
+          "start": "    /* [打印帧]",
+          "end": "}\n\nvoid PrintBits",
+          "pattern": "for(size_t i=0;i<8;i++)；%02X为十六进制；条件 ? A : B选字符串。",
+          "text": "先printf名字和等号。i0—7一共8次，每次读取data[i]。%02X里0补零、2最少两位、X大写十六进制；%s打印第二个参数。i==7是真就选换行，否则空格。这不是“只在i7打印数据”，每次都会打印字节。函数结束没有return值，控制流程回到main调用之后。",
+          "trace": "i0：85加空格；i1：FF加空格；i2：05加空格；i3—6：00加空格；i7：00加换行；i8条件假结束。"
+        },
+        {
+          "title": "11 · 故障注入：看到修改前和修改后",
+          "start": "    /* [故障注入]",
+          "end": "    /* [回到接收]",
+          "pattern": "|掩码置1；&~掩码清0；^掩码翻转；每个if独立判断damage。",
+          "text": "damage1用|3将mode两个bit都置1，05变07；damage2用|8让保留bit3置1，05变0D；damage3翻转data[0]的最低位，85变84；damage4用&~4清雷达位，05变01。~4反转整个参与类型，不仅8位；最后uint8_t存回一个字节。本课对象是普通数组，不能把此写法直接应用到特殊硬件寄存器。",
+          "trace": "damage1：05 | 03 = 07 → received_frame85 FF 07... → extracted_mode3，radar1，reserved0。发送frame那行已经打印，不会随数组自动改变。"
+        },
+        {
+          "title": "12 · DecodeTemp：先拒绝协议非法值",
+          "start": "    /* [解码校验]",
+          "end": "    /* [拼回16位]",
+          "pattern": "const输入指针只读；float*输出指针可写；&3取模式，&248取保留位。",
+          "text": "检查数组和温度输出地址、8字节长度，随后检查字节顺序、保留位、模式。输入指针const表示这个函数不通过该指针修改数据，不是永久禁止别人改data。mode3和保留位非零都是-2；后5字节也逐个必须为0。雷达0是合法字段，只表示业务信号无效，不需要把它伪装成协议错误。失败提前return，根本不执行温度写回。",
+          "trace": "正常05&248=0，05&3=1 → 通过；07&248=0，但07&3=3>2 → return-2；0D&248=8 → return-2。"
+        },
+        {
+          "title": "13 · 拼16位：逐层算括号，不跳步",
+          "start": "    /* [拼回16位]",
+          "end": "    /* [还原负刻度]",
+          "pattern": "先算内层转换和移位，再按位或；高位字段与低位字段不重叠。",
+          "text": "小端data[0]133、data[1]255；uint32_t高字节255左移8得到65280，也就是FF00；低字节133也就是0085。每列做OR，得FF85=65413。大端交换两格的职责，但公式最终结果相同。括号表达运算顺序，变量转换固定类型，不会把数组复制或按CPU端序重解释。",
+          "trace": "00000000 10000101 | 11111111 00000000 = 11111111 10000101。十进制133|65280=65413。"
+        },
+        {
+          "title": "14 · 还原符号：成功后才通过指针写回",
+          "start": "    /* [还原负刻度]",
+          "end": "    return 0;\n}\n\nvoid PrintFrame",
+          "pattern": "long可保存本例正负中间值；if(raw>=32768u)减65536；*temperature写调用者对象。",
+          "text": "先把raw转long，在有符号类型中减65536L；不能直接在uint32_t里期待得到-123。bit15置1对应raw至少32768，是此补码协议的负数区域。还原后检查刻度-400—1250，再乘0.1f写到main的decoded。return0是状态，decoded的温度经指针写出。",
+          "trace": "65413≥32768 → long65413-65536=-123 → 范围合法 → -123×0.1=-12.3 → 写decoded → return0。错误端序得到-31233，范围失败，不写decoded。"
+        },
+        {
+          "title": "15 · 回main：比较解码结果与错误算法",
+          "start": "    /* [回到接收]",
+          "end": "    return 0;\n}\n\nint EncodeTemp",
+          "pattern": "status=DecodeTemp(...)替换此前的编码状态；if(status==0)才打印有效输出。",
+          "text": "先用接收方字节顺序算received_raw，打印故意忽略符号的unsigned_wrong，再调用真正解码器。这个诊断值无论解码是否成功都显示，必须标为错误算法，不能混进有效温度卡片。DecodeTemp结束后main打印decode_status/valid，成功才打印decoded_temperature。main return0只结束本程序，不替代业务状态。",
+          "trace": "正常：unsigned_wrong6541.3但正式decoded-12.3。模式损坏：decode_status-2、decode_valid0，没有decoded_temperature。位翻转：解码仍成功但变-12.4，说明校验漏检。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "负温度标准帧",
+          "values": [
+            -12.3,
+            1,
+            1,
+            0,
+            0,
+            8
+          ],
+          "hint": "R=-123，U=65413，低133高255，发送85 FF 05；解码-12.3；错误无符号结果6541.3。",
+          "steps": [
+            "点击“负温度标准帧”，6个参数会自动填好。",
+            "从左到右检查温度、模式、雷达、故障、字节顺序、长度；先写预测，尤其发送与接收哪个字节会变。",
+            "点击“运行案例”；场景按钮本身不执行。等运行完成，看到运行记录已保存。",
+            "对照“发送载荷”和“接收载荷”两张表；查看control_bits、提取模式／雷达、decode_status，再看是否有有效温度。",
+            "本场景核对：R=-123，U=65413，低133高255，发送85 FF 05；解码-12.3；错误无符号结果6541.3。",
+            "把不一致处写进笔记，例如“我把|当成加法”“把frame误当成修改后的数组”；停笔自动保存。"
+          ]
+        },
+        {
+          "name": "双方大端",
+          "values": [
+            -12.3,
+            1,
+            1,
+            0,
+            1,
+            8
+          ],
+          "hint": "只交换前两格，发送FF 85 05；双方同用大端，所以仍还原-12.3。",
+          "steps": [
+            "点击“双方大端”，6个参数会自动填好。",
+            "从左到右检查温度、模式、雷达、故障、字节顺序、长度；先写预测，尤其发送与接收哪个字节会变。",
+            "点击“运行案例”；场景按钮本身不执行。等运行完成，看到运行记录已保存。",
+            "对照“发送载荷”和“接收载荷”两张表；查看control_bits、提取模式／雷达、decode_status，再看是否有有效温度。",
+            "本场景核对：只交换前两格，发送FF 85 05；双方同用大端，所以仍还原-12.3。",
+            "把不一致处写进笔记，例如“我把|当成加法”“把frame误当成修改后的数组”；停笔自动保存。"
+          ]
+        },
+        {
+          "name": "模式损坏",
+          "values": [
+            -12.3,
+            1,
+            1,
+            1,
+            0,
+            8
+          ],
+          "hint": "发送控制05，接收07；最低两位11表示3，decode_status=-2，无有效温度。",
+          "steps": [
+            "点击“模式损坏”，6个参数会自动填好。",
+            "从左到右检查温度、模式、雷达、故障、字节顺序、长度；先写预测，尤其发送与接收哪个字节会变。",
+            "点击“运行案例”；场景按钮本身不执行。等运行完成，看到运行记录已保存。",
+            "对照“发送载荷”和“接收载荷”两张表；查看control_bits、提取模式／雷达、decode_status，再看是否有有效温度。",
+            "本场景核对：发送控制05，接收07；最低两位11表示3，decode_status=-2，无有效温度。",
+            "把不一致处写进笔记，例如“我把|当成加法”“把frame误当成修改后的数组”；停笔自动保存。"
+          ]
+        },
+        {
+          "name": "保留位污染",
+          "values": [
+            -12.3,
+            1,
+            1,
+            2,
+            0,
+            8
+          ],
+          "hint": "接收控制0D=13；13&248=8，保留bit3非零，解码拒绝。",
+          "steps": [
+            "点击“保留位污染”，6个参数会自动填好。",
+            "从左到右检查温度、模式、雷达、故障、字节顺序、长度；先写预测，尤其发送与接收哪个字节会变。",
+            "点击“运行案例”；场景按钮本身不执行。等运行完成，看到运行记录已保存。",
+            "对照“发送载荷”和“接收载荷”两张表；查看control_bits、提取模式／雷达、decode_status，再看是否有有效温度。",
+            "本场景核对：接收控制0D=13；13&248=8，保留bit3非零，解码拒绝。",
+            "把不一致处写进笔记，例如“我把|当成加法”“把frame误当成修改后的数组”；停笔自动保存。"
+          ]
+        },
+        {
+          "name": "位翻转仍合法",
+          "values": [
+            -12.3,
+            1,
+            1,
+            3,
+            0,
+            8
+          ],
+          "hint": "第0字节85变84，温度变-12.4；decode_status=0，演示字段校验不能发现所有故障。",
+          "steps": [
+            "点击“位翻转仍合法”，6个参数会自动填好。",
+            "从左到右检查温度、模式、雷达、故障、字节顺序、长度；先写预测，尤其发送与接收哪个字节会变。",
+            "点击“运行案例”；场景按钮本身不执行。等运行完成，看到运行记录已保存。",
+            "对照“发送载荷”和“接收载荷”两张表；查看control_bits、提取模式／雷达、decode_status，再看是否有有效温度。",
+            "本场景核对：第0字节85变84，温度变-12.4；decode_status=0，演示字段校验不能发现所有故障。",
+            "把不一致处写进笔记，例如“我把|当成加法”“把frame误当成修改后的数组”；停笔自动保存。"
+          ]
+        },
+        {
+          "name": "清雷达位",
+          "values": [
+            -12.3,
+            1,
+            1,
+            4,
+            0,
+            8
+          ],
+          "hint": "05&~04=01，提取雷达0；协议解码成功，但雷达数据标志无效。",
+          "steps": [
+            "点击“清雷达位”，6个参数会自动填好。",
+            "从左到右检查温度、模式、雷达、故障、字节顺序、长度；先写预测，尤其发送与接收哪个字节会变。",
+            "点击“运行案例”；场景按钮本身不执行。等运行完成，看到运行记录已保存。",
+            "对照“发送载荷”和“接收载荷”两张表；查看control_bits、提取模式／雷达、decode_status，再看是否有有效温度。",
+            "本场景核对：05&~04=01，提取雷达0；协议解码成功，但雷达数据标志无效。",
+            "把不一致处写进笔记，例如“我把|当成加法”“把frame误当成修改后的数组”；停笔自动保存。"
+          ]
+        },
+        {
+          "name": "端序不匹配",
+          "values": [
+            -12.3,
+            1,
+            1,
+            0,
+            2,
+            8
+          ],
+          "hint": "发送85 FF，错误大端拼34303，符号刻度-31233越界；decode_status=-2。",
+          "steps": [
+            "点击“端序不匹配”，6个参数会自动填好。",
+            "从左到右检查温度、模式、雷达、故障、字节顺序、长度；先写预测，尤其发送与接收哪个字节会变。",
+            "点击“运行案例”；场景按钮本身不执行。等运行完成，看到运行记录已保存。",
+            "对照“发送载荷”和“接收载荷”两张表；查看control_bits、提取模式／雷达、decode_status，再看是否有有效温度。",
+            "本场景核对：发送85 FF，错误大端拼34303，符号刻度-31233越界；decode_status=-2。",
+            "把不一致处写进笔记，例如“我把|当成加法”“把frame误当成修改后的数组”；停笔自动保存。"
+          ]
+        },
+        {
+          "name": "迁移：-20.5℃",
+          "values": [
+            -20.5,
+            2,
+            1,
+            0,
+            0,
+            8
+          ],
+          "hint": "先自己算刻度、补码整数、高低字节、控制字节；填迁移答案后再运行核对。",
+          "steps": [
+            "点击“迁移：-20.5℃”，6个参数会自动填好。",
+            "从左到右检查温度、模式、雷达、故障、字节顺序、长度；先写预测，尤其发送与接收哪个字节会变。",
+            "点击“运行案例”；场景按钮本身不执行。等运行完成，看到运行记录已保存。",
+            "对照“发送载荷”和“接收载荷”两张表；查看control_bits、提取模式／雷达、decode_status，再看是否有有效温度。",
+            "本场景核对：先自己算刻度、补码整数、高低字节、控制字节；填迁移答案后再运行核对。",
+            "把不一致处写进笔记，例如“我把|当成加法”“把frame误当成修改后的数组”；停笔自动保存。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "先在“学课程”的bit演示中选择mode1、radar1，看shift和OR的每一列，再点bit3观察保留位错误。演示不会记作通关实验。",
+        "进入“跑案例”，8个场景按顺序逐个点击；每次再点“运行案例”，才生成运行记录。",
+        "前两例对比小端与大端；第3—7例对比非法值、漏检、业务无效与端序错误；不要把所有情况都叫编码失败。",
+        "第8例先手算并到检测区填写，再运行核对。实验清单全部打勾后才提交测验。",
+        "在线输出是浏览器模拟。本地完整服务运行同一份C程序；源码下载后也可按讲义命令独立编译。"
+      ],
+      "test_steps": [
+        "确认8个指定实验均显示“已运行”；缺哪个就点击该行“去运行”，再点击运行按钮。",
+        "回答10道单选题；先独立算二进制，不要只背上一例的十进制答案。",
+        "迁移输入-20.5℃、mode2、radar1：填写6个十进制计算答案；高低字节请填数字而不是FF字符串。",
+        "提交检测；错误项会解释推导过程。补做后可以重试，笔记不会被清空。",
+        "全部通过才解锁D05；D05尚待你反馈后制作。需要跳过时可自定义通关，会保持标为手动。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "一个uint8_t字节里，00000101的值和bit2的权重分别是什么？",
+          "options": [
+            "值5，bit2权重4",
+            "值101，bit2权重2",
+            "值3，bit2权重1"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "为什么mode用2位而radar用1位？",
+          "options": [
+            "因为所有状态都必须占3位",
+            "三种mode至少需4种组合的2位；radar两种状态需1位",
+            "因为CAN固定要求所有mode放2位"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "mode2与radar1组合：2 | (1<<2)得到多少？",
+          "options": [
+            "3",
+            "1",
+            "6"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "控制字节6：mode=6&3，radar=(6>>2)&1分别是多少？",
+          "options": [
+            "2和1",
+            "6和4",
+            "3和0"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "1|1和1+1的结果分别是什么？",
+          "options": [
+            "都为2",
+            "1和2",
+            "2和1"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "为什么control&~4能够清除雷达位？",
+          "options": [
+            "它把所有位都清零",
+            "因为~4只反转bit2",
+            "低8位掩码11111011仅把bit2与0，其余与1保留"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "表达式(uint32_t)data[1]<<8中的转换有什么作用？",
+          "options": [
+            "在移位前明确32位无符号操作数，避免依赖小类型的整数提升",
+            "让data[1]永久变成32位数组元素",
+            "表示取data[1]的地址"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "raw=65413按16位补码如何还原符号？",
+          "options": [
+            "直接65413×0.1",
+            "先在能装此数的有符号类型中减65536，得到-123",
+            "左移负数直到变小"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "%02X%s与i==7 ? \"换行\" : \"空格\"在循环中做什么？",
+          "options": [
+            "只在i7打印一个字节",
+            "按十进制打印，全部不换行",
+            "每次打印至少2位十六进制和分隔符，最后换行"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "翻转85的bit0得到84，解码仍成功但温度变了，说明什么？",
+          "options": [
+            "协议字段合法检查不能发现所有数据变化",
+            "decode成功就证明传输绝无错误",
+            "C的位运算一定算错了"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "独立迁移：-20.5℃，模式2，雷达1，无损坏，双方小端，长度8。填写十进制值，解释“为什么这些字节能还原负数”。",
+        "values": [
+          -20.5,
+          2,
+          1,
+          0,
+          0,
+          8
+        ],
+        "fields": [
+          {
+            "id": "signed_raw",
+            "label": "有符号刻度R",
+            "kind": "number"
+          },
+          {
+            "id": "unsigned_raw",
+            "label": "16位补码对应无符号整数U",
+            "kind": "number"
+          },
+          {
+            "id": "low",
+            "label": "低字节（十进制）",
+            "kind": "number"
+          },
+          {
+            "id": "high",
+            "label": "高字节（十进制）",
+            "kind": "number"
+          },
+          {
+            "id": "control",
+            "label": "控制字节（十进制）",
+            "kind": "number"
+          },
+          {
+            "id": "recovered",
+            "label": "接收还原温度（℃）",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "R=round(温度×10)；先确定是否为负。",
+          "R<0时U=65536+R，否则U=R。",
+          "high=U÷256取整数商；low=U-high×256；小端先低后高。",
+          "control=mode|(radar<<2)，画出两组不重叠的bit再算。",
+          "接收拼U；若U≥32768就在有符号中减65536；最后乘0.1得到温度。",
+          "先填答案，再用“将这组输入带到运行区”核对。"
+        ]
+      },
+      "pass_rule": "本浏览器内判定题目、指定实验和模拟回归。此结果只表示在线练习通过；真实C与正式通关请在本地完成。",
+      "code": "/* D04：温度信号编解码。自定义教学协议，不连接CAN设备。\n * 前2字节：16位补码整数，每刻度0.1摄氏度；第3字节：模式和雷达位。\n * 第4—8字节保留为0。这里只模拟载荷，不实现CAN驱动或安全控制器。 */\n#include <stdio.h>   /* scanf读输入；printf将观察结果打印出来。 */\n#include <stdint.h>  /* uint8_t是8位无符号整数；uint32_t是32位无符号整数。 */\n#include <stddef.h>  /* size_t用于长度；NULL表示没有可用地址。 */\n#include <math.h>    /* isfinite检查有限数；roundf对float四舍五入。 */\n\n/* 函数声明：先告诉编译器名字、参数和返回类型；实现放在main后面。\n * const限制通过该指针写数据；没有const的输出指针允许写回结果。\n * EncodeTemp/DecodeTemp：0成功，-1接口错误，-2数值或协议错误。 */\nint EncodeTemp(float temperature, int mode, int radar, int big,\n               uint8_t *data, size_t length);\nint DecodeTemp(const uint8_t *data, size_t length, int big, float *temperature);\nvoid PrintFrame(const char *name, const uint8_t *data);\nvoid PrintBits(const char *name, uint32_t value, unsigned int width);\n\nint main(void) {\n    /* [入口变量] main从这里开始。数组8格，下标0—7；{0}初始化全部格子。\n     * main里的对象通常在栈或寄存器中；C标准不强制具体存储位置。 */\n    float temperature = 0.0f, decoded = 0.0f;\n    int mode = 0, radar = 0, damage = 0, order = 0, length_input = 8;\n    uint8_t data[8] = {0};\n\n    /* [读取输入] 输入顺序：温度 模式 雷达 故障 字节顺序 长度。\n     * &temperature是变量地址；scanf成功写入6个变量才返回6。\n     * order：0双方小端；1双方大端；2发送小端但接收误用大端。 */\n    if (scanf(\"%f %d %d %d %d %d\", &temperature, &mode, &radar,\n              &damage, &order, &length_input) != 6) {\n        printf(\"status=-3\\nvalid=0\\n\");\n        return 0; /* 结束main；业务错误已经打印，进程正常结束。 */\n    }\n    if (length_input != 8) {\n        printf(\"status=-1\\nvalid=0\\n\");\n        return 0; /* 长度错误时不访问任何载荷元素。 */\n    }\n    if (damage < 0 || damage > 4 || order < 0 || order > 2) {\n        printf(\"status=-2\\nvalid=0\\n\");\n        return 0;\n    }\n\n    /* [进入编码] 比较表达式order==1得到0或1，作为发送字节顺序。\n     * 调用时main暂停；EncodeTemp写data，return状态再赋给status。 */\n    int status = EncodeTemp(temperature, mode, radar, order == 1, data, 8);\n    printf(\"status=%d\\nvalid=%d\\n\", status, status == 0);\n    if (status != 0) return 0;\n\n    /* [观察发送] 仅为解释重算raw，不把诊断值当正式接收结果。\n     * 先用int保存正负刻度，再用65536+负刻度取得16位补码的数值。\n     * -12.3×10=-123；65536-123=65413=0xFF85。 */\n    int raw_signed = (int)roundf(temperature * 10.0f);\n    uint32_t raw_unsigned = (uint32_t)(raw_signed < 0 ? 65536 + raw_signed : raw_signed);\n    printf(\"raw_signed=%d\\nraw_unsigned=%u\\nlow=%u\\nhigh=%u\\n\",\n           raw_signed, (unsigned int)raw_unsigned,\n           (unsigned int)(raw_unsigned & 255u), (unsigned int)((raw_unsigned >> 8) & 255u));\n    printf(\"control=%u\\n\", (unsigned int)data[2]);\n    PrintBits(\"raw_bits\", raw_unsigned, 16u);\n    PrintBits(\"control_bits\", (uint32_t)data[2], 8u);\n    PrintFrame(\"frame\", data);\n\n    /* [故障注入] 顺序：先打印发送帧，再改内存，再解码接收帧。\n     * |置1；&加反掩码清0；^翻转。先升到uint32_t，位运算使用无符号数。\n     * 3u=00000011；8u=00001000；4u=00000100（这里只画低8位）。 */\n    if (damage == 1) data[2] = (uint8_t)((uint32_t)data[2] | 3u);\n    if (damage == 2) data[2] = (uint8_t)((uint32_t)data[2] | 8u);\n    if (damage == 3) data[0] = (uint8_t)((uint32_t)data[0] ^ 1u);\n    if (damage == 4) data[2] = (uint8_t)((uint32_t)data[2] & ~4u);\n    PrintFrame(\"received_frame\", data);\n    PrintBits(\"received_bits\", (uint32_t)data[2], 8u);\n    printf(\"received_control=%u\\nextracted_mode=%u\\nextracted_radar=%u\\nreserved=%u\\n\",\n           (unsigned int)data[2], (unsigned int)((uint32_t)data[2] & 3u),\n           (unsigned int)(((uint32_t)data[2] >> 2) & 1u),\n           (unsigned int)((uint32_t)data[2] & 248u));\n\n    /* [回到接收] order!=0表示接收方用大端，order2故意与发送方不一致。\n     * unsigned_wrong是故意忽略符号的错误算法，不能当有效温度消费。 */\n    uint32_t received_raw;\n    if (order != 0) received_raw = ((uint32_t)data[0] << 8) | (uint32_t)data[1];\n    else received_raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    printf(\"received_raw=%u\\nunsigned_wrong=%.1f\\n\",\n           (unsigned int)received_raw, (double)((float)received_raw * 0.1f));\n    status = DecodeTemp(data, 8, order != 0, &decoded);\n    printf(\"decode_status=%d\\ndecode_valid=%d\\n\", status, status == 0);\n    if (status == 0) printf(\"decoded_temperature=%.1f\\n\", (double)decoded);\n    return 0;\n}\n\nint EncodeTemp(float temperature, int mode, int radar, int big,\n               uint8_t *data, size_t length) {\n    /* [编码校验] 先查地址和长度，再查数值；全通过才开始改data。\n     * !表示逻辑取反；||表示任一条件成立就拒绝，不是合并bit的|。 */\n    if (data == NULL || length != 8) return -1;\n    if (!isfinite(temperature) || temperature < -40.0f || temperature > 125.0f\n        || mode < 0 || mode > 2 || radar < 0 || radar > 1\n        || big < 0 || big > 1) return -2;\n\n    /* [量化与符号] 本例刻度范围-400—1250，C的int至少能容纳。\n     * 65536是2的16次方。负刻度加65536得到0—65535内的16位编码。\n     * 不对负数移位；不依赖超范围uint16_t转int16_t的实现行为。 */\n    int signed_raw = (int)roundf(temperature * 10.0f);\n    uint32_t raw = (uint32_t)(signed_raw < 0 ? 65536 + signed_raw : signed_raw);\n\n    /* [拆字节] &255只保留低8位；>>8让高字节来到最低位置。\n     * 小端低字节先写；大端高字节先写。这是协议选择，独立于CPU端序。 */\n    uint8_t low = (uint8_t)(raw & 255u);\n    uint8_t high = (uint8_t)((raw >> 8) & 255u);\n    if (big == 0) { data[0] = low; data[1] = high; }\n    else { data[0] = high; data[1] = low; }\n\n    /* [打包控制] mode占bit0—1，radar占bit2；字段不重叠才这样组合。\n     * mode2=00000010；radar1<<2=00000100；OR得到00000110，即6。\n     * uint8_t运算前通常会整数提升；显式转uint32_t固定无符号移位。 */\n    data[2] = (uint8_t)((uint32_t)mode | ((uint32_t)radar << 2));\n    for (size_t i = 3; i < 8; i++) data[i] = 0;\n    /* 状态经return输出，8字节经data指针写回。 */\n    return 0;\n}\n\nint DecodeTemp(const uint8_t *data, size_t length, int big, float *temperature) {\n    /* [解码校验] 模式3非法；bit3—7和后5字节必须为0。\n     * (data[2]&3)提取模式；(data[2]&248)挑出保留位。\n     * 雷达0是合法协议值，表示无效；上层是否使用它需要另行判断。 */\n    if (data == NULL || temperature == NULL || length != 8) return -1;\n    if (big < 0 || big > 1 || ((uint32_t)data[2] & 248u) != 0\n        || ((uint32_t)data[2] & 3u) > 2u) return -2;\n    for (size_t i = 3; i < 8; i++) if (data[i] != 0) return -2;\n\n    /* [拼回16位] 先转uint32_t再移位。高字节进入bit8—15，低字节留bit0—7。\n     * |逐位合并，不进位；0xFF00 | 0x0085 = 0xFF85 = 65413。 */\n    uint32_t raw;\n    if (big == 0) raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    else raw = ((uint32_t)data[0] << 8) | (uint32_t)data[1];\n\n    /* [还原负刻度] raw的bit15权重32768；它为1时，此补码协议表示负数。\n     * raw先转long（至少32位，能装65413），再减65536，避免无符号下溢。\n     * 65413-65536=-123；-123×0.1=-12.3摄氏度。 */\n    long signed_raw = (long)raw;\n    if (raw >= 32768u) signed_raw = signed_raw - 65536L;\n    if (signed_raw < -400L || signed_raw > 1250L) return -2;\n    *temperature = (float)signed_raw * 0.1f; /* *访问调用者的decoded并写值。 */\n    return 0;\n}\n\nvoid PrintFrame(const char *name, const uint8_t *data) {\n    /* [打印帧] name是文字如\"frame\"；%s打印文字；%02X打印至少2位大写十六进制。\n     * ?:只选择本次要打印的分隔符。最后i7用换行，前7次用空格。\n     * PrintFrame返回void：只打印，不向调用者返回数值。 */\n    printf(\"%s=\", name);\n    for (size_t i = 0; i < 8; i++) {\n        printf(\"%02X%s\", (unsigned int)data[i], i == 7 ? \"\\n\" : \" \");\n    }\n}\n\nvoid PrintBits(const char *name, uint32_t value, unsigned int width) {\n    /* [打印位] 从高位到低位：width8时依次检查bit7、6、5、4、3、2、1、0。\n     * i从8减到1；i-1作为位号，避免unsigned i减到0后继续变成大数。\n     * (value>>(i-1))&1把这一位移到bit0再取出，只可能0或1。\n     * 本程序只用width8/16，不允许任意外部移位量。 */\n    printf(\"%s=\", name);\n    for (unsigned int i = width; i > 0u; i--) {\n        printf(\"%u\", (unsigned int)((value >> (i - 1u)) & 1u));\n    }\n    printf(\"\\n\");\n}\n"
     }
   },
   "rules": {
@@ -1584,6 +2250,174 @@
           ],
           "lab6",
           "迁移实验"
+        ]
+      ]
+    },
+    "4": {
+      "correct": {
+        "q1": 0,
+        "q2": 1,
+        "q3": 2,
+        "q4": 0,
+        "q5": 1,
+        "q6": 2,
+        "q7": 0,
+        "q8": 1,
+        "q9": 2,
+        "q10": 0
+      },
+      "explanations": {
+        "q1": "00000101=4+1=5；bit2权重2的2次方=4。",
+        "q2": "mode有3种状态，1位只有2种组合，至少2位；radar两种状态用1位。",
+        "q3": "2=010，1<<2=100，OR逐列得到110=6。",
+        "q4": "6&3=2；(6>>2)&1=1。",
+        "q5": "OR不进位：1|1=1；加法进位：1+1=2。",
+        "q6": "~4的低8位是11111011，与它相与只清bit2。",
+        "q7": "小类型参与算式可能先升成int；先转uint32_t明确无符号32位移位，不改变对象本身。",
+        "q8": "65413先转long，再减65536=-123；忽略符号会得到巨大正温度。",
+        "q9": "每次循环都打印一格；%02X最少2位大写十六进制，%s打印所选分隔符。",
+        "q10": "变为-12.4仍在范围内、字段也合法；这套检查无法发现所有数据变化。"
+      },
+      "numeric": {
+        "signed_raw": [
+          -205,
+          "-20.5×10=-205刻度。"
+        ],
+        "unsigned_raw": [
+          65331,
+          "65536+(-205)=65331。"
+        ],
+        "low": [
+          51,
+          "65331=255×256+51，所以低字节51=33。"
+        ],
+        "high": [
+          255,
+          "65331÷256取整255=FF。"
+        ],
+        "control": [
+          6,
+          "mode2的010与radar1<<2的100按位或为110=6。"
+        ],
+        "recovered": [
+          -20.5,
+          "65331-65536=-205；乘0.1=-20.5℃。"
+        ]
+      },
+      "labels": {
+        "q1": "bit权重",
+        "q2": "字段位宽",
+        "q3": "按位组合",
+        "q4": "掩码提取",
+        "q5": "或与加法",
+        "q6": "清位",
+        "q7": "整数提升",
+        "q8": "补码符号",
+        "q9": "打印与循环",
+        "q10": "错误检测边界",
+        "signed_raw": "迁移signed_raw",
+        "unsigned_raw": "迁移unsigned_raw",
+        "low": "迁移low",
+        "high": "迁移high",
+        "control": "迁移control",
+        "recovered": "迁移recovered"
+      },
+      "needed": [
+        [
+          [
+            -12.3,
+            1,
+            1,
+            0,
+            0,
+            8
+          ],
+          "lab0",
+          "负温度标准帧"
+        ],
+        [
+          [
+            -12.3,
+            1,
+            1,
+            0,
+            1,
+            8
+          ],
+          "lab1",
+          "双方大端"
+        ],
+        [
+          [
+            -12.3,
+            1,
+            1,
+            1,
+            0,
+            8
+          ],
+          "lab2",
+          "模式损坏"
+        ],
+        [
+          [
+            -12.3,
+            1,
+            1,
+            2,
+            0,
+            8
+          ],
+          "lab3",
+          "保留位污染"
+        ],
+        [
+          [
+            -12.3,
+            1,
+            1,
+            3,
+            0,
+            8
+          ],
+          "lab4",
+          "位翻转仍合法"
+        ],
+        [
+          [
+            -12.3,
+            1,
+            1,
+            4,
+            0,
+            8
+          ],
+          "lab5",
+          "清雷达位"
+        ],
+        [
+          [
+            -12.3,
+            1,
+            1,
+            0,
+            2,
+            8
+          ],
+          "lab6",
+          "端序不匹配"
+        ],
+        [
+          [
+            -20.5,
+            2,
+            1,
+            0,
+            0,
+            8
+          ],
+          "lab7",
+          "迁移：-20.5℃"
         ]
       ]
     }
