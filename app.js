@@ -66,7 +66,7 @@ function coloredCode(target,source,firstLine=1){
   const token=/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:0[xX][\da-fA-F]+|\b(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)[uUlLfF]*|\b[a-zA-Z_]\w*\b|[\s\S]/g;
   for(const match of source.matchAll(token)){const t=match[0];let cls='';
     if(t.startsWith('/*')||t.startsWith('//'))cls='syntax-comment';else if(t[0]==='"'||t[0]==="'")cls='syntax-string';else if(/^\d/.test(t))cls='syntax-number';
-    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process)$/.test(t))cls='syntax-function';
+    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|Codec_Encode|Codec_Decode|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process)$/.test(t))cls='syntax-function';
     t.split('\n').forEach((part,i)=>{if(i)newLine();if(part){const span=document.createElement('span');span.className=cls;span.textContent=part;content.append(span);}});
   }
 }
@@ -81,6 +81,7 @@ function showStep(index){
 }
 $('prevStep').onclick=()=>showStep(stepIndex-1);$('nextStep').onclick=()=>showStep(stepIndex+1);
 function renderCode(){
+  $('downloadProject')?.remove();
   coloredCode($('code'),lesson.code);
   codeView='original';$('code').hidden=false;$('codeNotesLabel').hidden=true;
   $('architectureFlow').textContent=lesson.flow_text||'main入口 → 输入 → 业务函数 → 状态返回 → main决定是否显示结果';
@@ -150,7 +151,8 @@ async function selectDay(d){
   $('goals').replaceChildren();for(const goal of lesson.goals){const li=document.createElement('li');li.textContent=goal;$('goals').append(li);}
   renderCode();renderBitLab();$('reading').replaceChildren();
   for(const r of (lesson.code_sections?lesson.reading.slice(1):lesson.reading)){const section=document.createElement('section'),h=document.createElement('h3');h.textContent=r.title;section.append(h);for(const text of r.text.split('\n')){const p=document.createElement('p');p.textContent=text;section.append(p);}if(r.table)section.append(makeTable(r.table.headers,r.table.rows));for(const source of r.sources||[]){const p=document.createElement('p'),a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';p.append(a);section.append(p);}$('reading').append(section);}
-  for(const asset of lesson.assets||[]){const section=document.createElement('section'),h=document.createElement('h3'),pre=document.createElement('pre'),button=document.createElement('button');h.textContent='完整协议文件 · '+asset.name;pre.textContent=asset.text;pre.style.maxHeight='none';button.textContent='下载 '+asset.name;button.onclick=()=>download(asset.text,asset.name,'text/plain;charset=utf-8');section.append(h,pre,button);$('reading').append(section);}
+  for(const asset of lesson.assets||[]){const section=document.createElement('section'),h=document.createElement('h3'),pre=document.createElement('pre'),button=document.createElement('button');h.textContent='完整文件 · '+asset.name;pre.textContent=asset.text;pre.style.maxHeight='none';button.textContent='下载 '+asset.name;button.onclick=()=>download(asset.text,asset.name,'text/plain;charset=utf-8');section.append(h,pre,button);$('reading').append(section);}
+  if(lesson.project_name){const button=document.createElement('button');button.textContent='下载完整项目ZIP';button.id='downloadProject';button.className='primary';button.onclick=()=>download(projectZip(lesson.assets,lesson.project_name),lesson.project_name+'.zip','application/zip');$('architecture').append(button);}
   if(lesson.reference){const section=document.createElement('section'),h=document.createElement('h3'),p=document.createElement('p');h.textContent='独立工具实测参考 · 不是浏览器现场运行';p.textContent=`工具cantools ${lesson.reference.version}，实际读取DBC；每行同时与手工C和协议向量一致。`;section.append(h,p,makeTable(['输入速度／模式／雷达','factor／offset／width','工具编码字节','工具解码速度'],lesson.reference.vectors.map(v=>[v.values.slice(0,3).join(' / '),`${v.factor} / ${v.offset} / ${v.width}`,v.frame.map(x=>x.toString(16).toUpperCase().padStart(2,'0')).join(' '),v.decoded])));$('reading').append(section);}
   renderFields('runFields',lesson.run_fields);renderFields('answerFields',lesson.practice.fields,'answer-');
   steps('labSteps',lesson.lab_steps);steps('testSteps',lesson.test_steps);steps('practiceSteps',lesson.practice.steps);
@@ -175,7 +177,12 @@ $('runButton').onclick=async()=>{
   try{const values=lesson.run_fields.map(f=>$(f.id).value.trim());const result=await api('/api/run',{day,values});
     $('output').replaceChildren();const grid=document.createElement('div');grid.className='output-grid';
     let explanation,summaryText;
-    if(lesson.runner==='dbc_day05'){
+    if(lesson.runner==='module_day06'){
+      grid.append(item('构建状态',result.build_status===0?'通过':'预期构建错误',result.build_status===0?'good':'bad'),item('当前阶段',['','编译阶段','链接阶段','运行阶段'][result.build_stage]),item('程序是否运行',result.program_ran?'是':'否'),item('测试阶段',result.test_passed?'通过':'未执行'));
+      if(result.program_ran){grid.append(item('业务status',result.status,result.valid?'good':'bad'),item('结果valid',result.valid));if(result.valid)grid.append(item('raw',result.raw),item('还原车速km/h',result.decoded_speed.toFixed(1)));}
+      explanation=!result.program_ran?({missing_definition:'声明已可见，但链接缺少codec实现；程序未生成，Codec_Encode没有执行。',duplicate_definition:'同一个外部函数有两份定义；链接报multiple definition。把实现归属一个库，不要重复加入。',header_redefinition:'无保护重复展开enum，在编译阶段重定义；恢复头文件保护。'}[result.error_kind]):!result.valid?'构建与独立测试已经通过；这次业务输入被长度或数值检查拒绝。构建成功与业务成功分开。':`模块正常调用：${values[0]}×10=${result.raw}；发送低高字节后解码${result.decoded_speed.toFixed(1)}km/h。demo和test分别链接，共享codec库。`;
+      summaryText=`构建${result.build_status}，阶段${result.build_stage}，运行${result.program_ran}${result.program_ran?'，业务status'+result.status:''}`;
+    }else if(lesson.runner==='dbc_day05'){
       grid.append(item('编码status',result.status,result.valid?'good':'bad'),item('编码valid',result.valid));
       if(result.factor!==undefined)grid.append(item('发送factor / offset',`${result.factor} / ${result.offset}`),item('字段位宽bit',result.width),item('raw最大可表示值',result.raw_limit));
       if(result.valid){grid.append(item('原始刻度raw',result.raw),item('控制字节',result.control),item('接收factor / offset',`${result.receive_factor} / ${result.receive_offset}`),item('解码status',result.decode_status,result.decode_valid?'good':'bad'));if(result.decode_valid)grid.append(item('还原速度km/h',result.decoded_speed.toFixed(2),'good'));}
@@ -203,6 +210,11 @@ $('runButton').onclick=async()=>{
       summaryText=`${mode}，status=${result.status}，valid=${result.valid}${result.valid?`，期望=${result.desired}m，误差=${result.error}m`:''}`;
     }
     $('output').append(grid);const p=document.createElement('p');p.textContent=explanation;$('output').append(p);
+    if(lesson.runner==='module_day06'){
+      $('output').append(makeTable(['构建顺序','本次结果'],[['1 · 预处理/编译',result.build_stage===1?'在这里失败':'编译阶段已通过'],['2 · 链接实现和依赖',result.build_stage===1?'未到此处':result.build_stage===2?'在这里失败':'demo/test分别链接完成'],['3 · 测试与运行',result.program_ran?'测试后运行demo':'程序未生成，不运行']]));
+      if(result.frame)$('output').append(makeTable(['字节下标','十六进制','职责'],result.frame.map((v,i)=>[i,v.toString(16).toUpperCase().padStart(2,'0'),['车速低8位','车速高8位','模式与雷达'][i]||'保留0'])));
+      const log=document.createElement('details'),heading=document.createElement('summary'),pre=document.createElement('pre');heading.textContent=window.pagesAPI?'查看模拟构建说明（没有执行编译器）':'查看真实构建与测试诊断';pre.textContent=result.compiler_log;log.append(heading,pre);$('output').append(log);
+    }
     if(['bits_day04','dbc_day05'].includes(lesson.runner)&&result.frame){
       for(const [label,frame] of [['发送载荷 · 故障修改前',result.frame],['接收载荷 · 故障修改后',result.received_frame]]){const h=document.createElement('h4');h.textContent=label;$('output').append(h,makeTable(['字节下标','十进制','十六进制','8位二进制','职责'],frame.map((v,i)=>[i,v,v.toString(16).toUpperCase().padStart(2,'0'),v.toString(2).padStart(8,'0'),i<2?(lesson.runner==='dbc_day05'?(i===0?'车速低8位':Number(values[4])===8?'8位配置时保留0':'车速高8位'):Number(values[4])===1?(i===0?'温度高8位':'温度低8位'):(i===0?'温度低8位':'温度高8位')):i===2?'bit0—1模式、bit2雷达':'保留0'])));}
     }
@@ -244,6 +256,15 @@ $('downloadLesson').onclick=()=>{
 };
 $('copyRequest').onclick=async()=>{try{await saveNotes();const status=state.progress.find(p=>p.day===day);const request=`我完成了D${String(day).padStart(2,'0')}的在线练习（${status?.method==='test'?'浏览器练习通过':'尚未检测或自定义通关'}；不是本地真实C通关）。请根据以下笔记检查薄弱项，制作下一课，并更新Pages课程。\n\n我的笔记：\n${$('notes').value.slice(0,8000)}\n\n希望优化：\n${$('feedback').value||'暂未填写'}\n\n我的源码注释（个人副本）：\n${$('codeNotes').value===lesson.code?'未修改':$('codeNotes').value.slice(0,20000)}\n\n保持：整体架构、完整中文代码、执行链、代码旁解释、代码注释自动保存、题号、详细实作、真实C在本地完成。`;await copy(request,$('requestFallback'));}catch(e){message(e.message);}};
 function download(text,name,type){const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function projectZip(assets,folder){
+  // 无外部库的ZIP存储模式；只打包公开课程assets，绝不加入个人笔记或授权。
+  const encoder=new TextEncoder(),chunks=[],central=[];let offset=0;
+  function crc(bytes){let c=0xffffffff;for(const b of bytes){c^=b;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^0xffffffff)>>>0;}
+  for(const asset of assets){const name=encoder.encode(folder+'/'+asset.name),body=encoder.encode(asset.text),checksum=crc(body),header=new Uint8Array(30),v=new DataView(header.buffer);v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint16(6,0x0800,true);v.setUint16(12,0x5d4c,true);v.setUint32(14,checksum,true);v.setUint32(18,body.length,true);v.setUint32(22,body.length,true);v.setUint16(26,name.length,true);chunks.push(header,name,body);
+    const entry=new Uint8Array(46),e=new DataView(entry.buffer);e.setUint32(0,0x02014b50,true);e.setUint16(4,20,true);e.setUint16(6,20,true);e.setUint16(8,0x0800,true);e.setUint16(14,0x5d4c,true);e.setUint32(16,checksum,true);e.setUint32(20,body.length,true);e.setUint32(24,body.length,true);e.setUint16(28,name.length,true);e.setUint32(42,offset,true);central.push(entry,name);offset+=header.length+name.length+body.length;
+  }
+  const size=central.reduce((sum,b)=>sum+b.length,0),end=new Uint8Array(22),e=new DataView(end.buffer);e.setUint32(0,0x06054b50,true);e.setUint16(8,assets.length,true);e.setUint16(10,assets.length,true);e.setUint32(12,size,true);e.setUint32(16,offset,true);chunks.push(...central,end);const result=new Uint8Array(offset+size+22);let i=0;for(const chunk of chunks){result.set(chunk,i);i+=chunk.length;}return result;
+}
 async function exportReport(){await saveNotes();const text=await api('/api/report?day='+day);download(text,`D${String(day).padStart(2,'0')}-在线练习报告.md`,'text/markdown;charset=utf-8');}
 for(const id of ['exportReport','reportSide'])$(id).onclick=()=>exportReport().catch(e=>message(e.message));
 $('backup').onclick=async()=>{try{await saveNotes();const data=await api('/api/backup');download(JSON.stringify(data,null,2),'智驾学习数据备份.json','application/json');message('全部学习数据已导出。');}catch(e){message(e.message);}};

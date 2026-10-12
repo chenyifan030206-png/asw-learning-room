@@ -82,6 +82,12 @@ function pagesSimulate(day,values){
     if(length===8)Object.assign(result,{factor:profile===1?0.01:0.1,offset,width,raw_limit});
     Object.assign(result,{status,valid:Number(status===0)});
     if(status===0){const raw=scaled,control=mode|(radar<<2),frame=[raw&255,(raw>>>8)&255,control,0,0,0,0,0],received_frame=[...frame];if(damage===1)received_frame[2]|=3;if(damage===2)received_frame[2]|=8;const receive_factor=damage===3?0.01:result.factor,receive_offset=damage===3?0:offset,physical=f(f(raw*f(receive_factor))+receive_offset),received_control=received_frame[2],decode_status=(received_control&248)!==0||(received_control&3)>2||physical<0||physical>250?-2:0;Object.assign(result,{raw,control,frame,received_frame,receive_factor,receive_offset,received_control,decode_status,decode_valid:Number(decode_status===0)});if(decode_status===0)result.decoded_speed=Number(physical.toFixed(2));}
+  }else if(day===6){
+    const v=pagesNumbers(values,5),speed=f(v[0]),[mode,radar,length,scenario]=v.slice(1);
+    if(!v.slice(1).every(n=>Number.isInteger(n)&&n>=-100&&n<=100)||![0,1,2,3,4].includes(scenario))throw Error('模式、雷达、长度须为完整整数；构建场景0—4。');
+    const faults={1:['missing_definition',2,'模拟链接诊断：undefined reference；只给demo，没有codec实现。'],2:['duplicate_definition',2,'模拟链接诊断：multiple definition；重复加入codec实现。'],3:['header_redefinition',1,'模拟编译诊断：redeclaration；无保护重复展开enum。']};
+    if(faults[scenario]){const [error_kind,build_stage,compiler_log]=faults[scenario];result={build_status:-1,build_stage,error_kind,program_ran:0,test_passed:0,valid:0,compiler_log};}
+    else {const status=length!==8?-1:!Number.isFinite(speed)||speed<0||speed>250||mode<0||mode>2||radar<0||radar>1?-2:0;result={build_status:0,build_stage:3,error_kind:'none',program_ran:1,test_passed:1,status,valid:Number(status===0),compiler_log:'模拟构建流程：头文件展开 → 各.c编译 → codec库 → demo/test分别链接 → 模拟测试通过。没有执行编译器或CTest。'};if(status===0){const raw=Math.round(f(speed*10));Object.assign(result,{raw,frame:[raw&255,(raw>>>8)&255,mode|(radar<<2),0,0,0,0,0],decode_status:0,decode_valid:1,decoded_speed:Number(f(raw*f(0.1)).toFixed(1))});}}
   }else throw Error('在线模拟模块尚未发布。');
   result.stdout='浏览器模拟结果（不是C程序stdout）\n'+Object.entries(result).map(([k,v])=>`${k}=${Array.isArray(v)?v.join(','):v}`).join('\n');
   result.engine='在线版 · JavaScript浏览器模拟；没有编译或执行C';return result;
@@ -104,6 +110,7 @@ function pagesRegression(day){
     ['下界',[-40,1,1,0,0,8],{decoded_temperature:-40}],['上界',[125,1,1,0,0,8],{decoded_temperature:125}],
     ['负半数',[-12.25,1,1,0,0,8],{raw_signed:-123}],['越界',[-40.1,1,1,0,0,8],{status:-2}],['短帧',[-12.3,1,1,0,0,7],{status:-1}],['NaN',['nan',1,1,0,0,8],{status:-2}]];
   cases[5]=[['标准',[72.5,1,1,0,16,0,8],{frame:[213,2,5,0,0,0,0,0],decoded_speed:72.5}],['第二',[100,2,0,0,16,0,8],{frame:[232,3,2,0,0,0,0,0]}],['精细',[72.5,1,1,1,16,0,8],{raw:7250,frame:[82,28,5,0,0,0,0,0]}],['偏移',[72.5,1,1,2,16,0,8],{raw:825,decoded_speed:72.5}],['溢出',[72.5,1,1,0,8,0,8],{status:-2}],['模式',[72.5,1,1,0,16,1,8],{decode_status:-2}],['配置错',[72.5,1,1,0,16,3,8],{decoded_speed:7.25}],['迁移',[54.3,2,1,2,16,0,8],{raw:643,frame:[131,2,6,0,0,0,0,0],decoded_speed:54.3}],['8位边界',[25.5,1,1,0,8,0,8],{raw:255}],['精细边界',[2.55,1,1,1,8,0,8],{raw:255,decoded_speed:2.55}],['非法',['nan',1,1,0,16,0,8],{status:-2}]];
+  cases[6]=[['模块标准',[72.5,1,1,8,0],{build_status:0,frame:[213,2,5,0,0,0,0,0],decoded_speed:72.5}],['缺实现',[72.5,1,1,8,1],{build_status:-1,build_stage:2,program_ran:0}],['重复定义',[72.5,1,1,8,2],{build_status:-1,build_stage:2,program_ran:0}],['无保护',[72.5,1,1,8,3],{build_status:-1,build_stage:1,program_ran:0}],['恢复保护',[72.5,1,1,8,4],{build_status:0,decoded_speed:72.5}],['长度',[72.5,1,1,7,0],{build_status:0,status:-1}],['非法模式',[72.5,3,1,8,0],{build_status:0,status:-2}],['迁移',[54.3,2,1,8,0],{raw:543,frame:[31,2,6,0,0,0,0,0]}]];
   return cases[day].map(([name,input,expected])=>{const actual=pagesSimulate(day,input),passed=Object.entries(expected).every(([k,v])=>Array.isArray(v)?JSON.stringify(actual[k])===JSON.stringify(v):Math.abs(actual[k]-v)<0.001);return {name:'浏览器模拟 · '+name,passed,expected,actual};});
 }
 function pagesReport(day,bundle,db){
