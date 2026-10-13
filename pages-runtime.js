@@ -2,7 +2,9 @@
 // Pages没有服务端：这里的接口全在浏览器执行，绝不声称是C编译结果。
 const pagesBase = new URL('.', location.href);
 const pagesStorageKey = 'asw-pages-v1:' + pagesBase.pathname;
-const pagesReady = fetch(new URL('courses.json', pagesBase)).then(async r=>{
+const pagesCoursesURL=new URL('courses.json',pagesBase);
+pagesCoursesURL.searchParams.set('v',document.documentElement.dataset.courseVersion||'latest');
+const pagesReady = fetch(pagesCoursesURL,{cache:'no-store'}).then(async r=>{
   if(!r.ok)throw Error('课程资源读取失败，请检查Pages发布目录。');
   return r.json();
 });
@@ -17,7 +19,7 @@ function pagesStore(db){
 function pagesNow(){return new Date().toISOString();}
 function pagesState(bundle,db){
   let frontier=1;while(db.progress.some(p=>p.day===frontier)&&frontier<=84)frontier++;
-  return {app:'asw-pages-learning-v1',token:'browser-only',frontier:Math.min(frontier,84),all_complete:frontier>84,progress:db.progress,
+  return {app:'asw-pages-learning-v1',token:'browser-only',release:bundle.release||'旧版',frontier:Math.min(frontier,84),all_complete:frontier>84,progress:db.progress,
     courses:bundle.curriculum.map(c=>({day:c.day,title:c['主题'],week:c.week,stage:c.stage,published:!!bundle.lessons[c.day],unlocked:c.day<=frontier,completed:db.progress.some(p=>p.day===c.day),method:db.progress.find(p=>p.day===c.day)?.method}))};
 }
 function pagesAccess(day,bundle,db){

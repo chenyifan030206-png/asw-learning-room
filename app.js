@@ -37,8 +37,10 @@ for(const id of ['notes','feedback','codeNotes'])$(id).addEventListener('input',
 $('codeNotes').addEventListener('input',resizeCodeNotes);
 $('saveNotes').onclick=()=>saveNotes().then(()=>message('笔记和流程反馈已保存。')).catch(e=>message(e.message));
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+$('refreshCourses')?.addEventListener('click',async()=>{try{await saveNotes();const url=new URL(location.href);url.searchParams.set('coursesUpdate',Date.now());location.assign(url.href);}catch(e){message('先保存笔记再刷新：'+e.message);}});
 
 function drawRoute(){
+  if($('courseStatus')){const published=state.courses.filter(c=>c.published);$('courseStatus').textContent=`已加载 ${published.length} 课（D01—D${String(published.at(-1)?.day||1).padStart(2,'0')}） · 已完成 ${state.progress.length} 天 · 当前可进入 D${String(state.frontier).padStart(2,'0')} · 课程版本 ${state.release||'本地版'}。${state.progress.length===0?'当前浏览器尚未恢复学习记录，可在下方连接云端或导入备份。':''}`;}
   const n=state.progress.length;$('progress').textContent=`完成 ${n}/84 天 · 已发布 ${state.courses.filter(c=>c.published).length} 课`;
   $('routeSummary').textContent=`· 当前可推进到 D${String(state.frontier).padStart(2,'0')}`;
   $('days').replaceChildren();
