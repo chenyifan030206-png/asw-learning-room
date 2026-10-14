@@ -198,7 +198,7 @@ async function selectDay(d){
   $('notes').value=record.notes;$('feedback').value=record.feedback;loadPersonalRecord(record);dirty=false;
   try{const draft=JSON.parse(localStorage.getItem(draftKey(day))||'null');if(draft){$('notes').value=draft.notes;$('feedback').value=draft.feedback;loadPersonalRecord({...record,...draft});dirty=true;}}catch(e){}
   renderAnnotations();
-  $('saveStatus').textContent=dirty?'已恢复未保存草稿，请立即保存。':record.updated?'已从电脑读取笔记':'尚无笔记';
+  $('saveStatus').textContent=dirty?'已恢复未保存草稿，请立即保存。':record.updated?'已从当前浏览器读取笔记':'尚无笔记';
   $('passRule').textContent=lesson.pass_rule;$('practiceText').textContent=lesson.practice.text;
   $('questions').replaceChildren();for(const [qi,q] of lesson.questions.entries()){const f=document.createElement('fieldset'),leg=document.createElement('legend');f.className='question';leg.textContent=`第${qi+1}题（${q.id}） · ${q.text}`;f.append(leg);q.options.forEach((o,i)=>{const label=document.createElement('label'),input=document.createElement('input'),span=document.createElement('span');input.type='radio';input.name=q.id;input.value=i;span.textContent=`${String.fromCharCode(65+i)}. ${o}`;label.append(input,span);f.append(label);});$('questions').append(f);}
   $('output').replaceChildren();const empty=document.createElement('p');empty.className='muted';empty.textContent='选一个场景，点击运行。';$('output').append(empty);
@@ -298,7 +298,7 @@ $('downloadLesson').onclick=()=>{
   parts.push('## 迁移任务',lesson.practice.text,...lesson.practice.steps,'## 自测题（不附答案）',...lesson.questions.map(q=>q.text+'\n'+q.options.map((o,i)=>`${i+1}. ${o}`).join('\n')));
   download(parts.join('\n\n'),`D${String(day).padStart(2,'0')}-完整讲义.md`,'text/markdown;charset=utf-8');
 };
-$('copyRequest').onclick=async()=>{try{await saveNotes();const status=state.progress.find(p=>p.day===day);const request=`我完成了D${String(day).padStart(2,'0')}的在线练习（${status?.method==='test'?'浏览器练习通过':'尚未检测或自定义通关'}；不是本地真实C通关）。请根据以下笔记检查薄弱项，制作下一课，并更新Pages课程。\n\n我的笔记：\n${$('notes').value.slice(0,8000)}\n\n希望优化：\n${$('feedback').value||'暂未填写'}\n\n我的源码注释（个人副本）：\n${$('codeNotes').value===lesson.code?'未修改':$('codeNotes').value.slice(0,20000)}\n\n我的划线批注：\n${annotations.filter(a=>!a.deleted).map(a=>a.scope+'：'+a.quote+'\n我的批注：'+(a.comment||'')).join('\n\n').slice(0,12000)}\n\n保持：整体架构、完整中文代码、执行链、代码旁解释、代码注释自动保存、题号、详细实作、真实C在本地完成。`;await copy(request,$('requestFallback'));}catch(e){message(e.message);}};
+$('copyRequest').onclick=async()=>{try{await saveNotes();const status=state.progress.find(p=>p.day===day);const request=`我完成了D${String(day).padStart(2,'0')}的在线练习（${status?.method==='test'?'浏览器练习通过':'尚未检测或自定义通关'}；不是本地真实C通关）。请根据以下笔记检查薄弱项，制作下一课，并更新Pages课程。\n\n我的笔记：\n${$('notes').value.slice(0,8000)}\n\n希望优化：\n${$('feedback').value||'暂未填写'}\n\n我的源码注释（个人副本）：\n${lesson.project_name?(Object.entries(fileNotes).map(([name,n])=>'文件：'+name+'\n'+n.text).join('\n\n').slice(0,20000)||'未修改'):($('codeNotes').value===lesson.code?'未修改':$('codeNotes').value.slice(0,20000))}\n\n我的划线批注：\n${annotations.filter(a=>!a.deleted).map(a=>a.scope+'：'+a.quote+'\n我的批注：'+(a.comment||'')).join('\n\n').slice(0,12000)}\n\n保持：整体架构、完整中文代码、执行链、代码旁解释、代码注释自动保存、题号、详细实作、真实C在本地完成。`;await copy(request,$('requestFallback'));}catch(e){message(e.message);}};
 function download(text,name,type){const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function projectZip(assets,folder){
   // 无外部库的ZIP存储模式；只打包公开课程assets，绝不加入个人笔记或授权。
