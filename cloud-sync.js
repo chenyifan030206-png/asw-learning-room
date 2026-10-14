@@ -13,6 +13,8 @@ function cloudClean(input){
     if(!row||!Number.isInteger(row.day)||row.day<1||row.day>84)throw Error('记录里的学习日无效。');
     if(t==='notes'&&(typeof row.notes!=='string'||typeof row.feedback!=='string'||row.notes.length+row.feedback.length>100000))throw Error('笔记格式或长度不正确。');
     if(t==='notes'&&row.code_notes!==undefined&&(typeof row.code_notes!=='string'||row.code_notes.length>200000))throw Error('源码注释格式或长度不正确。');
+    if(t==='notes')for(const key of ['annotations','file_notes'])if(row[key]!==undefined){if(typeof row[key]!=='string'||row[key].length>(key==='annotations'?400000:200000))throw Error('批注数据格式或长度不正确。');const parsed=JSON.parse(row[key]);if(key==='annotations'?!Array.isArray(parsed):!parsed||Array.isArray(parsed)||typeof parsed!=='object')throw Error('批注结构不正确。');}
+    if(t==='notes')for(const v of [row,...(Array.isArray(row.history)?row.history:[])])pagesValidateAnnotations(JSON.parse(v.annotations||'[]'),JSON.parse(v.file_notes||'{}'));
     if(t==='notes'&&row.history!==undefined&&(!Array.isArray(row.history)||row.history.some(v=>v.code_notes!==undefined&&(typeof v.code_notes!=='string'||v.code_notes.length>200000))))throw Error('源码注释历史格式不正确。');
     if(t==='progress'&&!['test','manual'].includes(row.method))throw Error('通关方式无效。');
     if(t==='runs'&&(typeof row.inputs!=='string'||typeof row.output!=='string'))throw Error('运行记录格式无效。');
@@ -24,7 +26,7 @@ function cloudClean(input){
 }
 function cloudVersions(note){
   const items=[...(note.history||[]),note];
-  return items.filter(n=>typeof n.notes==='string'&&typeof n.feedback==='string').map(n=>({day:note.day,notes:n.notes,feedback:n.feedback,...(n.code_notes!==undefined?{code_notes:n.code_notes}:{}),updated:n.updated||'',source:n.source||'browser'}));
+  return items.filter(n=>typeof n.notes==='string'&&typeof n.feedback==='string').map(n=>({day:note.day,notes:n.notes,feedback:n.feedback,...(n.code_notes!==undefined?{code_notes:n.code_notes}:{}),...(n.annotations!==undefined?{annotations:n.annotations}:{}),...(n.file_notes!==undefined?{file_notes:n.file_notes}:{}),updated:n.updated||'',source:n.source||'browser'}));
 }
 function cloudMerge(a,b){
   a=cloudClean(a);b=cloudClean(b);const out={notes:[],progress:[],runs:[],attempts:[]};
@@ -34,6 +36,12 @@ function cloudMerge(a,b){
     const current=history.pop();
     // 较旧客户端未发送code_notes时，也不能抹掉另一设备保存的个人源码。
     if(current.code_notes===undefined){const annotated=history.findLast(v=>v.code_notes!==undefined);if(annotated)current.code_notes=annotated.code_notes;}
+    const allVersions=[...history,current],marks=new Map(),files=Object.create(null);let hasMarks=false,hasFiles=false;
+    for(const v of allVersions){if(v.annotations!==undefined){hasMarks=true;for(const mark of JSON.parse(v.annotations)){if(!mark||typeof mark.id!=='string')throw Error('批注缺少ID。');const old=marks.get(mark.id);if(!old||cloudTime(mark)>cloudTime(old)||cloudTime(mark)===cloudTime(old)&&cloudCanonical(mark)>cloudCanonical(old))marks.set(mark.id,mark);}}
+      if(v.file_notes!==undefined){hasFiles=true;for(const [name,record] of Object.entries(JSON.parse(v.file_notes))){if(!record||typeof record.text!=='string')throw Error('逐文件注释缺少文本。');if(!files[name]||cloudTime(record)>=cloudTime(files[name]))files[name]=record;}}
+    }
+    if(hasMarks)current.annotations=JSON.stringify([...marks.values()].sort((x,y)=>x.id.localeCompare(y.id)));
+    if(hasFiles)current.file_notes=JSON.stringify(Object.fromEntries(Object.entries(files).sort(([x],[y])=>x.localeCompare(y))));
     out.notes.push({...current,history});
   }
   for(const day of [...new Set([...a.progress,...b.progress].map(n=>n.day))].sort((x,y)=>x-y)){
@@ -67,7 +75,7 @@ async function cloudRefresh(jump=false){
   state=await api('/api/state');drawRoute();completeUI();
   if(jump){const ready=state.courses.filter(c=>c.unlocked&&c.published),next=ready.find(c=>!c.completed)||ready.at(-1);if(next)await selectDay(next.day);}
   else if(!dirty&&!['notes','feedback','codeNotes'].includes(document.activeElement?.id)){
-    const n=pagesLoad().notes.find(n=>n.day===day);if(n){$('notes').value=n.notes;$('feedback').value=n.feedback;$('codeNotes').value=n.code_notes||lesson.code;resizeCodeNotes();if(codeView==='personal')coloredCode($('code'),$('codeNotes').value);}
+    const n=pagesLoad().notes.find(n=>n.day===day);if(n){$('notes').value=n.notes;$('feedback').value=n.feedback;loadPersonalRecord(n);resizeCodeNotes();if(codeView==='personal')coloredCode($('code'),$('codeNotes').value);renderAnnotations();}
   }
   cloudHistory();
 }
@@ -75,7 +83,7 @@ function cloudHistory(){
   const target=document.getElementById('cloudHistory');if(!target)return;target.replaceChildren();
   for(const note of pagesLoad().notes){const versions=cloudVersions(note);if(versions.length<2)continue;
     const section=document.createElement('details'),heading=document.createElement('summary');heading.textContent=`D${String(note.day).padStart(2,'0')} · ${versions.length}个笔记版本（全部保留）`;section.append(heading);
-    for(const v of versions){const p=document.createElement('p');p.textContent=`${v.updated} · ${v.source==='local-c'?'原本地记录':'浏览器记录'}`;const pre=document.createElement('pre');pre.textContent=`笔记：\n${v.notes}\n\n反馈：\n${v.feedback}\n\n源码注释：\n${v.code_notes||'该版本没有源码注释'}`;section.append(p,pre);}target.append(section);
+    for(const v of versions){const p=document.createElement('p');p.textContent=`${v.updated} · ${v.source==='local-c'?'原本地记录':'浏览器记录'}`;const pre=document.createElement('pre');pre.textContent=`笔记：\n${v.notes}\n\n反馈：\n${v.feedback}\n\n源码注释：\n${v.code_notes||'该版本没有源码注释'}\n\n划线批注：\n${v.annotations||"[]"}\n\n逐文件注释：\n${v.file_notes||"{}"}`;section.append(p,pre);}target.append(section);
   }
   if(!target.children.length)target.textContent='出现不同设备的笔记版本时，会在这里保留完整历史。';
 }

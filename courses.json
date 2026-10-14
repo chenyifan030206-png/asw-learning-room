@@ -2955,7 +2955,7 @@
         },
         {
           "title": "8 · 当前项目怎么运行：给你完整文件和命令",
-          "text": "网页完整源码day06.c是把codec.h、demo.c、codec.c拼成的单文件阅读副本，方便连续阅读和直接写注释。它能单独用GCC编译，但这样不会体验多文件链接。实际课程运行与构建实验使用day06_project五个原文件。\n点击“下载完整项目ZIP”，解压后进入day06_project目录。打开Ubuntu终端：cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug；cmake --build build；ctest --test-dir build --output-on-failure；./build/codec_demo，输入72.5 1 1 8并回车。\n本机WSL最初没有系统cmake，本课在learning_app/tools/linux-cmake中放了固定3.31.6工具；学习服务会直接调用，不修改系统软件包。终端可用其完整路径/mnt/c/Users/user/Desktop/asw/learning_app/tools/linux-cmake/cmake/data/bin/cmake替代cmake，ctest同目录。\n最小GCC对照：gcc -std=c17 -Wall -Wextra -Wpedantic -Wconversion -Werror demo.c codec.c -lm -o demo。只留demo.c会缺实现；将codec.c写两次会重复定义；这些是有意做的故障实验。不要在正常项目里复制实现来消除undefined reference。\n在线版只模拟已知的构建阶段与结果，不实际调用GCC/CMake。真实构建日志只在本地版出现；网页仍可下载完整工程，自己运行。个人源码注释不会被课程服务当成输入代码执行。"
+          "text": "网页现在按文件切换展示codec.h、codec.c、demo.c、test_codec.c与CMakeLists.txt。day06.c旧整合阅读副本仍保留在讲义中；实际课程构建使用独立项目文件，不执行个人注释。\n点击“下载完整项目ZIP”，解压后进入day06_project目录。打开Ubuntu终端：cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug；cmake --build build；ctest --test-dir build --output-on-failure；./build/codec_demo，输入72.5 1 1 8并回车。\n本机WSL最初没有系统cmake，本课在learning_app/tools/linux-cmake中放了固定3.31.6工具；学习服务会直接调用，不修改系统软件包。终端可用其完整路径/mnt/c/Users/user/Desktop/asw/learning_app/tools/linux-cmake/cmake/data/bin/cmake替代cmake，ctest同目录。\n最小GCC对照：gcc -std=c17 -Wall -Wextra -Wpedantic -Wconversion -Werror demo.c codec.c -lm -o demo。只留demo.c会缺实现；将codec.c写两次会重复定义；这些是有意做的故障实验。不要在正常项目里复制实现来消除undefined reference。\n在线版只模拟已知的构建阶段与结果，不实际调用GCC/CMake。真实构建日志只在本地版出现；网页仍可下载完整工程，自己运行。个人源码注释不会被课程服务当成输入代码执行。"
         },
         {
           "title": "9 · 工程关联：先找依赖，而不是反复改算法",
@@ -2969,7 +2969,8 @@
           "end": "\n#endif",
           "pattern": "enum给整数状态起名字；原型末尾分号；没有函数体。",
           "text": "完整阅读版最上方包含接口，真正工程由各.c include。先认名字和参数，再从下面main进入运行；不是先执行头文件。Codec_Encode写字节、Codec_Decode写速度，return只表示状态。",
-          "trace": "CODEC_OK=0、INTERFACE=-1、INVALID=-2；调用处用这些名字判断。"
+          "trace": "CODEC_OK=0、INTERFACE=-1、INVALID=-2；调用处用这些名字判断。",
+          "file": "codec.h"
         },
         {
           "title": "2 · main入口：信号与构建开关分开",
@@ -2977,7 +2978,8 @@
           "end": "    /* [调用模块]",
           "pattern": "scanf返回转换项数；&变量传地址；length!=8先拒绝。",
           "text": "C程序只读4项。网页第5项由服务选择构建实验，不会变成帧字段。data8初始化0，decoded_speed初始化0；初值不代表收到新数据。长度非8时main结束，算法不执行。",
-          "trace": "72.5 1 1 8 → scanf4 → 长度合法 → 继续调用编码。"
+          "trace": "72.5 1 1 8 → scanf4 → 长度合法 → 继续调用编码。",
+          "file": "demo.c"
         },
         {
           "title": "3 · 调用模块：实现不在demo文件里",
@@ -2985,7 +2987,8 @@
           "end": "    /* [打印载荷]",
           "pattern": "status=Codec_Encode(...)；status!=CODEC_OK就停止。",
           "text": "编译器通过.h知道接口，链接器已将codec实现纳入程序。运行时main暂停进入Codec_Encode；不会再次读头文件或源文件。请先看编码两段再回这里。",
-          "trace": "实现return0 → status0 valid1；实现return-2 → status-2 valid0，main不显示帧。"
+          "trace": "实现return0 → status0 valid1；实现return-2 → status-2 valid0，main不显示帧。",
+          "file": "demo.c"
         },
         {
           "title": "4 · 编码校验：DBC不会自动替你写if",
@@ -2993,7 +2996,8 @@
           "end": "    /* [编码写入]",
           "pattern": "if(A||B)任何一项真就返回错误常量。",
           "text": "先检查地址和8字节长度，再检查speed有限且0—250、mode0—2、radar0/1。接口错误与业务非法区分，全部通过才写缓存。拆文件没有改变这些契约。",
-          "trace": "mode3 → mode>2真 → return CODEC_INVALID=-2；data不修改。"
+          "trace": "mode3 → mode>2真 → return CODEC_INVALID=-2；data不修改。",
+          "file": "codec.c"
         },
         {
           "title": "5 · 编码写入：库职责止于字节与状态",
@@ -3001,7 +3005,8 @@
           "end": "\n}\n\nint Codec_Decode",
           "pattern": "roundf量化；转uint32_t；&255取低字节，>>8取高字节；|组合控制。",
           "text": "原有协议不变：0.1km/h刻度、小端。先清全部8格，再写低高和控制字节。codec.c不打印；调用者获得状态后自行决定界面展示。",
-          "trace": "72.5×10=725；低D5高02；mode1雷达1组合05；return CODEC_OK。"
+          "trace": "72.5×10=725；低D5高02；mode1雷达1组合05；return CODEC_OK。",
+          "file": "codec.c"
         },
         {
           "title": "6 · 回main打印，不把显示塞进codec",
@@ -3009,7 +3014,8 @@
           "end": "    /* [调用解码]",
           "pattern": "printf格式对应参数；for i0—7依次打印，最后换行。",
           "text": "main负责人的输入和显示，算法库可以不依赖控制台复用。展示raw725只是诊断，不是另一套接收算法；接收仍必须调用Codec_Decode并检查返回。",
-          "trace": "frame=D5 02 05 00 00 00 00 00；此时解码还没调用。"
+          "trace": "frame=D5 02 05 00 00 00 00 00；此时解码还没调用。",
+          "file": "demo.c"
         },
         {
           "title": "7 · 解码校验：失败保持输出",
@@ -3017,7 +3023,8 @@
           "end": "    /* [解码写回]",
           "pattern": "const只读输入；float*输出地址；&掩码检查模式与保留位。",
           "text": "先查地址和长度；控制字节保留位必须0，mode3非法；后5字节必须0。失败提前return，不能把decoded_speed的旧值当新速度。",
-          "trace": "05&248=0、05&3=1，后5格0 → 继续；控制07 → return-2。"
+          "trace": "05&248=0、05&3=1，后5格0 → 继续；控制07 → return-2。",
+          "file": "codec.c"
         },
         {
           "title": "8 · 解码写回：数据与return分开",
@@ -3025,7 +3032,8 @@
           "end": "\n}",
           "pattern": "raw=low|(high<<8)；检查raw<=2500；*speed写回。",
           "text": "高字节先转uint32_t移8位，再与低字节合并。业务range仍由if实现。成功后写调用者的decoded_speed，返回0；两种输出各有职责。",
-          "trace": "213|(2<<8)=725；725×0.1=72.5；*speed写main对象；return0。"
+          "trace": "213|(2<<8)=725；725×0.1=72.5；*speed写main对象；return0。",
+          "file": "codec.c"
         },
         {
           "title": "9 · 回main完成：业务成功不等于构建成功",
@@ -3033,7 +3041,8 @@
           "end": "\n}\n\n/* ===== 原codec.c",
           "pattern": "调用→返回状态→if成功才使用输出；main return0结束进程。",
           "text": "Codec_Decode通过地址写新值，main检查status==CODEC_OK才显示。程序能运行说明链接过关，却不代表任意输入合法。构建错误时根本不会走到这一段。",
-          "trace": "decode_status0、decode_valid1、decoded_speed72.5；之后进程正常退出。"
+          "trace": "decode_status0、decode_valid1、decoded_speed72.5；之后进程正常退出。",
+          "file": "demo.c"
         }
       ],
       "experiments": [
@@ -3362,12 +3371,12 @@
         {
           "name": "test_codec.c",
           "language": "c",
-          "text": "/* test_codec.c：独立测试入口，和demo分别生成程序，不把两个main放一起。 */\n#include \"codec.h\"\n#include <assert.h> /* assert(条件)：真则继续，假则终止测试并报告位置。 */\n#include <math.h>   /* fabsf取float绝对值，用于比较浮点误差。 */\n#include <string.h> /* memset给字节缓冲区填值；memcmp比较两块内存。 */\n#include <stdio.h>\n\nint main(void) {\n    /* [测试标准向量] expected来自独立协议手算，不由被测函数生成。 */\n    uint8_t data[8];\n    const uint8_t expected[8] = {0xD5, 0x02, 0x05, 0, 0, 0, 0, 0};\n    float speed = 99.0f;\n    assert(Codec_Encode(72.5f, 1, 1, data, 8) == CODEC_OK);\n    assert(memcmp(data, expected, 8) == 0);\n    assert(Codec_Decode(data, 8, &speed) == CODEC_OK);\n    assert(fabsf(speed - 72.5f) < 0.001f);\n\n    /* [测试失败契约] 编码失败必须保持输出缓存；解码失败不能写新车速。 */\n    uint8_t saved[8];\n    memset(data, 0xA5, 8); memset(saved, 0xA5, 8);\n    assert(Codec_Encode(-1.0f, 1, 1, data, 8) == CODEC_INVALID);\n    assert(memcmp(data, saved, 8) == 0);\n    assert(Codec_Encode(72.5f, 1, 1, NULL, 8) == CODEC_INTERFACE);\n    assert(Codec_Encode(72.5f, 1, 1, data, 7) == CODEC_INTERFACE);\n    assert(Codec_Encode(72.5f, 1, 1, data, 8) == CODEC_OK);\n    data[2] = 7; speed = 99.0f;\n    assert(Codec_Decode(data, 8, &speed) == CODEC_INVALID);\n    assert(speed == 99.0f);\n    printf(\"test_passed=1\\n\");\n    return 0; /* CTest看到进程正常退出，记录测试通过。 */\n}\n"
+          "text": "/* test_codec.c：独立测试入口，和demo分别生成程序，不把两个main放一起。 */\n#include \"codec.h\"\n#ifdef NDEBUG\n#error \"This test requires enabled assertions. Build codec_tests with -UNDEBUG.\"\n#endif\n#include <assert.h> /* assert(条件)：真则继续，假则终止测试并报告位置。 */\n#include <math.h>   /* fabsf取float绝对值，用于比较浮点误差。 */\n#include <string.h> /* memset给字节缓冲区填值；memcmp比较两块内存。 */\n#include <stdio.h>\n\nint main(void) {\n    /* [测试标准向量] expected来自独立协议手算，不由被测函数生成。 */\n    uint8_t data[8];\n    const uint8_t expected[8] = {0xD5, 0x02, 0x05, 0, 0, 0, 0, 0};\n    float speed = 99.0f;\n    /* 被测调用放在assert外；避免断言关闭时连被测函数也没有执行。 */\n    int status = Codec_Encode(72.5f, 1, 1, data, 8);\n    assert(status == CODEC_OK);\n    assert(memcmp(data, expected, 8) == 0);\n    status = Codec_Decode(data, 8, &speed);\n    assert(status == CODEC_OK);\n    assert(fabsf(speed - 72.5f) < 0.001f);\n\n    /* [测试失败契约] 编码失败必须保持输出缓存；解码失败不能写新车速。 */\n    uint8_t saved[8];\n    memset(data, 0xA5, 8); memset(saved, 0xA5, 8);\n    status = Codec_Encode(-1.0f, 1, 1, data, 8);\n    assert(status == CODEC_INVALID);\n    assert(memcmp(data, saved, 8) == 0);\n    status = Codec_Encode(72.5f, 1, 1, NULL, 8); assert(status == CODEC_INTERFACE);\n    status = Codec_Encode(72.5f, 1, 1, data, 7); assert(status == CODEC_INTERFACE);\n    status = Codec_Encode(72.5f, 1, 1, data, 8); assert(status == CODEC_OK);\n    data[2] = 7; speed = 99.0f;\n    status = Codec_Decode(data, 8, &speed);\n    assert(status == CODEC_INVALID);\n    assert(speed == 99.0f);\n    printf(\"assertions_enabled=1\\ntest_passed=1\\n\");\n    return 0; /* CTest看到进程正常退出，记录测试通过。 */\n}\n"
         },
         {
           "name": "CMakeLists.txt",
           "language": "cmake",
-          "text": "# CMake描述构建关系，不是C代码，不是main执行时读取的配置。\ncmake_minimum_required(VERSION 3.16) # 最低工具要求，本课实际验证3.31.6。\nproject(asw_codec_demo LANGUAGES C) # 项目名字；启用C编译器。\nset(CMAKE_C_STANDARD 17) # 采用C17；不是声明一个C变量。\nset(CMAKE_C_STANDARD_REQUIRED ON)\n# 本项目面向WSL/GCC；严格警告配置。如果换MSVC，需要对应编译器选项。\nadd_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Werror -g -O0)\n\n# codec.c仅在这个库目标里定义一次；STATIC是CMake静态库类型，不是C的static语法。\nadd_library(codec STATIC codec.c)\ntarget_include_directories(codec PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\ntarget_link_libraries(codec PUBLIC m) # m是数学库，支持roundf；使用者继承链接要求。\n\n# 两个可执行文件分别有自己的main；共享同一个codec库。\nadd_executable(codec_demo demo.c)\ntarget_link_libraries(codec_demo PRIVATE codec)\nadd_executable(codec_tests test_codec.c)\ntarget_link_libraries(codec_tests PRIVATE codec)\n\nenable_testing() # 允许CTest收集和运行测试。\nadd_test(NAME codec_contract COMMAND codec_tests) # 测试名字和要执行的测试程序。\n"
+          "text": "# CMake描述构建关系，不是C代码，不是main执行时读取的配置。\ncmake_minimum_required(VERSION 3.16) # 最低工具要求，本课实际验证3.31.6。\nproject(asw_codec_demo LANGUAGES C) # 项目名字；启用C编译器。\nset(CMAKE_C_STANDARD 17) # 采用C17；不是声明一个C变量。\nset(CMAKE_C_STANDARD_REQUIRED ON)\n# 本项目面向WSL/GCC；严格警告配置。如果换MSVC，需要对应编译器选项。\nadd_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Werror -g -O0)\n\n# codec.c仅在这个库目标里定义一次；STATIC是CMake静态库类型，不是C的static语法。\nadd_library(codec STATIC codec.c)\ntarget_include_directories(codec PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\ntarget_link_libraries(codec PUBLIC m) # m是数学库，支持roundf；使用者继承链接要求。\n\n# 两个可执行文件分别有自己的main；共享同一个codec库。\nadd_executable(codec_demo demo.c)\ntarget_link_libraries(codec_demo PRIVATE codec)\nadd_executable(codec_tests test_codec.c)\ntarget_compile_options(codec_tests PRIVATE -UNDEBUG) # GCC：仅测试目标显式启用断言，含Release构建。\ntarget_link_libraries(codec_tests PRIVATE codec)\n\nenable_testing() # 允许CTest收集和运行测试。\nadd_test(NAME codec_contract COMMAND codec_tests) # 测试名字和要执行的测试程序。\n"
         },
         {
           "name": "README.md",
@@ -3376,6 +3385,638 @@
         }
       ],
       "code": "/* D06单文件阅读副本：codec.h → demo.c → codec.c。\n * 便于完整显示和直接注释；真实模块构建请下载day06_project工程，分别编译、链接。 */\n\n/* codec.h：接口说明。告诉调用者有哪些名字、参数和返回约定，不放函数体。 */\n#ifndef ASW_CODEC_H /* 如果本次预处理还没定义这个名字，就继续读下面。 */\n#define ASW_CODEC_H /* 定义保护标记。再次include时跳过到#endif。 */\n#include <stdint.h> /* uint8_t：8位无符号字节。 */\n#include <stddef.h> /* size_t：对象大小与长度；NULL：无可用地址。 */\n\n/* enum是枚举：给整数值取有意义的名字，不分配新的数据缓冲区。\n * 此处CODEC_OK等常量供各.c共用；函数仍返回int，便于与前课衔接。 */\nenum CodecStatus {\n    CODEC_OK = 0,\n    CODEC_INTERFACE = -1,\n    CODEC_INVALID = -2\n};\n\n/* [接口声明] 末尾分号；没有{函数体}，因此仅include头文件不会提供实现。\n * Encode写data；Decode只读data，通过*speed写回；都用return报告状态。 */\nint Codec_Encode(float speed, int mode, int radar, uint8_t *data, size_t length);\nint Codec_Decode(const uint8_t *data, size_t length, float *speed);\n#endif /* ASW_CODEC_H：结束头文件保护，不是结束一个运行中的if。 */\n\n/* ===== 原demo.c：入口与演示 ===== */\n/* demo.c：演示入口。输入和打印属于main，编码算法属于codec.c。 */\n#include <stdio.h> /* scanf读输入；printf打印。 */\n\nint main(void) {\n    /* [入口数据] 输入4项：车速、模式、雷达、长度。网页第5项是构建实验选择，\n     * 由学习服务控制构建步骤，不是这个C程序读取的信号。 */\n    float speed = 0.0f, decoded_speed = 0.0f;\n    int mode = 0, radar = 0, length_input = 8;\n    uint8_t data[8] = {0};\n    if (scanf(\"%f %d %d %d\", &speed, &mode, &radar, &length_input) != 4) {\n        printf(\"status=-3\\nvalid=0\\n\"); return 0;\n    }\n    if (length_input != 8) {\n        printf(\"status=-1\\nvalid=0\\n\"); return 0;\n    }\n\n    /* [调用模块] main暂停，进入另一个.c里链接进来的Codec_Encode实现。\n     * &不必加在数组data前；函数调用时数组转换为首元素指针。 */\n    int status = Codec_Encode(speed, mode, radar, data, 8);\n    printf(\"status=%d\\nvalid=%d\\n\", status, status == CODEC_OK);\n    if (status != CODEC_OK) return 0;\n\n    /* [打印载荷] 展示不是算法职责；同一个codec库也能被另一个main复用。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    printf(\"raw=%u\\nframe=\", (unsigned int)raw);\n    for (size_t i = 0; i < 8; i++) {\n        printf(\"%02X%s\", (unsigned int)data[i], i == 7 ? \"\\n\" : \" \");\n    }\n\n    /* [调用解码] 返回状态与输出变量分开；失败时不显示旧值。 */\n    status = Codec_Decode(data, 8, &decoded_speed);\n    printf(\"decode_status=%d\\ndecode_valid=%d\\n\", status, status == CODEC_OK);\n    if (status == CODEC_OK) printf(\"decoded_speed=%.1f\\n\", (double)decoded_speed);\n    return 0; /* main进程退出状态，不是编码器的业务状态。 */\n}\n\n/* ===== 原codec.c：唯一实现 ===== */\n/* codec.c：唯一实现。只处理信号与字节，不读取用户输入、不打印界面。 */\n#include <math.h>  /* isfinite与roundf；GCC链接时需要数学库m。 */\n\nint Codec_Encode(float speed, int mode, int radar, uint8_t *data, size_t length) {\n    /* [编码校验] 先检查接口，再检查业务范围，全部通过才写data。\n     * DBC描述范围，不会让C自动插入这些if。||任一错误成立就拒绝。 */\n    if (data == NULL || length != 8) return CODEC_INTERFACE;\n    if (!isfinite(speed) || speed < 0.0f || speed > 250.0f\n        || mode < 0 || mode > 2 || radar < 0 || radar > 1) return CODEC_INVALID;\n\n    /* [编码写入] 自定义教学车速协议：0.1km/h一刻度、16位无符号、小端。\n     * 72.5×10=725=0x02D5。先清8格，再写低字节D5、高字节02和控制05。 */\n    uint32_t raw = (uint32_t)roundf(speed * 10.0f);\n    for (size_t i = 0; i < 8; i++) data[i] = 0;\n    data[0] = (uint8_t)(raw & 255u);\n    data[1] = (uint8_t)((raw >> 8) & 255u);\n    data[2] = (uint8_t)((uint32_t)mode | ((uint32_t)radar << 2));\n    return CODEC_OK; /* 状态返回0；字节已经通过指针写到调用者数组。 */\n}\n\nint Codec_Decode(const uint8_t *data, size_t length, float *speed) {\n    /* [解码校验] const限制通过data写输入；输出speed允许写回。\n     * 错误提前return，不修改*speed；因此调用方必须检查status。 */\n    if (data == NULL || speed == NULL || length != 8) return CODEC_INTERFACE;\n    if (((uint32_t)data[2] & 248u) != 0 || ((uint32_t)data[2] & 3u) > 2u)\n        return CODEC_INVALID;\n    for (size_t i = 3; i < 8; i++) if (data[i] != 0) return CODEC_INVALID;\n\n    /* [解码写回] 先拼raw再检查业务范围，再把新车速写回调用者对象。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    if (raw > 2500u) return CODEC_INVALID;\n    *speed = (float)raw * 0.1f;\n    return CODEC_OK;\n}\n"
+    },
+    "7": {
+      "day": 7,
+      "revision": "2026-10-14-capstone-v1",
+      "title": "第1周闯关：先补清模块关系，再重建接口与测试",
+      "source": "day07.c",
+      "runner": "assessment_day07",
+      "project_name": "day07_project",
+      "summary": "在线练习版：浏览器模拟，不执行C、不进行服务端检测。沿用你已贴出的网页端assert/内存函数说明，并结合实际代码与GCC实验整理。本次审阅请求已发到既有GPT学习会话，尚未取得新回复或确认6 high。先看文件职责和运行入口，逐文件讲解头文件保护、测试与CMake，再定位端序、非法模式与断言关闭。",
+      "time": "约180分钟：文件关系与保护35分钟；test/内存函数/断言35分钟；CMake25分钟；8个实作35分钟；闭卷重建30分钟；题号检测与批注20分钟。不懂的段落选中划线，批注自动保存。",
+      "goals": [
+        "区分文件、函数、模块、库、可执行程序，能说明谁有main",
+        "逐行演算头文件保护第一次/第二次include与不同翻译单元",
+        "说明断言是否启用，实际调用不依赖assert条件求值",
+        "读懂void*、memcmp与memset在字节数组测试中的作用",
+        "依职责重建最小模块工程；定位端序反转与mode3",
+        "源码与讲义选中文本划线批注，不再需要重复抄到独立笔记"
+      ],
+      "flow_text": "构建依赖：demo/test → codec.h声明；codec.c → codec库；demo和test分别链接库。运行demo：读输入 → Encode → 发送 → 可选修改 → Decode → 检查状态。运行test：固定向量 → 显式调用库 → 检查字节和状态 → 退出。CMake与头文件保护在构建时处理，不是main中的子程序。",
+      "remediation_title": "先看关系：一个项目的文件，不等于多个同时运行的程序",
+      "architecture": {
+        "headers": [
+          "文件",
+          "它负责什么",
+          "什么时候起作用／依赖谁"
+        ],
+        "rows": [
+          [
+            "codec.h",
+            "列接口、状态名字、保护标记",
+            "预处理/编译时；demo/test/codec都看它"
+          ],
+          [
+            "codec.c",
+            "唯一业务实现：校验、编码、解码",
+            "编译成库；运行时被两个入口分别调用"
+          ],
+          [
+            "demo.c",
+            "人的输入与结果展示，一个main",
+            "生成codec_demo，调用codec库"
+          ],
+          [
+            "test_codec.c",
+            "固定条件与预期检查，另一个main",
+            "生成codec_tests，调用同一个库"
+          ],
+          [
+            "CMakeLists.txt",
+            "谁编成库、谁链接成程序、谁作为测试",
+            "构建阶段由CMake读；不参与业务函数调用"
+          ],
+          [
+            "assert_probe.c",
+            "故意演示断言关闭与副作用",
+            "独立探针，不作为正常通过的CTest"
+          ],
+          [
+            "README／审阅请求",
+            "运行步骤与外部讲解审阅提示",
+            "文档，不编译，不链接"
+          ]
+        ]
+      },
+      "run_fields": [
+        {
+          "id": "speed",
+          "label": "车速km/h",
+          "kind": "text",
+          "value": 72.5
+        },
+        {
+          "id": "mode",
+          "label": "模式",
+          "kind": "select",
+          "value": 1,
+          "options": [
+            [
+              "0",
+              "0速度"
+            ],
+            [
+              "1",
+              "1间距"
+            ],
+            [
+              "2",
+              "2故障"
+            ],
+            [
+              "3",
+              "3非法"
+            ]
+          ]
+        },
+        {
+          "id": "radar",
+          "label": "雷达有效位",
+          "kind": "select",
+          "value": 1,
+          "options": [
+            [
+              "0",
+              "0无效"
+            ],
+            [
+              "1",
+              "1有效"
+            ]
+          ]
+        },
+        {
+          "id": "length",
+          "label": "长度（字节，要求8）",
+          "kind": "number",
+          "value": 8
+        },
+        {
+          "id": "scenario",
+          "label": "实验类型",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "0正常"
+            ],
+            [
+              "1",
+              "1接收端交换车速字节"
+            ],
+            [
+              "2",
+              "2接收mode两位置1"
+            ],
+            [
+              "3",
+              "3启用断言，故意失败"
+            ],
+            [
+              "4",
+              "4定义NDEBUG，断言关闭"
+            ],
+            [
+              "5",
+              "5真实预处理观察头文件保护"
+            ]
+          ]
+        }
+      ],
+      "reading": [
+        {
+          "title": "一个项目、几份文件、两个入口",
+          "text": "先把“子程序”拆成明确的词。函数是Codec_Encode这种被调用的工作单元；文件是codec.c这种源代码容器；模块是我们按职责划分的编码功能；程序是构建出来、可启动的codec_demo。不是每个.c都在运行一个独立程序。\n此项目有两种正常启动方式。人启动codec_demo时，操作系统进入demo.c的main；它调用codec库。CTest启动codec_tests时，进入test_codec.c的main；它也调用同一个库。两个main属于两个独立可执行文件，所以不冲突。codec.c没有main，不能把它当第三个应用入口。\ncodec.h与CMakeLists都不在运行时替main做业务判断。头文件告诉编译器名字和类型；CMake告诉构建工具把哪些文件组成目标。真正把速度换算成字节的仍是codec.c里的函数体。"
+        },
+        {
+          "title": "1 · 我自己写时，先定职责，再选文件",
+          "text": "按六步搭最小工程：先写业务输入输出和错误约定；把公开函数签名写入codec.h；把实现只写入codec.c；在demo.c建立读输入/显示入口；在test_codec.c建立固定输入/预期的测试入口；最后用CMake声明库和两种程序。\n接口说明先写清：speed单位km/h且0—250，mode0—2、radar0/1；data是真实至少8字节数组，length必须8；return0成功、-1接口错误、-2业务非法；失败不修改输出。先约定这些，再写if和公式，避免“代码能跑但双方以为约定不同”。\ncodec.c不依赖控制台输入，因为算法不该决定从哪里拿信号；demo决定输入来自键盘，将来也可来自CAN接收或ROS节点。test不复写算法，只给同一实现确定输入和独立预期。CMake不包含车速公式，它只描述构建依赖。\n闭卷练习请另建自己的目录，自写这五个文件，再本地编译；网页个人代码副本与批注会保存，但在线运行始终使用课程参考实现，不能把参考例子通过当成你重建代码已经通过。"
+        },
+        {
+          "title": "2 · 头文件保护：把它当一张“已读登记卡”",
+          "text": "预处理一份demo.c时，最开始没有ASW_CODEC_H这张标记。碰到第一行include，展开codec.h：#ifndef问“有没有这张标记？”；还没有，于是进入；#define登记已读；接着保留enum和函数声明；#endif结束这个范围。\n继续读demo.c第二次include时，又到同一个codec.h。现在标记已存在，#ifndef条件不成立，于是从这里跳过受保护内容到#endif。enum和声明不会再次进入这份demo的编译内容。不是运行main时跳过一个函数，而是编译前整理文本时跳过头文件内容。\n你可以在纸上按顺序写：第一次→无标记→设置标记→保留enum；第二次→有标记→跳过enum。去掉#ifndef/#define/#endif就没有登记卡，两次include各复制一次enum，编译器看到同一enum定义两次就报错。\n再编译codec.c时，是另一个翻译单元，预处理标记重新从该单元的起点处理，因此它仍能看到自己的接口声明。保护不跨所有.c“只保留一份全工程内容”，也不会消除多个.c里同名外部函数的定义。\n实际实验5用gcc -E取得预处理文本。demo.c里include两次，但enum CodecStatus定义只有一次。观察的是宏展开后的文本，不是“调用了enum一次”；enum本来就不是函数。"
+        },
+        {
+          "title": "3 · assert：调用、比较、检查分开看",
+          "text": "沿用你贴出的执行理解：启用时，先执行Codec_Encode，函数写data并返回状态，再与CODEC_OK比较，条件假则终止测试。不过旧写法把调用藏在assert括号里，一旦定义NDEBUG，整个条件不求值，Codec_Encode可能根本没被调用。\n现在推荐两句：int status=Codec_Encode(...); assert(status==CODEC_OK);。第一句不依赖断言是否开启，算法一定调用；第二句只是检查状态。数据是否真是期望帧，还要单独memcmp检查，状态0不能替代字节正确性。\nassert来自assert.h，是宏。宏在预处理时参与展开，普通函数则按函数接口进行运行调用；不必背标准库内部实现，只记本例可观察的行为。NDEBUG在包含assert.h时定义，会使assert条件不再求值；这与是否写了-g不是一回事。\ntest_codec.c顶部的#ifdef NDEBUG/#error是保护：如果意外关闭断言，主动编译报错，避免程序什么也没检查却打印通过。CMake为测试目标加-UNDEBUG，使GCC取消这个宏；已实际验证Release构建下也启用。生产输入检查仍用if返回错误，不依赖可关闭的assert。",
+          "sources": [
+            {
+              "title": "官方标准库说明：assert与NDEBUG",
+              "url": "https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/assert-macro-assert-wassert?view=msvc-170"
+            }
+          ]
+        },
+        {
+          "title": "4 · memcmp：传两个地址，比较前n个字节",
+          "text": "int memcmp(const void *s1,const void *s2,size_t n)的int是返回类型；s1/s2是两块内存首地址；n是字节数。const表示不通过这些指针修改内容。void*是可接收不同对象地址的通用指针，不表示函数没有返回值，也不是空指针NULL。\ndata和expected都是8字节数组，在调用中转换成首元素地址。memcmp(data,expected,8)从两块内存的第0个字节比到第7个；全相同返回0，有不同返回非零。只用==0判断相等，不假设不等必定恰好返回1或-1。\n期望帧D5 02 05 00 00 00 00 00来自手算标准向量。若实际D5 02 07...，前两字节相同，第2字节不同，memcmp非零，测试失败。若只比较2字节会漏掉控制错误，所以比较长度是测试契约的一部分。\nmemcmp比较对象表示的原始字节，不自动理解float数值或结构体含义。这里只比较uint8_t数组很直接；含填充字节的结构体、浮点近似值不要照搬，应用数值与字段检查。两块对象都必须有至少n字节可读。",
+          "sources": [
+            {
+              "title": "官方标准库说明：memcmp",
+              "url": "https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/memcmp-wmemcmp?view=msvc-170"
+            }
+          ]
+        },
+        {
+          "title": "5 · memset：每一个字节填什么，而不是整个数组赋一个数",
+          "text": "void *memset(void *s,int c,size_t n)返回目标地址；本例不使用返回值。s是可写目标地址，c是准备填入的字节值，n是写多少个字节。memset(data,0xA5,8)让data0—7每格都等于A5，也就是十进制165。\nsaved也填8个A5，得到一份哨兵预期。调用负车速Encode应返回-2且不碰data；再memcmp(data,saved,8)==0，确认失败未写出半帧。不是说任何A5就是合法CAN载荷；它只是易于识别的测试初始图案。\n不要认为memset整型数组为1会让每个int数值等于1。它逐字节写01，在常见32位int表示下可能形成0x01010101。这里对象是uint8_t字节数组，每格本来只有1字节，所以直接填字节最清楚。\n调用前要确认真实缓冲区容量够n；库函数不会自动知道数组有几格，也不会帮你实现业务长度校验。",
+          "sources": [
+            {
+              "title": "官方标准库说明：memset",
+              "url": "https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/memset-wmemset?view=msvc-170"
+            }
+          ]
+        },
+        {
+          "title": "6 · test_codec.c的main完整关系：准备→调用→核对",
+          "text": "test里的data是待写输出，expected是固定期望，speed是待写解码输出。它没有scanf，因为测试输入写在代码里，才能重复复现。main第一步调用Encode，第二步看状态，第三步比字节；再调用Decode，看状态，再用fabsf误差检查速度。\n之后改变初始条件测试错误路径：先把data/saved填A5；输入-1速度；要求返回INVALID并保持data不变；再给NULL、短长度；再构造控制字节7，要求Decode拒绝且speed保持99。每个case回答一个明确问题，不是所有错误都靠一次assert猜出来。\nfabsf(speed-72.5f)<0.001f比较数值误差，memcmp比较字节表示。两个检查承担不同职责。assert失败会中止测试进程；全部检查通过后打印assertions_enabled=1和test_passed=1，再main return0。CTest观察这个进程退出状态。\n正常codec_tests不应故意失败；assert_probe是独立教学程序，专门assert(0)展示终止。它没有注册成正常CTest用例，避免你看到预期故障就以为整个项目应该测试失败。"
+        },
+        {
+          "title": "7 · CMakeLists.txt逐个目标看：不会同时调用两个main",
+          "text": "先看目标表：codec是库，源文件codec.c；codec_demo是演示程序，源文件demo.c，链接codec；codec_tests是测试程序，源文件test_codec.c，也链接codec。STATIC只是CMake说“静态库”，不是在C函数前写static。\ntarget_include_directories给出找头文件的位置；PUBLIC让使用库的目标继承头文件需求。target_link_libraries(codec PUBLIC m)声明数学库roundf依赖；demo/test链接codec时继承它，不需在每个调用处“再运行数学库”。\nPRIVATE的-UNDEBUG只为codec_tests目标加断言保护；它不会把codec业务变成一个测试main。add_test只是登记测试程序；真正执行要运行ctest。配置成功、构建成功、测试通过、本次业务有效是四个不同状态。\n从命令复现：cmake -S . -B build -DCMAKE_BUILD_TYPE=Release；cmake --build build；ctest --test-dir build --output-on-failure；./build/codec_demo。代码执行时不会再读取CMakeLists，也不会自动运行test的main。\nassert_probe是额外可执行目标，只在断言实验单独启动。它不属于业务模块，也不会在正常demo调用链中出现。"
+        },
+        {
+          "title": "8 · 本周复建验收：先遮住答案再写",
+          "text": "另建空目录，按接口表自己写codec.h/c、demo/test、CMake，不复制函数体。先验证正常72.5和独立帧D5 02 05，再加负速度、NULL、短长度、mode3，最后验证失败不修改输出。编译用警告当错误，正常测试启用断言。\n再注入两个问题：交换发送/接收解释的两个车速字节，看到raw54530超过2500；把控制05改成07，提取mode3被拒绝。先定位是字节顺序还是控制字段，不把错误统一叫“编译失败”。\n在线题目与实验只能核对概念和参考行为。你的重建文件必须本地构建，提交代码、测试输出和职责图才能评估是否真的独立写出来；不要把网页通过当成已经能调试全部生产代码。\n把看不懂的句子或代码选中，写批注即可。按文件查看批注，云同步会保存；右侧旧笔记仅为兼容保留，不要求重复抄。下一课依据你的批注和真实练习继续补充。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "1 · demo入口：这次到底启动哪个main",
+          "file": "demo.c",
+          "start": "int main(void)",
+          "end": "    /* [调用模块]",
+          "pattern": "声明对象→scanf5项→长度检查。",
+          "text": "这个main属于演示程序；第五项scenario是故障注入，不是业务信号。test的main此时没有运行。",
+          "trace": "72.5 1 1 8 0 → 长度8合法 → 调用编码。"
+        },
+        {
+          "title": "2 · codec.h：对外说清函数接口",
+          "file": "codec.h",
+          "start": "/* [接口声明]",
+          "end": "\n#endif",
+          "pattern": "末尾分号是声明；参数写输入、地址和长度。",
+          "text": "声明让demo编译时认识函数；实际实现只在codec.c，不靠头文件凭空产生。",
+          "trace": "Encode的data输出数组；Decode的speed输出地址；状态由return给出。"
+        },
+        {
+          "title": "3 · codec.c：编码先检查，再写字节",
+          "file": "codec.c",
+          "start": "int Codec_Encode",
+          "end": "\nint Codec_Decode",
+          "pattern": "if非法提前return；成功路径量化并写8格。",
+          "text": "模块不scanf、不printf。先保证接口与业务契约，再写data，所以失败不污染输出。",
+          "trace": "72.5→raw725→D5 02 05；mode3输入则返回-2。"
+        },
+        {
+          "title": "4 · demo：发送显示与接收修改",
+          "file": "demo.c",
+          "start": "    /* [打印载荷]",
+          "end": "    /* [调用解码]",
+          "pattern": "先打印旧帧，再按scenario改变当前数组。",
+          "text": "同一数组内容变了，但先前输出不会自动更新。故障1交换两个字节，故障2控制位变07。",
+          "trace": "正常raw725；交换后213<<8|2=54530；置mode后最低两位3。"
+        },
+        {
+          "title": "5 · codec.c：解码并保持失败输出",
+          "file": "codec.c",
+          "start": "int Codec_Decode",
+          "end": "\n}",
+          "pattern": "const读输入；掩码检查；成功才写*speed。",
+          "text": "先查控制位，再拼raw检查范围。失败不写速度，所以main必须看状态。",
+          "trace": "控制07先拒绝；端序raw54530后拒绝；正常写72.5。"
+        },
+        {
+          "title": "6 · codec.h：已读标记到底怎样工作",
+          "file": "codec.h",
+          "start": "#ifndef",
+          "end": "/* [接口声明]",
+          "pattern": "#ifndef/#define/#endif是构建时预处理指令。",
+          "text": "第一次无标记进入并登记；第二次有标记跳过enum；另一个.c重新处理自己的翻译单元。",
+          "trace": "实验5：include两次，预处理结果enum定义一次。"
+        },
+        {
+          "title": "7 · test：先显式调用，再断言状态",
+          "file": "test_codec.c",
+          "start": "int main(void)",
+          "end": "    /* [测试失败契约]",
+          "pattern": "int status=调用；assert(status==CODEC_OK)检查。",
+          "text": "Codec_Encode在assert外执行。memcmp看8个字节；Decode后fabsf看数值；三种检查不相互替代。",
+          "trace": "得到status0、data D5 02 05；memcmp0；decoded72.5，误差小于0.001。"
+        },
+        {
+          "title": "8 · test：A5哨兵验证失败不写输出",
+          "file": "test_codec.c",
+          "start": "    /* [测试失败契约]",
+          "end": "    printf",
+          "pattern": "memset先填字节；调用错误路径；memcmp比缓存；比较旧速度。",
+          "text": "这里期望函数拒绝，所以返回-2可以让测试通过。生产输入校验由if完成，不由assert兜底。",
+          "trace": "负速度返回-2且8格仍A5；接收mode3时speed仍99。"
+        },
+        {
+          "title": "9 · CMake：库和两种入口各自归属",
+          "file": "CMakeLists.txt",
+          "start": "add_library",
+          "end": "enable_testing",
+          "pattern": "add_library/ executable声明目标；link_libraries声明依赖。",
+          "text": "codec源只收集一次；demo/test各有main，各自链接库；-UNDEBUG只保障测试断言。",
+          "trace": "构建生成libcodec.a、codec_demo、codec_tests；CTest运行后者。"
+        },
+        {
+          "title": "10 · assert_probe：故意展示NDEBUG风险",
+          "file": "assert_probe.c",
+          "start": "int main(void)",
+          "end": "\n}",
+          "pattern": "此探针故意把++放进assert，不是推荐测试写法。",
+          "text": "启用时calls变1，assert0终止；关闭时两次assert都不求值，calls0还能继续。",
+          "trace": "场景3 assertions_enabled1 side_effect_count1 assert_failed1；场景4为0、0、0并continued1。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "正常完整调用链",
+          "values": [
+            72.5,
+            1,
+            1,
+            8,
+            0
+          ],
+          "hint": "编码D5 02 05，解码72.5；正常测试明确启用断言。",
+          "steps": [
+            "点击“正常完整调用链”填参数，先预测错误属于预处理、运行协议还是断言。",
+            "点击运行按钮；本地是实际GCC/CMake，在线是明确标注的模拟。",
+            "看断言是否启用、调用计数、是否继续，或看业务状态与raw；不同实验字段不同。",
+            "核对：编码D5 02 05，解码72.5；正常测试明确启用断言。",
+            "在当前讲解或文件中选中文字，写批注保存；不需另抄到右侧。"
+          ]
+        },
+        {
+          "name": "端序反转",
+          "values": [
+            72.5,
+            1,
+            1,
+            8,
+            1
+          ],
+          "hint": "接收raw54530>2500，解码-2，不消费旧速度。",
+          "steps": [
+            "点击“端序反转”填参数，先预测错误属于预处理、运行协议还是断言。",
+            "点击运行按钮；本地是实际GCC/CMake，在线是明确标注的模拟。",
+            "看断言是否启用、调用计数、是否继续，或看业务状态与raw；不同实验字段不同。",
+            "核对：接收raw54530>2500，解码-2，不消费旧速度。",
+            "在当前讲解或文件中选中文字，写批注保存；不需另抄到右侧。"
+          ]
+        },
+        {
+          "name": "接收模式3",
+          "values": [
+            72.5,
+            1,
+            1,
+            8,
+            2
+          ],
+          "hint": "控制05变07，mode3非法，解码-2。",
+          "steps": [
+            "点击“接收模式3”填参数，先预测错误属于预处理、运行协议还是断言。",
+            "点击运行按钮；本地是实际GCC/CMake，在线是明确标注的模拟。",
+            "看断言是否启用、调用计数、是否继续，或看业务状态与raw；不同实验字段不同。",
+            "核对：控制05变07，mode3非法，解码-2。",
+            "在当前讲解或文件中选中文字，写批注保存；不需另抄到右侧。"
+          ]
+        },
+        {
+          "name": "断言启用：故意失败",
+          "values": [
+            72.5,
+            1,
+            1,
+            8,
+            3
+          ],
+          "hint": "调用计数1，assert0使真实探针终止；这是预期故障，不是正常测试失败。",
+          "steps": [
+            "点击“断言启用：故意失败”填参数，先预测错误属于预处理、运行协议还是断言。",
+            "点击运行按钮；本地是实际GCC/CMake，在线是明确标注的模拟。",
+            "看断言是否启用、调用计数、是否继续，或看业务状态与raw；不同实验字段不同。",
+            "核对：调用计数1，assert0使真实探针终止；这是预期故障，不是正常测试失败。",
+            "在当前讲解或文件中选中文字，写批注保存；不需另抄到右侧。"
+          ]
+        },
+        {
+          "name": "断言关闭：副作用消失",
+          "values": [
+            72.5,
+            1,
+            1,
+            8,
+            4
+          ],
+          "hint": "NDEBUG使assert参数不求值，计数0，程序仍继续；说明不能把必需调用藏在assert。",
+          "steps": [
+            "点击“断言关闭：副作用消失”填参数，先预测错误属于预处理、运行协议还是断言。",
+            "点击运行按钮；本地是实际GCC/CMake，在线是明确标注的模拟。",
+            "看断言是否启用、调用计数、是否继续，或看业务状态与raw；不同实验字段不同。",
+            "核对：NDEBUG使assert参数不求值，计数0，程序仍继续；说明不能把必需调用藏在assert。",
+            "在当前讲解或文件中选中文字，写批注保存；不需另抄到右侧。"
+          ]
+        },
+        {
+          "name": "预处理：保护标记",
+          "values": [
+            72.5,
+            1,
+            1,
+            8,
+            5
+          ],
+          "hint": "源文件include两次，预处理后的enum只有一次。",
+          "steps": [
+            "点击“预处理：保护标记”填参数，先预测错误属于预处理、运行协议还是断言。",
+            "点击运行按钮；本地是实际GCC/CMake，在线是明确标注的模拟。",
+            "看断言是否启用、调用计数、是否继续，或看业务状态与raw；不同实验字段不同。",
+            "核对：源文件include两次，预处理后的enum只有一次。",
+            "在当前讲解或文件中选中文字，写批注保存；不需另抄到右侧。"
+          ]
+        },
+        {
+          "name": "失败契约：短长度",
+          "values": [
+            72.5,
+            1,
+            1,
+            7,
+            0
+          ],
+          "hint": "构建测试通过；业务长度7拒绝status-1，无帧。",
+          "steps": [
+            "点击“失败契约：短长度”填参数，先预测错误属于预处理、运行协议还是断言。",
+            "点击运行按钮；本地是实际GCC/CMake，在线是明确标注的模拟。",
+            "看断言是否启用、调用计数、是否继续，或看业务状态与raw；不同实验字段不同。",
+            "核对：构建测试通过；业务长度7拒绝status-1，无帧。",
+            "在当前讲解或文件中选中文字，写批注保存；不需另抄到右侧。"
+          ]
+        },
+        {
+          "name": "迁移：54.3",
+          "values": [
+            54.3,
+            2,
+            1,
+            8,
+            0
+          ],
+          "hint": "raw543，低31，高2，control6；先算再运行。",
+          "steps": [
+            "点击“迁移：54.3”填参数，先预测错误属于预处理、运行协议还是断言。",
+            "点击运行按钮；本地是实际GCC/CMake，在线是明确标注的模拟。",
+            "看断言是否启用、调用计数、是否继续，或看业务状态与raw；不同实验字段不同。",
+            "核对：raw543，低31，高2，control6；先算再运行。",
+            "在当前讲解或文件中选中文字，写批注保存；不需另抄到右侧。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "先按文件按钮依次读demo.c、codec.h、codec.c、test_codec.c、CMakeLists.txt，给每份文件一句职责批注。",
+        "8个场景分别点击并运行，故意失败场景观察正确终止即可算完成。",
+        "看见assertions_enabled要区分正常测试目标与独立探针；关闭场景不代表课程正常测试也关闭。",
+        "迁移题先手算；独立重建项目须在本地编译，在线不会执行个人修改。"
+      ],
+      "test_steps": [
+        "确保8项参考实验已运行。",
+        "按第1—10题判断文件关系、保护和测试语义。",
+        "填写P1—P4迁移；不要把memcmp0理解成“比较了0字节”。",
+        "提交后看相同题号的反馈；未通过可按批注补课再重试。",
+        "D08待反馈后继续，不提前发布。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "启动codec_demo时哪个main运行？",
+          "options": [
+            "demo.c的main；test的main属于另一程序",
+            "两个main同时自动运行",
+            "codec.h的main"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "codec.h第二次include被跳过发生在哪一步？",
+          "options": [
+            "运行解码时",
+            "本翻译单元的预处理阶段",
+            "所有.c链接完之后"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "保护标记是否保证多个.c的同名函数体不重复？",
+          "options": [
+            "保证，只需有#ifndef",
+            "保证，所有.c共用一份标记",
+            "不保证；保护不跨翻译单元解决外部定义重复"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "更稳妥的测试调用与断言关系是哪种？",
+          "options": [
+            "先调用存status，再assert比较status",
+            "必须把调用全部放assert内",
+            "只看程序return0不用核对数据"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "定义NDEBUG时assert(++calls==1)会怎样？",
+          "options": [
+            "仍执行++calls，但不终止",
+            "整个条件不求值，++calls也跳过",
+            "始终编译报错"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "memcmp(data,expected,8)==0说明什么？",
+          "options": [
+            "两个地址相同",
+            "函数什么也没比较",
+            "前8字节相同"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "memset(data,0xA5,8)对uint8_t[8]做什么？",
+          "options": [
+            "每个字节填A5，共8字节",
+            "只填第一个元素",
+            "把数组地址变成A5"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "const uint8_t*与float*输出分别有什么职责？",
+          "options": [
+            "两个都不允许写",
+            "前者读载荷，后者写调用者输出值",
+            "前者是空指针，后者返回状态"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "test的main与CMake文件是什么关系？",
+          "options": [
+            "CMake运行时被test调用",
+            "CMake里的STATIC就是C函数static",
+            "CMake定义test可执行目标；CTest另行启动其main"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "Decode失败时speed仍99，是否能说新速度99？",
+          "options": [
+            "不能；返回状态失败，输出未写新值",
+            "能，99一定是有效接收值",
+            "能，assert已经保证所有数据永远正确"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "54.3km/h、mode2、radar1、长度8正常接收：计算raw和control。另判断预处理两次include得到几个enum定义，NDEBUG探针调用计数是多少。",
+        "values": [
+          54.3,
+          2,
+          1,
+          8,
+          0
+        ],
+        "fields": [
+          {
+            "id": "raw",
+            "label": "P1 · 原始整数raw",
+            "kind": "number"
+          },
+          {
+            "id": "control",
+            "label": "P2 · 控制字节",
+            "kind": "number"
+          },
+          {
+            "id": "enum_count",
+            "label": "P3 · 有保护的enum展开次数",
+            "kind": "number"
+          },
+          {
+            "id": "disabled_calls",
+            "label": "P4 · NDEBUG探针的副作用计数",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "raw=round(54.3×10)。",
+          "control=2|(1<<2)。",
+          "第一次登记标记，第二次跳过；注意只问同一翻译单元。",
+          "assert参数不求值，计数保持初值。"
+        ]
+      },
+      "pass_rule": "本浏览器内判定题目、指定实验和模拟回归。此结果只表示在线练习通过；真实C与正式通关请在本地完成。",
+      "assets": [
+        {
+          "name": "assert_probe.c",
+          "language": "c",
+          "text": "/* assert_probe.c：故意展示旧式副作用写法的风险，不是生产测试推荐写法。\n * 正常编译时故意失败；加-DNDEBUG时条件表达式完全不求值。 */\n#include <assert.h>\n#include <stdio.h>\nint main(void) {\n    int calls = 0;\n#ifdef NDEBUG\n    printf(\"assertions_enabled=0\\n\");\n#else\n    printf(\"assertions_enabled=1\\n\");\n#endif\n    /* 对照：启用时++calls会执行，禁用时连++calls也被跳过。 */\n    assert(++calls == 1);\n    printf(\"side_effect_count=%d\\n\", calls);\n    fflush(stdout); /* 先把观察文字输出，避免终止时缓冲内容未显示。 */\n    assert(0); /* 故意为假，启用断言时应终止；不是正常用例。 */\n    printf(\"continued=1\\n\");\n    return 0;\n}\n"
+        },
+        {
+          "name": "CMakeLists.txt",
+          "language": "cmake",
+          "text": "# CMake描述构建关系，不是C代码，不是main执行时读取的配置。\ncmake_minimum_required(VERSION 3.16) # 最低工具要求，本课实际验证3.31.6。\nproject(asw_codec_week1 LANGUAGES C) # 项目名字；启用C编译器。\nset(CMAKE_C_STANDARD 17) # 采用C17；不是声明一个C变量。\nset(CMAKE_C_STANDARD_REQUIRED ON)\n# 本项目面向WSL/GCC；严格警告配置。如果换MSVC，需要对应编译器选项。\nadd_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Werror -g -O0)\n\n# codec.c仅在这个库目标里定义一次；STATIC是CMake静态库类型，不是C的static语法。\nadd_library(codec STATIC codec.c)\ntarget_include_directories(codec PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\ntarget_link_libraries(codec PUBLIC m) # m是数学库，支持roundf；使用者继承链接要求。\n\n# 两个可执行文件分别有自己的main；共享同一个codec库。\nadd_executable(codec_demo demo.c)\ntarget_link_libraries(codec_demo PRIVATE codec)\nadd_executable(codec_tests test_codec.c)\ntarget_compile_options(codec_tests PRIVATE -UNDEBUG) # GCC：仅测试目标显式启用断言，含Release构建。\ntarget_link_libraries(codec_tests PRIVATE codec)\n\nenable_testing() # 允许CTest收集和运行测试。\nadd_test(NAME codec_contract COMMAND codec_tests) # 测试名字和要执行的测试程序。\n\n# 仅用于故意失败的断言教学；不加入正常CTest测试列表。\nadd_executable(assert_probe assert_probe.c)\ntarget_compile_options(assert_probe PRIVATE -UNDEBUG)\n"
+        },
+        {
+          "name": "codec.c",
+          "language": "c",
+          "text": "/* codec.c：唯一实现。只处理信号与字节，不读取用户输入、不打印界面。 */\n#include \"codec.h\" /* 引号表示本项目头文件；本文件也需核对接口声明。 */\n#include <math.h>  /* isfinite与roundf；GCC链接时需要数学库m。 */\n\nint Codec_Encode(float speed, int mode, int radar, uint8_t *data, size_t length) {\n    /* [编码校验] 先检查接口，再检查业务范围，全部通过才写data。\n     * DBC描述范围，不会让C自动插入这些if。||任一错误成立就拒绝。 */\n    if (data == NULL || length != 8) return CODEC_INTERFACE;\n    if (!isfinite(speed) || speed < 0.0f || speed > 250.0f\n        || mode < 0 || mode > 2 || radar < 0 || radar > 1) return CODEC_INVALID;\n\n    /* [编码写入] 自定义教学车速协议：0.1km/h一刻度、16位无符号、小端。\n     * 72.5×10=725=0x02D5。先清8格，再写低字节D5、高字节02和控制05。 */\n    uint32_t raw = (uint32_t)roundf(speed * 10.0f);\n    for (size_t i = 0; i < 8; i++) data[i] = 0;\n    data[0] = (uint8_t)(raw & 255u);\n    data[1] = (uint8_t)((raw >> 8) & 255u);\n    data[2] = (uint8_t)((uint32_t)mode | ((uint32_t)radar << 2));\n    return CODEC_OK; /* 状态返回0；字节已经通过指针写到调用者数组。 */\n}\n\nint Codec_Decode(const uint8_t *data, size_t length, float *speed) {\n    /* [解码校验] const限制通过data写输入；输出speed允许写回。\n     * 错误提前return，不修改*speed；因此调用方必须检查status。 */\n    if (data == NULL || speed == NULL || length != 8) return CODEC_INTERFACE;\n    if (((uint32_t)data[2] & 248u) != 0 || ((uint32_t)data[2] & 3u) > 2u)\n        return CODEC_INVALID;\n    for (size_t i = 3; i < 8; i++) if (data[i] != 0) return CODEC_INVALID;\n\n    /* [解码写回] 先拼raw再检查业务范围，再把新车速写回调用者对象。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    if (raw > 2500u) return CODEC_INVALID;\n    *speed = (float)raw * 0.1f;\n    return CODEC_OK;\n}\n"
+        },
+        {
+          "name": "codec.h",
+          "language": "c",
+          "text": "/* codec.h：接口说明。告诉调用者有哪些名字、参数和返回约定，不放函数体。 */\n#ifndef ASW_CODEC_H /* 如果本次预处理还没定义这个名字，就继续读下面。 */\n#define ASW_CODEC_H /* 定义保护标记。再次include时跳过到#endif。 */\n#include <stdint.h> /* uint8_t：8位无符号字节。 */\n#include <stddef.h> /* size_t：对象大小与长度；NULL：无可用地址。 */\n\n/* enum是枚举：给整数值取有意义的名字，不分配新的数据缓冲区。\n * 此处CODEC_OK等常量供各.c共用；函数仍返回int，便于与前课衔接。 */\nenum CodecStatus {\n    CODEC_OK = 0,\n    CODEC_INTERFACE = -1,\n    CODEC_INVALID = -2\n};\n\n/* [接口声明] 末尾分号；没有{函数体}，因此仅include头文件不会提供实现。\n * Encode写data；Decode只读data，通过*speed写回；都用return报告状态。 */\nint Codec_Encode(float speed, int mode, int radar, uint8_t *data, size_t length);\nint Codec_Decode(const uint8_t *data, size_t length, float *speed);\n#endif /* ASW_CODEC_H：结束头文件保护，不是结束一个运行中的if。 */\n"
+        },
+        {
+          "name": "demo.c",
+          "language": "c",
+          "text": "/* demo.c：演示入口。输入和打印属于main，编码算法属于codec.c。 */\n#include \"codec.h\"\n#include \"codec.h\" /* 故意include两次：头文件保护应使enum和声明只进入一次。 */\n#include <stdio.h> /* scanf读输入；printf打印。 */\n\nint main(void) {\n    /* [入口数据] 输入5项：车速、模式、雷达、长度、接收故障开关。\n     * scenario1交换前两字节；scenario2把模式两位置为11。 */\n    float speed = 0.0f, decoded_speed = 0.0f;\n    int mode = 0, radar = 0, length_input = 8, scenario = 0;\n    uint8_t data[8] = {0};\n    if (scanf(\"%f %d %d %d %d\", &speed, &mode, &radar, &length_input, &scenario) != 5) {\n        printf(\"status=-3\\nvalid=0\\n\"); return 0;\n    }\n    if (length_input != 8) {\n        printf(\"status=-1\\nvalid=0\\n\"); return 0;\n    }\n\n    /* [调用模块] main暂停，进入另一个.c里链接进来的Codec_Encode实现。\n     * &不必加在数组data前；函数调用时数组转换为首元素指针。 */\n    int status = Codec_Encode(speed, mode, radar, data, 8);\n    printf(\"status=%d\\nvalid=%d\\n\", status, status == CODEC_OK);\n    if (status != CODEC_OK) return 0;\n\n    /* [打印载荷] 展示不是算法职责；同一个codec库也能被另一个main复用。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    printf(\"raw=%u\\nframe=\", (unsigned int)raw);\n    for (size_t i = 0; i < 8; i++) {\n        printf(\"%02X%s\", (unsigned int)data[i], i == 7 ? \"\\n\" : \" \");\n    }\n\n    /* [接收故障] 发送日志已经打印；现在只改接收方的数组。 */\n    if (scenario == 1) { uint8_t saved = data[0]; data[0] = data[1]; data[1] = saved; }\n    if (scenario == 2) data[2] = (uint8_t)((uint32_t)data[2] | 3u);\n    printf(\"received_raw=%u\\nreceived_control=%u\\n\",\n           (unsigned int)((uint32_t)data[0] | ((uint32_t)data[1] << 8)), (unsigned int)data[2]);\n\n    /* [调用解码] 返回状态与输出变量分开；失败时不显示旧值。 */\n    status = Codec_Decode(data, 8, &decoded_speed);\n    printf(\"decode_status=%d\\ndecode_valid=%d\\n\", status, status == CODEC_OK);\n    if (status == CODEC_OK) printf(\"decoded_speed=%.1f\\n\", (double)decoded_speed);\n    return 0; /* main进程退出状态，不是编码器的业务状态。 */\n}\n"
+        },
+        {
+          "name": "GPT网页端审阅请求.md",
+          "language": "text",
+          "text": "请使用我选择的6 high模型，作为C初学者教学审阅者，而不是编写另一个项目。审阅D07第1周闯关：codec.h接口、codec.c实现、demo.c演示入口、test_codec.c独立测试入口、CMakeLists.txt构建关系、assert_probe.c仅做故意失败探针。请先画文件/目标依赖和运行调用两张图，再解释头文件第二次include如何被ifndef跳过、不同.c的宏状态为何独立。逐步解释调用→返回状态→比较→断言；NDEBUG关闭时表达式不求值，因此调用应放assert外。解释const void*、memcmp返回0仅表示前n字节相同、memset逐字节填充。逐项解释CMake library/executable、PUBLIC/PRIVATE、-UNDEBUG、CTest，区分编译成功、链接成功、测试成功和业务输入成功。给每段执行前后具体变量值，指出假设、边界和新语法。不要把在线模拟说成真实C执行，不要声称我已会搭生产工程。\n当前用户薄弱点：文件与程序的区别、头文件保护、测试宏与内存函数、如何自己分职责搭工程。内容必须中文、通俗、不跳步。请给可逐文件对照的解释和错误路径；最后给补课与验收建议。\n"
+        },
+        {
+          "name": "README.md",
+          "language": "text",
+          "text": "# D07 模块补课与第1周闯关\n每次选一个文件读。demo.c是演示入口；test_codec.c是测试入口，分别生成程序。codec.h声明，codec.c唯一实现，CMakeLists.txt定义构建关系。\nUbuntu/GCC：cmake -S . -B build -DCMAKE_BUILD_TYPE=Release\ncmake --build build\nctest --test-dir build --output-on-failure\n./build/codec_demo，输入72.5 1 1 8 0。\n第五项1交换车速字节，2置mode3；其它情况由课程服务做独立探针。\nassert_probe故意失败，不加入正常CTest列表。测试目标-UNDEBUG保证断言启用；#error防止意外关闭。\n若没有系统CMake，可用本机learning_app/tools/linux-cmake/cmake/data/bin下工具的完整WSL路径。\n闭卷重建练习：另建目录，自写codec.h/c、demo/test与CMake，先接口契约再实现。在线只验参考实验，不执行你个人改写的代码；你的重建需要本地编译和测试。\n"
+        },
+        {
+          "name": "test_codec.c",
+          "language": "c",
+          "text": "/* test_codec.c：独立测试入口，和demo分别生成程序，不把两个main放一起。 */\n#include \"codec.h\"\n#ifdef NDEBUG\n#error \"This test requires enabled assertions. Build codec_tests with -UNDEBUG.\"\n#endif\n#include <assert.h> /* assert(条件)：真则继续，假则终止测试并报告位置。 */\n#include <math.h>   /* fabsf取float绝对值，用于比较浮点误差。 */\n#include <string.h> /* memset给字节缓冲区填值；memcmp比较两块内存。 */\n#include <stdio.h>\n\nint main(void) {\n    /* [测试标准向量] expected来自独立协议手算，不由被测函数生成。 */\n    uint8_t data[8];\n    const uint8_t expected[8] = {0xD5, 0x02, 0x05, 0, 0, 0, 0, 0};\n    float speed = 99.0f;\n    /* 被测调用放在assert外；避免断言关闭时连被测函数也没有执行。 */\n    int status = Codec_Encode(72.5f, 1, 1, data, 8);\n    assert(status == CODEC_OK);\n    assert(memcmp(data, expected, 8) == 0);\n    status = Codec_Decode(data, 8, &speed);\n    assert(status == CODEC_OK);\n    assert(fabsf(speed - 72.5f) < 0.001f);\n\n    /* [测试失败契约] 编码失败必须保持输出缓存；解码失败不能写新车速。 */\n    uint8_t saved[8];\n    memset(data, 0xA5, 8); memset(saved, 0xA5, 8);\n    status = Codec_Encode(-1.0f, 1, 1, data, 8);\n    assert(status == CODEC_INVALID);\n    assert(memcmp(data, saved, 8) == 0);\n    status = Codec_Encode(72.5f, 1, 1, NULL, 8); assert(status == CODEC_INTERFACE);\n    status = Codec_Encode(72.5f, 1, 1, data, 7); assert(status == CODEC_INTERFACE);\n    status = Codec_Encode(72.5f, 1, 1, data, 8); assert(status == CODEC_OK);\n    data[2] = 7; speed = 99.0f;\n    status = Codec_Decode(data, 8, &speed);\n    assert(status == CODEC_INVALID);\n    assert(speed == 99.0f);\n    printf(\"assertions_enabled=1\\ntest_passed=1\\n\");\n    return 0; /* CTest看到进程正常退出，记录测试通过。 */\n}\n"
+        }
+      ],
+      "review_provenance": "依据用户已粘贴的网页端说明、既有课程和本地实验整理；已向既有GPT学习会话发送审阅请求，尚未获得本次新回复，未确认6 high模型。",
+      "code": "/* D07旧式整合阅读副本，网页默认逐文件展示；运行使用独立工程。 */\n/* codec.h：接口说明。告诉调用者有哪些名字、参数和返回约定，不放函数体。 */\n#ifndef ASW_CODEC_H /* 如果本次预处理还没定义这个名字，就继续读下面。 */\n#define ASW_CODEC_H /* 定义保护标记。再次include时跳过到#endif。 */\n#include <stdint.h> /* uint8_t：8位无符号字节。 */\n#include <stddef.h> /* size_t：对象大小与长度；NULL：无可用地址。 */\n\n/* enum是枚举：给整数值取有意义的名字，不分配新的数据缓冲区。\n * 此处CODEC_OK等常量供各.c共用；函数仍返回int，便于与前课衔接。 */\nenum CodecStatus {\n    CODEC_OK = 0,\n    CODEC_INTERFACE = -1,\n    CODEC_INVALID = -2\n};\n\n/* [接口声明] 末尾分号；没有{函数体}，因此仅include头文件不会提供实现。\n * Encode写data；Decode只读data，通过*speed写回；都用return报告状态。 */\nint Codec_Encode(float speed, int mode, int radar, uint8_t *data, size_t length);\nint Codec_Decode(const uint8_t *data, size_t length, float *speed);\n#endif /* ASW_CODEC_H：结束头文件保护，不是结束一个运行中的if。 */\n\n/* demo.c：演示入口。输入和打印属于main，编码算法属于codec.c。 */\n#include <stdio.h> /* scanf读输入；printf打印。 */\n\nint main(void) {\n    /* [入口数据] 输入5项：车速、模式、雷达、长度、接收故障开关。\n     * scenario1交换前两字节；scenario2把模式两位置为11。 */\n    float speed = 0.0f, decoded_speed = 0.0f;\n    int mode = 0, radar = 0, length_input = 8, scenario = 0;\n    uint8_t data[8] = {0};\n    if (scanf(\"%f %d %d %d %d\", &speed, &mode, &radar, &length_input, &scenario) != 5) {\n        printf(\"status=-3\\nvalid=0\\n\"); return 0;\n    }\n    if (length_input != 8) {\n        printf(\"status=-1\\nvalid=0\\n\"); return 0;\n    }\n\n    /* [调用模块] main暂停，进入另一个.c里链接进来的Codec_Encode实现。\n     * &不必加在数组data前；函数调用时数组转换为首元素指针。 */\n    int status = Codec_Encode(speed, mode, radar, data, 8);\n    printf(\"status=%d\\nvalid=%d\\n\", status, status == CODEC_OK);\n    if (status != CODEC_OK) return 0;\n\n    /* [打印载荷] 展示不是算法职责；同一个codec库也能被另一个main复用。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    printf(\"raw=%u\\nframe=\", (unsigned int)raw);\n    for (size_t i = 0; i < 8; i++) {\n        printf(\"%02X%s\", (unsigned int)data[i], i == 7 ? \"\\n\" : \" \");\n    }\n\n    /* [接收故障] 发送日志已经打印；现在只改接收方的数组。 */\n    if (scenario == 1) { uint8_t saved = data[0]; data[0] = data[1]; data[1] = saved; }\n    if (scenario == 2) data[2] = (uint8_t)((uint32_t)data[2] | 3u);\n    printf(\"received_raw=%u\\nreceived_control=%u\\n\",\n           (unsigned int)((uint32_t)data[0] | ((uint32_t)data[1] << 8)), (unsigned int)data[2]);\n\n    /* [调用解码] 返回状态与输出变量分开；失败时不显示旧值。 */\n    status = Codec_Decode(data, 8, &decoded_speed);\n    printf(\"decode_status=%d\\ndecode_valid=%d\\n\", status, status == CODEC_OK);\n    if (status == CODEC_OK) printf(\"decoded_speed=%.1f\\n\", (double)decoded_speed);\n    return 0; /* main进程退出状态，不是编码器的业务状态。 */\n}\n\n/* codec.c：唯一实现。只处理信号与字节，不读取用户输入、不打印界面。 */\n#include <math.h>  /* isfinite与roundf；GCC链接时需要数学库m。 */\n\nint Codec_Encode(float speed, int mode, int radar, uint8_t *data, size_t length) {\n    /* [编码校验] 先检查接口，再检查业务范围，全部通过才写data。\n     * DBC描述范围，不会让C自动插入这些if。||任一错误成立就拒绝。 */\n    if (data == NULL || length != 8) return CODEC_INTERFACE;\n    if (!isfinite(speed) || speed < 0.0f || speed > 250.0f\n        || mode < 0 || mode > 2 || radar < 0 || radar > 1) return CODEC_INVALID;\n\n    /* [编码写入] 自定义教学车速协议：0.1km/h一刻度、16位无符号、小端。\n     * 72.5×10=725=0x02D5。先清8格，再写低字节D5、高字节02和控制05。 */\n    uint32_t raw = (uint32_t)roundf(speed * 10.0f);\n    for (size_t i = 0; i < 8; i++) data[i] = 0;\n    data[0] = (uint8_t)(raw & 255u);\n    data[1] = (uint8_t)((raw >> 8) & 255u);\n    data[2] = (uint8_t)((uint32_t)mode | ((uint32_t)radar << 2));\n    return CODEC_OK; /* 状态返回0；字节已经通过指针写到调用者数组。 */\n}\n\nint Codec_Decode(const uint8_t *data, size_t length, float *speed) {\n    /* [解码校验] const限制通过data写输入；输出speed允许写回。\n     * 错误提前return，不修改*speed；因此调用方必须检查status。 */\n    if (data == NULL || speed == NULL || length != 8) return CODEC_INTERFACE;\n    if (((uint32_t)data[2] & 248u) != 0 || ((uint32_t)data[2] & 3u) > 2u)\n        return CODEC_INVALID;\n    for (size_t i = 3; i < 8; i++) if (data[i] != 0) return CODEC_INVALID;\n\n    /* [解码写回] 先拼raw再检查业务范围，再把新车速写回调用者对象。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    if (raw > 2500u) return CODEC_INVALID;\n    *speed = (float)raw * 0.1f;\n    return CODEC_OK;\n}\n"
     }
   },
   "rules": {
@@ -4188,6 +4829,156 @@
           ],
           "lab6",
           "业务模式非法"
+        ],
+        [
+          [
+            54.3,
+            2,
+            1,
+            8,
+            0
+          ],
+          "lab7",
+          "迁移：54.3"
+        ]
+      ]
+    },
+    "7": {
+      "correct": {
+        "q1": 0,
+        "q2": 1,
+        "q3": 2,
+        "q4": 0,
+        "q5": 1,
+        "q6": 2,
+        "q7": 0,
+        "q8": 1,
+        "q9": 2,
+        "q10": 0
+      },
+      "explanations": {
+        "q1": "启动demo只运行demo.c的main；test的main是另一个程序。",
+        "q2": "头文件保护在当前翻译单元预处理时跳过第二次展开。",
+        "q3": "标记不跨翻译单元消除多个外部定义。",
+        "q4": "先调用存状态，再断言，必需调用不依赖宏是否开启。",
+        "q5": "NDEBUG时整个条件不求值，所以++calls也不执行。",
+        "q6": "memcmp0只说明前8个字节相同，不说明地址相同。",
+        "q7": "对uint8_t数组逐字节填A5，共8格。",
+        "q8": "const输入只读载荷；输出指针写调用者对象。",
+        "q9": "CMake定义目标依赖；CTest另启动测试main。",
+        "q10": "失败表示未产生新输出；保留99不能冒充本次新值。"
+      },
+      "numeric": {
+        "raw": [
+          543,
+          "54.3×10=543。"
+        ],
+        "control": [
+          6,
+          "2|(1<<2)=6。"
+        ],
+        "enum_count": [
+          1,
+          "同一翻译单元第一次登记，第二次跳过，所以定义1次。"
+        ],
+        "disabled_calls": [
+          0,
+          "NDEBUG时assert参数不求值，计数保持0。"
+        ]
+      },
+      "labels": {
+        "q1": "入口归属",
+        "q2": "预处理保护",
+        "q3": "保护边界",
+        "q4": "测试显式调用",
+        "q5": "NDEBUG副作用",
+        "q6": "字节比较",
+        "q7": "逐字节填充",
+        "q8": "输入输出指针",
+        "q9": "CMake与CTest",
+        "q10": "失败输出",
+        "raw": "P1 · raw",
+        "control": "P2 · control",
+        "enum_count": "P3 · enum_count",
+        "disabled_calls": "P4 · disabled_calls"
+      },
+      "needed": [
+        [
+          [
+            72.5,
+            1,
+            1,
+            8,
+            0
+          ],
+          "lab0",
+          "正常完整调用链"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            8,
+            1
+          ],
+          "lab1",
+          "端序反转"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            8,
+            2
+          ],
+          "lab2",
+          "接收模式3"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            8,
+            3
+          ],
+          "lab3",
+          "断言启用：故意失败"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            8,
+            4
+          ],
+          "lab4",
+          "断言关闭：副作用消失"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            8,
+            5
+          ],
+          "lab5",
+          "预处理：保护标记"
+        ],
+        [
+          [
+            72.5,
+            1,
+            1,
+            7,
+            0
+          ],
+          "lab6",
+          "失败契约：短长度"
         ],
         [
           [
@@ -5045,5 +5836,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "e846a1084da5"
+  "release": "84d129cd94df"
 }
