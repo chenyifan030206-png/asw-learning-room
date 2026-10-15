@@ -106,17 +106,27 @@ function renderCode(){
 }
 function chooseFile(name){rememberFile();activeFile=name;$('codeNotes').value=fileNotes[name]?.text||sourceFile().text;showCodeView('original');$('codeFile').textContent=lesson.project_name?lesson.project_name+' / '+name:name;for(const b of $('fileTabs').children)b.classList.toggle('current',b.dataset.file===name);renderAnnotations();}
 function resizeCodeNotes(){const el=$('codeNotes');if(!el||el.closest('[hidden]'))return;el.style.height='auto';el.style.height=Math.max(500,el.scrollHeight+6)+'px';}
+let annotationEditRecorded=false;
 const annotationColors={yellow:'#fff0a6',green:'#bdeccc',blue:'#bcdfff'};
+function annotationUndoKey(){return 'asw-annotation-undo:'+location.pathname+':'+day;}
+function annotationUndoHistory(){try{const history=JSON.parse(localStorage.getItem(annotationUndoKey())||'[]');return Array.isArray(history)?history:[];}catch{return [];}}
+function rememberAnnotationUndo(id,before){const history=annotationUndoHistory();history.push({id,before:before?structuredClone(before):null});try{localStorage.setItem(annotationUndoKey(),JSON.stringify(history.slice(-20)));}catch{message('撤销记录保存失败，请使用清除标注。');}}
+function annotationStamp(mark){return new Date(Math.max(Date.now(),(Date.parse(mark?.updated)||0)+1)).toISOString();}
+function removeAnnotationById(id){const mark=annotations.find(a=>a.id===id&&!a.deleted);if(!mark)return;rememberAnnotationUndo(id,mark);annotations=annotations.map(a=>a.id===id?{...a,deleted:true,updated:annotationStamp(a)}:a);$('annotationPanel').hidden=true;pendingAnnotation=null;rememberDraft();renderAnnotations();saveNotes().catch(e=>message(e.message));$('annotationUndoStatus').textContent='已清除标注；可以撤销恢复。';}
+function undoAnnotation(){const history=annotationUndoHistory(),entry=history.pop();if(!entry)return;const current=annotations.find(a=>a.id===entry.id),restored=entry.before?{...entry.before,updated:annotationStamp(current)}:current?{...current,deleted:true,updated:annotationStamp(current)}:null;annotations=annotations.filter(a=>a.id!==entry.id);if(restored)annotations.push(restored);localStorage.setItem(annotationUndoKey(),JSON.stringify(history));pendingAnnotation=null;$('annotationPanel').hidden=true;rememberDraft();renderAnnotations();saveNotes().catch(e=>message(e.message));$('annotationUndoStatus').textContent='已撤销上一次标注操作。';}
+$('undoAnnotation').onclick=undoAnnotation;$('undoAnnotationPopup').onclick=undoAnnotation;$('removeAnnotation').onclick=()=>{if(pendingAnnotation)removeAnnotationById(pendingAnnotation.id);};
 function openAnnotation(mark,rect){
-  pendingAnnotation={...mark};$('annotationSelection').textContent='已选中：'+mark.quote;$('annotationText').value=mark.comment||'';$('annotationColor').value=mark.color||'yellow';$('saveAnnotation').disabled=false;
+  annotationEditRecorded=false;pendingAnnotation={...mark};$('annotationSelection').textContent='已选中：'+mark.quote;$('annotationText').value=mark.comment||'';const existing=annotations.some(a=>a.id===mark.id&&!a.deleted);$('annotationColor').value=existing?(mark.color||'yellow'):'';$('saveAnnotation').disabled=!existing;$('removeAnnotation').hidden=!existing;
   const panel=$('annotationPanel');panel.hidden=false;panel.style.left=Math.max(8,Math.min(rect?.left??innerWidth-380,innerWidth-Math.min(350,innerWidth-16)-8))+'px';
   const height=Math.min(panel.getBoundingClientRect().height,innerHeight-16);panel.style.top=Math.max(8,Math.min((rect?.bottom??60)+8,innerHeight-height-8))+'px';
-  $('annotationStatus').textContent='标记已保存；输入批注自动保存，点别处收起。';
+  $('annotationStatus').textContent=existing?'可换颜色或清除标注；批注自动保存。':'请先选颜色；只选文字或关闭弹框不会留下标注。';
 }
-function persistAnnotation(){
-  if(!pendingAnnotation)return;
+function persistAnnotation(event){
+  if(!pendingAnnotation||!annotationColors[$('annotationColor').value])return;
   const mark={...pendingAnnotation,comment:$('annotationText').value.slice(0,10000),color:$('annotationColor').value,updated:new Date().toISOString(),deleted:false};
-  annotations=annotations.filter(a=>a.id!==mark.id);annotations.push(mark);pendingAnnotation=mark;rememberDraft();renderAnnotations();
+  const old=annotations.find(a=>a.id===mark.id);if(old&&!old.deleted&&(old.comment||'')===mark.comment&&(old.color||'yellow')===mark.color)return;
+  if(!annotationEditRecorded||event?.type==='change'){rememberAnnotationUndo(mark.id,old);annotationEditRecorded=true;}
+  mark.updated=annotationStamp(old);annotations=annotations.filter(a=>a.id!==mark.id);annotations.push(mark);pendingAnnotation=mark;$('saveAnnotation').disabled=false;$('removeAnnotation').hidden=false;$('annotationStatus').textContent='标注与批注自动保存；可清除或撤销。';rememberDraft();renderAnnotations();
 }
 function closeAnnotation(){if(!$('annotationPanel').hidden){persistAnnotation();$('annotationPanel').hidden=true;pendingAnnotation=null;saveNotes().catch(e=>message(e.message));}}
 function captureAnnotation(event){
@@ -126,19 +136,21 @@ function captureAnnotation(event){
   if(!scope||!$('learn').contains(scope)||!scope.contains(range.endContainer)||range.toString().trim().length===0||range.toString().length>8000)return;
   const prefix=range.cloneRange();prefix.selectNodeContents(scope);prefix.setEnd(range.startContainer,range.startOffset);
   const mark={id:crypto.randomUUID(),scope:scope.dataset.annotationScope,quote:range.toString(),start:prefix.toString().length,end:prefix.toString().length+range.toString().length,color:'yellow',comment:'',updated:new Date().toISOString(),deleted:false};
-  const rect=range.getBoundingClientRect();openAnnotation(mark,rect);persistAnnotation();selected.removeAllRanges();
+  const existing=annotations.find(a=>!a.deleted&&a.scope===mark.scope&&a.start===mark.start&&a.end===mark.end)||annotations.find(a=>!a.deleted&&a.scope===mark.scope&&a.start<=mark.start&&a.end>=mark.end);
+  const rect=range.getBoundingClientRect();openAnnotation(existing||mark,rect);
 }
 document.addEventListener('mouseup',captureAnnotation);document.addEventListener('keyup',e=>{if(e.shiftKey)captureAnnotation(e);if(e.key==='Escape')closeAnnotation();});
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#annotationPanel'))closeAnnotation();});
-$('annotationText').addEventListener('input',persistAnnotation);$('annotationColor').addEventListener('change',persistAnnotation);$('closeAnnotation').onclick=closeAnnotation;
+$('annotationText').addEventListener('input',persistAnnotation);$('annotationColor').addEventListener('change',event=>{if(!$('annotationColor').value&&pendingAnnotation&&annotations.some(a=>a.id===pendingAnnotation.id&&!a.deleted)){removeAnnotationById(pendingAnnotation.id);return;}persistAnnotation(event);if(pendingAnnotation&&annotationColors[$('annotationColor').value])window.getSelection()?.removeAllRanges();});$('closeAnnotation').onclick=closeAnnotation;
 function rangeAt(root,start,end){const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node,offset=0,first=null,last=null;while(node=walker.nextNode()){const next=offset+node.textContent.length;if(!first&&start>=offset&&start<next)first=[node,start-offset];if(end>offset&&end<=next){last=[node,end-offset];break;}offset=next;}if(!first||!last)return null;const range=document.createRange();range.setStart(...first);range.setEnd(...last);return range;}
 function renderAnnotations(){
   if(!$('annotationsList'))return;for(const old of $('learn').querySelectorAll('mark.annotation-mark')){const parent=old.parentNode;old.replaceWith(document.createTextNode(old.textContent));parent.normalize();}$('annotationsList').replaceChildren();const ranges=[],colored={yellow:[],green:[],blue:[]};
   for(const mark of annotations.filter(a=>!a.deleted)){
     const scope=[...$('learn').querySelectorAll('[data-annotation-scope]')].find(el=>el.dataset.annotationScope===mark.scope);let stale=false;
     if(scope){const text=scope.textContent;let start=mark.start,end=mark.end;if(text.slice(start,end)!==mark.quote){const index=text.indexOf(mark.quote);if(index>=0&&text.indexOf(mark.quote,index+1)<0){start=index;end=index+mark.quote.length;}else stale=true;}if(!stale){const range=rangeAt(scope,start,end);if(range){ranges.push(range);colored[annotationColors[mark.color]?mark.color:'yellow'].push(range);}}}
-    const details=document.createElement('details'),summary=document.createElement('summary'),quote=document.createElement('blockquote'),p=document.createElement('p'),edit=document.createElement('button'),remove=document.createElement('button');summary.textContent=(mark.scope?.startsWith('code:')?mark.scope.slice(5):'讲解标注')+' · '+(mark.comment||'已划线').slice(0,45)+(stale?'（原文已更新，请核对）':'');quote.textContent=mark.quote;p.textContent=mark.comment||'只划线，未写批注';edit.textContent='编辑';edit.onclick=()=>{openAnnotation(mark,edit.getBoundingClientRect());};remove.textContent='移除划线';remove.onclick=()=>{annotations=annotations.map(a=>a.id===mark.id?{...a,deleted:true,updated:new Date().toISOString()}:a);rememberDraft();renderAnnotations();saveNotes().catch(e=>message(e.message));};details.append(summary,quote,p,edit,remove);$('annotationsList').append(details);
+    const details=document.createElement('details'),summary=document.createElement('summary'),quote=document.createElement('blockquote'),p=document.createElement('p'),edit=document.createElement('button'),remove=document.createElement('button');summary.textContent=(mark.scope?.startsWith('code:')?mark.scope.slice(5):'讲解标注')+' · '+(mark.comment||'已划线').slice(0,45)+(stale?'（原文已更新，请核对）':'');quote.textContent=mark.quote;p.textContent=mark.comment||'只划线，未写批注';edit.textContent='编辑';edit.onclick=()=>{openAnnotation(mark,edit.getBoundingClientRect());};remove.textContent='清除此标注';remove.onclick=()=>removeAnnotationById(mark.id);details.append(summary,quote,p,edit);const row=document.createElement('div');row.className='annotation-entry';row.append(details,remove);$('annotationsList').append(row);
   }
+  const undoAvailable=annotationUndoHistory().length>0;$('undoAnnotation').disabled=!undoAvailable;$('undoAnnotationPopup').disabled=!undoAvailable;
   if(window.CSS?.highlights&&window.Highlight){for(const [color,list] of Object.entries(colored))CSS.highlights.set(color==='yellow'?'aswAnnotations':'aswAnnotations'+color,new Highlight(...list));}
   else{for(const range of ranges.reverse()){if(range.startContainer===range.endContainer){const mark=document.createElement('mark');mark.className='annotation-mark';mark.style.backgroundColor=Object.entries(colored).find(([,list])=>list.includes(range))?.[0]?annotationColors[Object.entries(colored).find(([,list])=>list.includes(range))[0]]:annotationColors.yellow;try{range.surroundContents(mark);}catch{}}}}
 }
