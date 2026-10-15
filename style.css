@@ -11,3 +11,11 @@
 
 .syntax-comment{color:#6a9955}.syntax-string{color:#ce9178}.syntax-number{color:#b5cea8}.syntax-keyword{color:#c586c0}.syntax-type{color:#4ec9b0}.syntax-function{color:#dcdcaa}
 .step-buttons{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}.step-buttons .current{background:#174b83;color:white}.walk-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}.walk-grid>div{min-width:0}#stepCode{max-height:650px;overflow:auto;background:#1e1e1e;color:#d4d4d4;padding:12px;font-size:13px}#stepExplanation{padding:0 12px;background:#f5f8fc;border-radius:8px}#remediation{padding:14px;background:#f7f5ea}#code{background:#1e1e1e} @media(max-width:1000px){.walk-grid{grid-template-columns:minmax(0,1fr)}#stepCode{max-height:none}}
+
+.annotation-popover{position:fixed;z-index:1000;width:min(350px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;box-sizing:border-box;background:#fff;border:1px solid #8ea7ce;border-radius:12px;box-shadow:0 8px 32px #182e5040;padding:14px;margin:0}
+.annotation-popover[hidden]{display:none!important}.annotation-popover textarea{min-height:90px;width:100%;box-sizing:border-box}.annotation-popover #annotationSelection{max-height:70px;overflow:auto;white-space:pre-wrap}.annotation-popover select{padding:5px}.notebook #annotationsList{max-height:45vh;overflow:auto}.notebook #annotationsList blockquote{margin:8px 0;padding:8px;background:#f1f5fb;white-space:pre-wrap;overflow-wrap:anywhere}
+::highlight(aswAnnotationsgreen){background:#bdeccc;color:#143823}::highlight(aswAnnotationsblue){background:#bcdfff;color:#113352}
+
+.byte-lab{background:#f3f7ff;padding:14px;border-radius:10px;margin:16px 0}.byte-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.byte-cell{padding:10px 4px;border:2px solid #ccd7e7;border-radius:8px;text-align:center;background:white}.byte-cell span,.byte-cell strong{display:block}.byte-cell.requested{border-color:#2870ca;background:#e0efff}@media(max-width:500px){.byte-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.annotation-popover{font-size:14px;line-height:1.45;padding:12px}.annotation-popover button{padding:6px 10px;font-size:14px}.annotation-popover label{margin:8px 0 4px}.annotation-popover p{margin:8px 0}.annotation-popover textarea{height:72px;min-height:72px}.annotation-popover .row{gap:8px;justify-content:space-between}

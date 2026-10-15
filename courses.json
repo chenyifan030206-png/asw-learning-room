@@ -4017,6 +4017,627 @@
       ],
       "review_provenance": "依据用户已粘贴的网页端说明、既有课程和本地实验整理；已向既有GPT学习会话发送审阅请求，尚未获得本次新回复，未确认6 high模型。",
       "code": "/* D07旧式整合阅读副本，网页默认逐文件展示；运行使用独立工程。 */\n/* codec.h：接口说明。告诉调用者有哪些名字、参数和返回约定，不放函数体。 */\n#ifndef ASW_CODEC_H /* 如果本次预处理还没定义这个名字，就继续读下面。 */\n#define ASW_CODEC_H /* 定义保护标记。再次include时跳过到#endif。 */\n#include <stdint.h> /* uint8_t：8位无符号字节。 */\n#include <stddef.h> /* size_t：对象大小与长度；NULL：无可用地址。 */\n\n/* enum是枚举：给整数值取有意义的名字，不分配新的数据缓冲区。\n * 此处CODEC_OK等常量供各.c共用；函数仍返回int，便于与前课衔接。 */\nenum CodecStatus {\n    CODEC_OK = 0,\n    CODEC_INTERFACE = -1,\n    CODEC_INVALID = -2\n};\n\n/* [接口声明] 末尾分号；没有{函数体}，因此仅include头文件不会提供实现。\n * Encode写data；Decode只读data，通过*speed写回；都用return报告状态。 */\nint Codec_Encode(float speed, int mode, int radar, uint8_t *data, size_t length);\nint Codec_Decode(const uint8_t *data, size_t length, float *speed);\n#endif /* ASW_CODEC_H：结束头文件保护，不是结束一个运行中的if。 */\n\n/* demo.c：演示入口。输入和打印属于main，编码算法属于codec.c。 */\n#include <stdio.h> /* scanf读输入；printf打印。 */\n\nint main(void) {\n    /* [入口数据] 输入5项：车速、模式、雷达、长度、接收故障开关。\n     * scenario1交换前两字节；scenario2把模式两位置为11。 */\n    float speed = 0.0f, decoded_speed = 0.0f;\n    int mode = 0, radar = 0, length_input = 8, scenario = 0;\n    uint8_t data[8] = {0};\n    if (scanf(\"%f %d %d %d %d\", &speed, &mode, &radar, &length_input, &scenario) != 5) {\n        printf(\"status=-3\\nvalid=0\\n\"); return 0;\n    }\n    if (length_input != 8) {\n        printf(\"status=-1\\nvalid=0\\n\"); return 0;\n    }\n\n    /* [调用模块] main暂停，进入另一个.c里链接进来的Codec_Encode实现。\n     * &不必加在数组data前；函数调用时数组转换为首元素指针。 */\n    int status = Codec_Encode(speed, mode, radar, data, 8);\n    printf(\"status=%d\\nvalid=%d\\n\", status, status == CODEC_OK);\n    if (status != CODEC_OK) return 0;\n\n    /* [打印载荷] 展示不是算法职责；同一个codec库也能被另一个main复用。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    printf(\"raw=%u\\nframe=\", (unsigned int)raw);\n    for (size_t i = 0; i < 8; i++) {\n        printf(\"%02X%s\", (unsigned int)data[i], i == 7 ? \"\\n\" : \" \");\n    }\n\n    /* [接收故障] 发送日志已经打印；现在只改接收方的数组。 */\n    if (scenario == 1) { uint8_t saved = data[0]; data[0] = data[1]; data[1] = saved; }\n    if (scenario == 2) data[2] = (uint8_t)((uint32_t)data[2] | 3u);\n    printf(\"received_raw=%u\\nreceived_control=%u\\n\",\n           (unsigned int)((uint32_t)data[0] | ((uint32_t)data[1] << 8)), (unsigned int)data[2]);\n\n    /* [调用解码] 返回状态与输出变量分开；失败时不显示旧值。 */\n    status = Codec_Decode(data, 8, &decoded_speed);\n    printf(\"decode_status=%d\\ndecode_valid=%d\\n\", status, status == CODEC_OK);\n    if (status == CODEC_OK) printf(\"decoded_speed=%.1f\\n\", (double)decoded_speed);\n    return 0; /* main进程退出状态，不是编码器的业务状态。 */\n}\n\n/* codec.c：唯一实现。只处理信号与字节，不读取用户输入、不打印界面。 */\n#include <math.h>  /* isfinite与roundf；GCC链接时需要数学库m。 */\n\nint Codec_Encode(float speed, int mode, int radar, uint8_t *data, size_t length) {\n    /* [编码校验] 先检查接口，再检查业务范围，全部通过才写data。\n     * DBC描述范围，不会让C自动插入这些if。||任一错误成立就拒绝。 */\n    if (data == NULL || length != 8) return CODEC_INTERFACE;\n    if (!isfinite(speed) || speed < 0.0f || speed > 250.0f\n        || mode < 0 || mode > 2 || radar < 0 || radar > 1) return CODEC_INVALID;\n\n    /* [编码写入] 自定义教学车速协议：0.1km/h一刻度、16位无符号、小端。\n     * 72.5×10=725=0x02D5。先清8格，再写低字节D5、高字节02和控制05。 */\n    uint32_t raw = (uint32_t)roundf(speed * 10.0f);\n    for (size_t i = 0; i < 8; i++) data[i] = 0;\n    data[0] = (uint8_t)(raw & 255u);\n    data[1] = (uint8_t)((raw >> 8) & 255u);\n    data[2] = (uint8_t)((uint32_t)mode | ((uint32_t)radar << 2));\n    return CODEC_OK; /* 状态返回0；字节已经通过指针写到调用者数组。 */\n}\n\nint Codec_Decode(const uint8_t *data, size_t length, float *speed) {\n    /* [解码校验] const限制通过data写输入；输出speed允许写回。\n     * 错误提前return，不修改*speed；因此调用方必须检查status。 */\n    if (data == NULL || speed == NULL || length != 8) return CODEC_INTERFACE;\n    if (((uint32_t)data[2] & 248u) != 0 || ((uint32_t)data[2] & 3u) > 2u)\n        return CODEC_INVALID;\n    for (size_t i = 3; i < 8; i++) if (data[i] != 0) return CODEC_INVALID;\n\n    /* [解码写回] 先拼raw再检查业务范围，再把新车速写回调用者对象。 */\n    uint32_t raw = (uint32_t)data[0] | ((uint32_t)data[1] << 8);\n    if (raw > 2500u) return CODEC_INVALID;\n    *speed = (float)raw * 0.1f;\n    return CODEC_OK;\n}\n"
+    },
+    "8": {
+      "day": 8,
+      "revision": "2026-10-15-memory-v1",
+      "title": "memset到底改哪几格？把边界和工程测试讲透",
+      "source": "day08.c",
+      "runner": "memory_day08",
+      "project_name": "day08_project",
+      "summary": "在线练习版：浏览器模拟，不执行C、不进行服务端检测。依据D07反馈，先补内存起点、字节数和工程测试归属，再做带范围检查的填充模块。五个文件分别展示，8格对照图和9个实验。在线是模拟，真实C在本地。",
+      "time": "约180分钟：8格内存与语法40分钟；入口与实现35分钟；测试/CMake30分钟；9个实验35分钟；迁移检测25分钟；划线复述15分钟。",
+      "review_provenance": "已向既有GPT学习会话发送D08教学审阅请求；当前接口仅返回回复引用，未读到新回复正文或6 high配置证明。本课依据用户反馈、公开一手文档与真实C实验整理。",
+      "goals": [
+        "用起点start和数量count准确指出被写入的下标",
+        "区分字节覆盖范围、程序打印顺序和CPU实际写入顺序",
+        "解释data+start、size_t、无符号边界与失败不写契约",
+        "分清业务库、演示程序、主机测试以及BUILD_TESTING开关",
+        "读懂真实项目中测试的用途；知道一个主机单测不能代替集成或硬件验证"
+      ],
+      "flow_text": "构建：fill.c→fill库；demo.c→fill_demo；BUILD_TESTING=ON时test_fill.c→fill_tests并登记CTest。运行：demo的main初始化8格→读取int输入→拒绝负数/虚报容量→转size_t调用Fill_Bytes→空指针/起点/剩余空间检查→memset→返回status→逐格打印。CTest启动另一个main检查固定预期。",
+      "remediation_title": "先回答你的两个问题：覆盖哪几格，测试放在哪里",
+      "architecture": {
+        "headers": [
+          "文件/目标",
+          "职责",
+          "边界和依赖"
+        ],
+        "rows": [
+          [
+            "fill.h",
+            "声明输入、输出、错误约定",
+            "调用方保证真实可写容量"
+          ],
+          [
+            "fill.c / fill库",
+            "校验范围并填连续字节",
+            "没有main，不读取键盘"
+          ],
+          [
+            "demo.c / fill_demo",
+            "接收输入、调用、打印每格",
+            "真实数组8格；先拒绝负数再转size_t"
+          ],
+          [
+            "test_fill.c / fill_tests",
+            "固定预期、失败保护、返回非0表示测试失败",
+            "独立main；7项检查不依赖assert"
+          ],
+          [
+            "CMakeLists.txt",
+            "库与程序的构建依赖",
+            "ON创建测试目标；OFF不创建测试目标"
+          ]
+        ]
+      },
+      "run_fields": [
+        {
+          "id": "start",
+          "label": "起始下标 start（0起算）",
+          "kind": "number",
+          "value": 2
+        },
+        {
+          "id": "count",
+          "label": "填写字节数 count",
+          "kind": "number",
+          "value": 3
+        },
+        {
+          "id": "value",
+          "label": "填写值 value（输入十进制）",
+          "kind": "number",
+          "value": 165
+        },
+        {
+          "id": "capacity",
+          "label": "可用容量 capacity（实际数组8格）",
+          "kind": "number",
+          "value": 8
+        },
+        {
+          "id": "testing",
+          "label": "是否构建独立测试",
+          "kind": "select",
+          "value": 1,
+          "options": [
+            [
+              "1",
+              "ON · 构建并运行测试"
+            ],
+            [
+              "0",
+              "OFF · 仅构建演示与库"
+            ]
+          ]
+        }
+      ],
+      "reading": [
+        {
+          "title": "先用八个抽屉理解",
+          "text": "把data看作8个相邻的字节抽屉，下标从0到7。初始内容按十六进制是10 11 12 13 14 15 16 17。这里10是十六进制，等于十进制16；输入框165是十进制，对应A5。\nmemset(data,0xA5,3)最终改0、1、2；memset(data+2,0xA5,3)最终改2、3、4。第一个参数选择起点，第三个参数选择字节数量。不是看到一个8格数组就自动全填。\n“从起点开始的前n字节”是结果范围。标准没有保证CPU先写2再写3再写4，库可能成块优化；本课的逐格图和打印是观察结果的顺序。大端小端讨论多字节数的表示，不改变这次连续字节的选区。\n真实工程中常见独立测试源码，但不强制叫test_codec.c；它一般在开发机或CI运行，不因与业务代码同仓库就一定进入ECU固件。"
+        },
+        {
+          "title": "1 · 起点+数量：把公式逐项代入",
+          "text": "容量capacity=8表示可用下标0到7；start=2表示跳过2个uint8_t元素；count=3表示写3个字节。数量大于0时末下标=start+count-1=2+3-1=4，覆盖[2,5)，5是不包含的结束边界。count=0时没有末个被写下标，不能强行说末下标7被写过。\ndata作为函数参数表达式通常转换为指向首元素的指针。data+2指向第2号元素，不改变data[0]内容。指针加1跨一个所指类型的元素：uint8_t是一字节，所以本例跨一字节；若换成int*，加1跨一个int，不能仍按一字节理解。&data[2]在此与data+2指向同一格。\nmemset第三参数单位始终是字节，不是任意类型的元素数。为int数组每个元素赋数值1不能用memset(...,1,...)替代循环赋值。当前8位字节平台，给32位整数四字节各填01会得到01010101这种位模式，而不是整数1。",
+          "table": {
+            "headers": [
+              "下标",
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7"
+            ],
+            "rows": [
+              [
+                "原值",
+                "10",
+                "11",
+                "12",
+                "13",
+                "14",
+                "15",
+                "16",
+                "17"
+              ],
+              [
+                "start2/count3/valueA5",
+                "10",
+                "11",
+                "A5",
+                "A5",
+                "A5",
+                "15",
+                "16",
+                "17"
+              ]
+            ]
+          }
+        },
+        {
+          "title": "2 · memset参数、返回和转换",
+          "text": "原型void *memset(void *s,int c,size_t n)：s是目标起点，c是要转换为unsigned char的值，n是字节数。void*是通用对象地址类型，不代表没有地址；本例uint8_t*可传给它。返回值是目标地址s，不提供成功/失败状态码；它不会替你测容量或可靠报告越界。我们的Fill_Bytes是外层有检查的接口，return -2是我们定义的约定。\n本例8位字节中165→A5；-1转换为无符号字节→255→FF；4660=0x1234，转成字节后为52=0x34。所以memset(...,4660,2)填34 34，不是把1234拆成12 34。\n不要把越界理解为固定报错或空输入。直接调用越界memset会产生未定义行为，可能破坏数据或崩溃，也可能表面没事；我们不执行这种危险调用，用前置检查拒绝。",
+          "sources": [
+            {
+              "title": "memset标准库接口（The Open Group）",
+              "url": "https://pubs.opengroup.org/onlinepubs/7908799/xsh/memset.html"
+            }
+          ]
+        },
+        {
+          "title": "3 · 为什么先检查start，再减剩余容量",
+          "text": "size_t是无符号类型。它不表达负数，不能将“转size_t”当成检查合法性的办法。demo先用int接输入，发现start或count为负就拒绝；非负才转换。int本来就能保存-1，这不是类型不匹配。\n在Fill_Bytes内：先查data==NULL，再查start>capacity，最后查count>capacity-start。capacity8,start2剩6，count3合法；start7,count2剩1而需要2，拒绝；start9则先拒绝，不计算8-9。\n无符号减法在负结果时回绕为很大的值，不会像数学上的-1那样可直接比较。因此必须先确认start<=capacity。不写start+count>capacity，是避免一般size_t极大输入相加回绕。本接口检查不能证明指针背后真实有多少空间；调用者谎报容量仍可能使它越界。demo把capacity限制到真实数组大小8。\n零长度是我们的明确接口约定：非空data、start<=capacity且count0时返回0，不调用memset；start=capacity是合法的空区间，start>capacity仍拒绝。"
+        },
+        {
+          "title": "4 · 两种return与逻辑运算，不跳过这一层",
+          "text": "业务函数return0表示本次范围填写成功，-1表示空地址，-2表示范围错误。main的return是程序退出码，交给操作系统/CTest；测试main非0说明测试不满足预期。二者是不同层次。demo处理了非法用户输入并打印status=-2后仍return0，表示展示流程正常结束，不表示那次填写成功。\nif(A || B)中的||是逻辑“或者”，不是位运算|。A真就不用计算B，这叫短路；任一真整个条件就真。if(status != 0 || memcmp(...) != 0)表示状态错误或字节错误都让测试失败。!=是不等于；==是比较相等，=是赋值。\n++i表示i增加1；for(初始化;继续条件;每轮更新)先初始化一次，条件真才进入循环，执行后更新再判断。i=0、i<8、++i依次读0到7，不读8。printf(\"%02X%s\",...)中%02X以至少两位大写十六进制输出无符号值，%s输出字符串；i==7 ? \"\\n\" : \" \"表示最后一格换行，否则空格。这里只用于排版，不决定内存写入。"
+        },
+        {
+          "title": "5 · 真正的工程测试：谁运行、测什么",
+          "text": "test_codec.c不是只为了好看，它代表一种常见的独立单元测试。文件名可改，工程也常用GoogleTest等框架组织测试；现在先用if+return看清流程。Autoware的公开规范同样要求测试，并在开发流程中使用覆盖率等检查。我们借用这种职责划分，而不是声称这五个文件已经是完整生产工程。\n测试1给固定输入并对比手写8字节预期；测试2给越界请求并验证旧数据没被改；测试3空区间；测试4空地址；测试5起点超界；测试6极大size_t计数；测试7字节转换。预期不再调用被测函数生成，否则同一个错误可能同时污染“结果”和“答案”。\n主机单元测试检查小模块契约。集成测试检查多个模块接线与约定；SIL是在软件仿真环境中测试；HIL用硬件在环设备配合真实控制器验证。它们覆盖不同问题，一个主机memset测试不能证明车辆时序、总线或硬件安全。测试代码是否随交付物构建由项目决定，不应把测试main和业务main塞进同一个可执行文件。",
+          "sources": [
+            {
+              "title": "Autoware：真实项目单元测试规范",
+              "url": "https://docs.autoware.org/main/contributing/testing-guidelines/unit-testing/"
+            }
+          ]
+        },
+        {
+          "title": "6 · BUILD_TESTING开关：不构建不等于通过",
+          "text": "CMake的include(CTest)加载构建工具自己的模块，提供BUILD_TESTING选项，默认ON。它不是C的#include，也不会把测试代码塞进fill_demo。if(BUILD_TESTING)在配置时决定是否创建fill_tests和登记add_test；它不是Fill_Bytes运行时的if。\nON：生成fill库、fill_demo、fill_tests，CTest登记1个测试。这个测试程序内部执行7项检查，所以“CTest测试数1”和“检查数7”不是矛盾。OFF：生成库和demo，不创建fill_tests，CTest登记0个测试。0个测试不能宣称7项检查通过，网页会分别显示。\n用两个全新build-on/build-off目录比较，避免上次生成的测试二进制留在目录里。开关关闭不会自动删除所有旧文件。真实工程CI可以开启测试，而产品目标可不编译主机测试；仍需按项目交付规则安排验证。",
+          "sources": [
+            {
+              "title": "CMake：BUILD_TESTING选项",
+              "url": "https://cmake.org/cmake/help/latest/variable/BUILD_TESTING.html"
+            }
+          ]
+        },
+        {
+          "title": "7 · 如何自己写，而不是只复制",
+          "text": "先用一句话写契约：“在真实容量内，从start开始填count个字节；非法请求不改输出”。列出正常、中间、末尾、空区间、超界、空指针。然后写fill.h签名，fill.c检查，demo展示，test独立预期，最后写CMake目标关系。\n本地另建练习目录，照README逐条构建。先输入2 3 165 8预测八格，再运行；最后闭卷把“从下标5填2个0字节”写成调用，并独立写一个拒绝请求测试。浏览器只运行参考模拟，不编译你的个人代码副本；你自己的改写必须在本地构建和测试。\nsizeof(data)在demo中对真实uint8_t[8]求值是8，sizeof(data[0])是1。在Fill_Bytes里data是指针，sizeof(data)测指针自身大小，不能推回原数组长度；所以capacity要明确传入。"
+        },
+        {
+          "title": "8 · 今天不抢跑新的算法",
+          "text": "你现在的瓶颈是内存区间与测试层次，先用3小时补牢。后续仍面向C++/ROS 2智驾工程：接口契约、缓冲区边界、测试目标拆分会直接影响CAN/传感器适配层。下一课依据你本次反馈再推进信号时效或状态机，不预先把新课全部发布。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "1 · 先从demo的main分清八格与四个输入",
+          "file": "demo.c",
+          "start": "int main",
+          "end": "    int status;",
+          "pattern": "uint8_t data[8]保存8个字节；int start,count,value,capacity各保存一个输入整数。",
+          "text": "初始化两份相同8格，before是观察基线，不是第二份待填写目标；scanf的&取每个变量地址，让它能写输入。",
+          "trace": "输入2 3 165 8得到start2,count3,value165,capacity8，data仍10到17。"
+        },
+        {
+          "title": "2 · 输入检查与类型转换",
+          "file": "demo.c",
+          "start": "    int status;",
+          "end": "    /* [4",
+          "pattern": "if先查负数和虚报容量；else才调用；(size_t)显式转换。",
+          "text": "||是或者且短路。-1作为int合法但作为长度非法；拒绝是业务规则，不是int拒收负数。",
+          "trace": "start=-1时status=-2且未调用Fill_Bytes；start2/count3时进入else。"
+        },
+        {
+          "title": "3 · 进入fill.h理解调用双方的约定",
+          "file": "fill.h",
+          "start": "/* 调用者",
+          "end": "\n#endif",
+          "pattern": "函数声明给出返回类型、函数名、按顺序的五个参数，分号表示没有函数体。",
+          "text": "data给起始地址，capacity给真实可用字节数，start给相对下标，count给数量，value给填充值；调用时实参按位置对应。",
+          "trace": "Fill_Bytes(data,8,2,3,165)的2不是容量，3不是结束下标。"
+        },
+        {
+          "title": "4 · fill.c先验证，后减法",
+          "file": "fill.c",
+          "start": "int Fill_Bytes",
+          "end": "    /* [最后执行]",
+          "pattern": "多个if按书写顺序执行；return会立即离开当前函数。",
+          "text": "data空立即-1；start>capacity立即-2；前面通过才算剩余空间，避免无符号下溢。",
+          "trace": "start7/count2/capacity8：前两项通过，2>1真→-2；后面memset未执行。"
+        },
+        {
+          "title": "5 · 真正写入只有这一句",
+          "file": "fill.c",
+          "start": "    /* [最后执行]",
+          "end": "\n}",
+          "pattern": "data+start移动起点；memset第三参数count控制字节范围。",
+          "text": "数据在调用者数组中被改，不需要返回整个数组。count0不调用；成功return0由我们的接口定义。",
+          "trace": "start2/count3/value165：data2、3、4成A5；status0；其余原值。"
+        },
+        {
+          "title": "6 · 回到main观察结果而不推断CPU顺序",
+          "file": "demo.c",
+          "start": "    /* [4",
+          "end": "\n}",
+          "pattern": "for控制打印与计数；?:只选择字符串；++changed把不同格数加1。",
+          "text": "after是调用后的8字节；changed_count统计不同，不是执行过几次写操作。outside_unchanged检查选区外是否保持原样。",
+          "trace": "start0/count1/value16写入与原值相同：成功但changed0，不代表没有合法写入请求。"
+        },
+        {
+          "title": "7 · 独立test的main：有预期才叫检查",
+          "file": "test_fill.c",
+          "start": "int main",
+          "end": "    /* [测试3",
+          "pattern": "先显式调用，然后if检查status和完整memcmp结果；失败return非0。",
+          "text": "这一版不用assert，NDEBUG不会删除这些if检查。负路径期待-2；错误被正确拒绝时，测试仍是成功的。",
+          "trace": "2/3/A5得到expected全8格；越界7/2拒绝且仍是expected。"
+        },
+        {
+          "title": "8 · 空区间、空地址、极大数量",
+          "file": "test_fill.c",
+          "start": "    /* [测试3",
+          "end": "    printf",
+          "pattern": "(size_t)-1转换为无符号最大值；这里是故意的边界测试。",
+          "text": "先保证start合法，再比较count与剩余空间；极大count仍被拒绝，不进行写入。测试7单独看-1转无符号字节。",
+          "trace": "7项都满足才输出checks_passed7，return0；第6项失败会return6。"
+        },
+        {
+          "title": "9 · CMake只在ON时创建测试目标",
+          "file": "CMakeLists.txt",
+          "start": "include(CTest)",
+          "end": "\nendif",
+          "pattern": "include加载CMake模块；if/endif包住测试目标；PRIVATE是链接关系范围。",
+          "text": "demo一直构建；test只在开关ON构建。ON的CTest1个测试内部有7项检查；OFF没有测试，不能说通过。",
+          "trace": "同样输入2 3 165 8，ON/OFF的after一致；test_built分别1/0，checks分别7/0。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "E01 · 从首格填3字节",
+          "values": [
+            0,
+            3,
+            165,
+            8,
+            1
+          ],
+          "hint": "下标0、1、2变A5，后5格不变。",
+          "steps": [
+            "点击“E01 · 从首格填3字节”。五个输入依次是start、count、十进制value、capacity、测试开关；此按钮只填输入。",
+            "在8格预览中找下标0；算剩余空间capacity-start，判断count是否放得下。先预测after和status。",
+            "点击“运行案例”。看状态和“运行后8格”；在线明确是模拟，本地执行固定C工程。",
+            "核对：下标0、1、2变A5，后5格不变。",
+            "再核对选区外保持=1。测试ON看CTest数1/检查数7；OFF显示0表示未执行，不算测试通过。",
+            "选中你不懂的源码/讲解，选颜色，在弹出框写理解，点别处自动收起；批注保存在右栏。"
+          ]
+        },
+        {
+          "name": "E02 · 从中间填3字节",
+          "values": [
+            2,
+            3,
+            165,
+            8,
+            1
+          ],
+          "hint": "10 11 A5 A5 A5 15 16 17，末下标4。",
+          "steps": [
+            "点击“E02 · 从中间填3字节”。五个输入依次是start、count、十进制value、capacity、测试开关；此按钮只填输入。",
+            "在8格预览中找下标0；算剩余空间capacity-start，判断count是否放得下。先预测after和status。",
+            "点击“运行案例”。看状态和“运行后8格”；在线明确是模拟，本地执行固定C工程。",
+            "核对：10 11 A5 A5 A5 15 16 17，末下标4。",
+            "再核对选区外保持=1。测试ON看CTest数1/检查数7；OFF显示0表示未执行，不算测试通过。",
+            "选中你不懂的源码/讲解，选颜色，在弹出框写理解，点别处自动收起；批注保存在右栏。"
+          ]
+        },
+        {
+          "name": "E03 · 越界请求先拒绝",
+          "values": [
+            7,
+            2,
+            0,
+            8,
+            1
+          ],
+          "hint": "只剩1格却要2格，status-2，8格全部保持原样。",
+          "steps": [
+            "点击“E03 · 越界请求先拒绝”。五个输入依次是start、count、十进制value、capacity、测试开关；此按钮只填输入。",
+            "在8格预览中找下标0；算剩余空间capacity-start，判断count是否放得下。先预测after和status。",
+            "点击“运行案例”。看状态和“运行后8格”；在线明确是模拟，本地执行固定C工程。",
+            "核对：只剩1格却要2格，status-2，8格全部保持原样。",
+            "再核对选区外保持=1。测试ON看CTest数1/检查数7；OFF显示0表示未执行，不算测试通过。",
+            "选中你不懂的源码/讲解，选颜色，在弹出框写理解，点别处自动收起；批注保存在右栏。"
+          ]
+        },
+        {
+          "name": "E04 · 末尾空区间",
+          "values": [
+            8,
+            0,
+            0,
+            8,
+            1
+          ],
+          "hint": "status0，changed0，没有被写下标。",
+          "steps": [
+            "点击“E04 · 末尾空区间”。五个输入依次是start、count、十进制value、capacity、测试开关；此按钮只填输入。",
+            "在8格预览中找下标0；算剩余空间capacity-start，判断count是否放得下。先预测after和status。",
+            "点击“运行案例”。看状态和“运行后8格”；在线明确是模拟，本地执行固定C工程。",
+            "核对：status0，changed0，没有被写下标。",
+            "再核对选区外保持=1。测试ON看CTest数1/检查数7；OFF显示0表示未执行，不算测试通过。",
+            "选中你不懂的源码/讲解，选颜色，在弹出框写理解，点别处自动收起；批注保存在右栏。"
+          ]
+        },
+        {
+          "name": "E05 · 负下标由入口拒绝",
+          "values": [
+            -1,
+            1,
+            0,
+            8,
+            1
+          ],
+          "hint": "int接收-1，输入层拒绝，不转size_t调用，status-2。",
+          "steps": [
+            "点击“E05 · 负下标由入口拒绝”。五个输入依次是start、count、十进制value、capacity、测试开关；此按钮只填输入。",
+            "在8格预览中找下标0；算剩余空间capacity-start，判断count是否放得下。先预测after和status。",
+            "点击“运行案例”。看状态和“运行后8格”；在线明确是模拟，本地执行固定C工程。",
+            "核对：int接收-1，输入层拒绝，不转size_t调用，status-2。",
+            "再核对选区外保持=1。测试ON看CTest数1/检查数7；OFF显示0表示未执行，不算测试通过。",
+            "选中你不懂的源码/讲解，选颜色，在弹出框写理解，点别处自动收起；批注保存在右栏。"
+          ]
+        },
+        {
+          "name": "E06 · 负填充值转字节",
+          "values": [
+            5,
+            2,
+            -1,
+            8,
+            1
+          ],
+          "hint": "下标5/6填FF，value是-1但最终字节是255。",
+          "steps": [
+            "点击“E06 · 负填充值转字节”。五个输入依次是start、count、十进制value、capacity、测试开关；此按钮只填输入。",
+            "在8格预览中找下标0；算剩余空间capacity-start，判断count是否放得下。先预测after和status。",
+            "点击“运行案例”。看状态和“运行后8格”；在线明确是模拟，本地执行固定C工程。",
+            "核对：下标5/6填FF，value是-1但最终字节是255。",
+            "再核对选区外保持=1。测试ON看CTest数1/检查数7；OFF显示0表示未执行，不算测试通过。",
+            "选中你不懂的源码/讲解，选颜色，在弹出框写理解，点别处自动收起；批注保存在右栏。"
+          ]
+        },
+        {
+          "name": "E07 · 大填充值只取字节",
+          "values": [
+            2,
+            2,
+            4660,
+            8,
+            1
+          ],
+          "hint": "4660转成0x34，每格是34，不是12 34。",
+          "steps": [
+            "点击“E07 · 大填充值只取字节”。五个输入依次是start、count、十进制value、capacity、测试开关；此按钮只填输入。",
+            "在8格预览中找下标0；算剩余空间capacity-start，判断count是否放得下。先预测after和status。",
+            "点击“运行案例”。看状态和“运行后8格”；在线明确是模拟，本地执行固定C工程。",
+            "核对：4660转成0x34，每格是34，不是12 34。",
+            "再核对选区外保持=1。测试ON看CTest数1/检查数7；OFF显示0表示未执行，不算测试通过。",
+            "选中你不懂的源码/讲解，选颜色，在弹出框写理解，点别处自动收起；批注保存在右栏。"
+          ]
+        },
+        {
+          "name": "E08 · 关闭独立测试",
+          "values": [
+            2,
+            3,
+            165,
+            8,
+            0
+          ],
+          "hint": "after与E02相同；test_built0、test_count0、checks_passed0，表示未构建/未运行。",
+          "steps": [
+            "点击“E08 · 关闭独立测试”。五个输入依次是start、count、十进制value、capacity、测试开关；此按钮只填输入。",
+            "在8格预览中找下标0；算剩余空间capacity-start，判断count是否放得下。先预测after和status。",
+            "点击“运行案例”。看状态和“运行后8格”；在线明确是模拟，本地执行固定C工程。",
+            "核对：after与E02相同；test_built0、test_count0、checks_passed0，表示未构建/未运行。",
+            "再核对选区外保持=1。测试ON看CTest数1/检查数7；OFF显示0表示未执行，不算测试通过。",
+            "选中你不懂的源码/讲解，选颜色，在弹出框写理解，点别处自动收起；批注保存在右栏。"
+          ]
+        },
+        {
+          "name": "E09 · 迁移：中间清零",
+          "values": [
+            3,
+            2,
+            0,
+            8,
+            1
+          ],
+          "hint": "10 11 12 00 00 15 16 17，末下标4，changed2。",
+          "steps": [
+            "点击“E09 · 迁移：中间清零”。五个输入依次是start、count、十进制value、capacity、测试开关；此按钮只填输入。",
+            "在8格预览中找下标0；算剩余空间capacity-start，判断count是否放得下。先预测after和status。",
+            "点击“运行案例”。看状态和“运行后8格”；在线明确是模拟，本地执行固定C工程。",
+            "核对：10 11 12 00 00 15 16 17，末下标4，changed2。",
+            "再核对选区外保持=1。测试ON看CTest数1/检查数7；OFF显示0表示未执行，不算测试通过。",
+            "选中你不懂的源码/讲解，选颜色，在弹出框写理解，点别处自动收起；批注保存在右栏。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "先读整体架构，然后按文件按钮依次看demo.c→fill.h→fill.c→test_fill.c→CMakeLists.txt。",
+        "完成E01—E09；每次必须点击运行，预览不计实验。",
+        "输入value使用十进制；165对应A5，4660对应1234。输出格子标为十六进制。",
+        "README给本地ON/OFF两个目录完整命令；不要实际执行未检查的越界memset。"
+      ],
+      "test_steps": [
+        "在实验清单核对E01—E09均已运行。",
+        "回答第1—10题；特别区分数量与末下标、未执行与测试通过。",
+        "填写P1—P4，迁移条件为start3/count2/value0/capacity8。",
+        "点击提交；失败反馈按题号返回，改正后可重试。",
+        "通关只解锁下一日；D09等待你的反馈后再制作。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "memset(data+2,0xA5,3)最终覆盖哪些下标？",
+          "options": [
+            "0、1、2",
+            "2、3、4",
+            "2、3、4、5"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "是否保证CPU实际先写下标2，再3，再4？",
+          "options": [
+            "保证逐字节正向顺序",
+            "保证与大端有关",
+            "不保证内部写入先后；只约定结果范围"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "memset(data,1,8)的8是什么单位？",
+          "options": [
+            "字节数",
+            "任意数组的元素数",
+            "结束下标"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "uint8_t数组中memset(data,4660,2)写入什么？",
+          "options": [
+            "12 34",
+            "34 34（十六进制）",
+            "两个整数4660"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "capacity8/start9时为什么先拒绝再做减法？",
+          "options": [
+            "防止无符号8-9回绕，不能把它当数学-1",
+            "因为size_t总是有符号",
+            "因为memset能自动判断真实容量"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "本课start8/count0/capacity8会怎样？",
+          "options": [
+            "越界写第8格",
+            "返回0且不写；start等于容量的空区间被允许",
+            "填最后一格"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "实际工程需要独立测试源码吗？",
+          "options": [
+            "只能为演示写，生产从不用",
+            "必须把测试main编进ECU业务程序",
+            "常见但文件名不强制，主机测试通常单独构建"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "BUILD_TESTING=OFF、CTest测试数0意味着什么？",
+          "options": [
+            "未创建测试目标，不能声称测试已通过",
+            "所有测试都通过",
+            "fill_demo也一定不构建"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "函数参数uint8_t *data上的sizeof(data)是什么？",
+          "options": [
+            "原数组8字节",
+            "指针对象大小，不能据此推算原容量",
+            "总是1字节"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "成功写1格但值恰好与原值一样，changed_count是多少？",
+          "options": [
+            "1",
+            "8",
+            "0；它统计实际不同的格数"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "start=3,count=2,value=0,capacity=8，测试ON。计算末个写入下标、data[5]的十进制原值、该CTest登记的测试数和程序内部检查数。",
+        "values": [
+          3,
+          2,
+          0,
+          8,
+          1
+        ],
+        "fields": [
+          {
+            "id": "last_index",
+            "label": "P1 · 末个写入下标",
+            "kind": "number"
+          },
+          {
+            "id": "unchanged_byte",
+            "label": "P2 · data[5]十进制值",
+            "kind": "number"
+          },
+          {
+            "id": "test_count",
+            "label": "P3 · CTest测试数",
+            "kind": "number"
+          },
+          {
+            "id": "checks_passed",
+            "label": "P4 · 独立测试内部检查数",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "count>0时末下标=start+count-1。",
+          "只改3、4；下标5仍是十六进制15，转十进制=1×16+5。",
+          "CMake只登记一个fill_contract；测试main中一共7项检查。"
+        ]
+      },
+      "pass_rule": "本浏览器内判定题目、指定实验和模拟回归。此结果只表示在线练习通过；真实C与正式通关请在本地完成。",
+      "assets": [
+        {
+          "name": "CMakeLists.txt",
+          "language": "cmake",
+          "text": "# 本项目验证于WSL/GCC、CMake3.31.6；不是ECU固件的交叉编译配置。\ncmake_minimum_required(VERSION 3.16)\nproject(asw_fill LANGUAGES C)\nset(CMAKE_C_STANDARD 17)\nset(CMAKE_C_STANDARD_REQUIRED ON)\nadd_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Werror)\n# 库没有main；demo有自己的main，链接同一个库。\nadd_library(fill STATIC fill.c)\ntarget_include_directories(fill PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\nadd_executable(fill_demo demo.c)\ntarget_link_libraries(fill_demo PRIVATE fill)\n# include加载CTest模块，提供BUILD_TESTING选项，默认ON。\ninclude(CTest)\nif(BUILD_TESTING) # 只有ON才创建测试目标；不是C里的运行时if。\n    add_executable(fill_tests test_fill.c)\n    target_link_libraries(fill_tests PRIVATE fill)\n    add_test(NAME fill_contract COMMAND fill_tests)\nendif()\n"
+        },
+        {
+          "name": "demo.c",
+          "language": "c",
+          "text": "/* demo.c：演示入口。读输入、展示变化，不把打印塞进业务模块。 */\n#include \"fill.h\"\n#include <stdio.h> /* scanf读数；printf输出。 */\n\nint main(void) {\n    /* [1 初始化8格] 0x10是十六进制16，不是十进制10。下标为0到7。 */\n    uint8_t data[8] = {0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17};\n    uint8_t before[8] = {0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17};\n    int start, count, value, capacity;\n    /* [2 先用int接输入] int可保存负数；不能直接读成size_t再期待它保留-1。 */\n    if (scanf(\"%d %d %d %d\", &start, &count, &value, &capacity) != 4) return 1;\n    int status;\n    if (start < 0 || count < 0 || capacity < 0 || capacity > 8) {\n        status = -2; /* 输入层拒绝负长度和虚报超过真实8格的容量；不调用库。 */\n    } else {\n        /* [3 已确认非负，才显式转换类型] (size_t)不做范围检查，它只是转换。 */\n        status = Fill_Bytes(data, (size_t)capacity, (size_t)start, (size_t)count, value);\n    }\n    /* [4 用下标观察结果] 循环顺序是我们打印的顺序，不是证明memset内部写入顺序。 */\n    printf(\"status=%d\\nvalid=%d\\nfill_byte=%u\\n\", status, status == 0, (unsigned int)(unsigned char)value);\n    printf(\"before=\");\n    for (size_t i=0; i<8; ++i) printf(\"%02X%s\", (unsigned int)before[i], i==7 ? \"\\n\" : \" \");\n    printf(\"after=\");\n    for (size_t i=0; i<8; ++i) printf(\"%02X%s\", (unsigned int)data[i], i==7 ? \"\\n\" : \" \");\n    int changed=0, outside_unchanged=1;\n    for (int i=0; i<8; ++i) {\n        if (data[i] != before[i]) ++changed; /* 实际不同的格数；不一定等于count。 */\n        if ((status != 0 || i < start || i >= start + count) && data[i] != before[i]) outside_unchanged=0;\n    }\n    printf(\"changed_count=%d\\noutside_unchanged=%d\\n\", changed, outside_unchanged);\n    return 0; /* 演示程序正常完成；业务status=-2不等于进程必须失败退出。 */\n}\n"
+        },
+        {
+          "name": "fill.c",
+          "language": "c",
+          "text": "/* fill.c：唯一实现。这里不知道键盘、网页或CAN，只处理接口约定。 */\n#include \"fill.h\"\n#include <string.h> /* memset声明在这里；没有自动的缓冲区容量检查。 */\n\nint Fill_Bytes(uint8_t *data, size_t capacity, size_t start, size_t count, int value) {\n    /* [先检查地址] NULL不是可写对象；本接口即使count=0也拒绝NULL。 */\n    if (data == NULL) return -1;\n    /* [再检查起点] 必须先做这一步，否则capacity-start可能无符号下溢。 */\n    if (start > capacity) return -2;\n    /* [检查剩余空间] capacity=8,start=2时只剩6字节，count最多为6。\n     * 不用start+count比较，避免一般size_t输入相加溢出。 */\n    if (count > capacity - start) return -2;\n    /* [最后执行] data+2指向data[2]，不是把data[0]的数值加2。\n     * memset(data+2,0xA5,3)使下标2/3/4都变成A5，其他位置不变。\n     * 标准约定最终覆盖范围，不约定CPU内部按哪个顺序发出写操作。 */\n    if (count > 0) memset(data + start, value, count);\n    return 0; /* 成功报告状态；它不是memset的返回值，memset本身返回原目标地址。 */\n}\n"
+        },
+        {
+          "name": "fill.h",
+          "language": "c",
+          "text": "/* fill.h：约定能做什么。这里声明接口，函数体只在fill.c里写一次。 */\n#ifndef ASW_FILL_H\n#define ASW_FILL_H\n#include <stdint.h> /* uint8_t：本课每个元素恰好一个8位字节。 */\n#include <stddef.h> /* size_t：容量、下标与字节数；无符号，不表达负数。 */\n\n/* 调用者必须保证data确实指向至少capacity个可写字节。\n * capacity是实际可用范围，不是函数自己测出来的。\n * start=起始下标；count=填写字节数；value先转换为unsigned char。\n * 返回0成功，-1空指针，-2范围非法；失败时全部保持原样。\n * count为0且start不超过capacity时成功，不写任何字节。 */\nint Fill_Bytes(uint8_t *data, size_t capacity, size_t start, size_t count, int value);\n#endif\n"
+        },
+        {
+          "name": "README.md",
+          "language": "text",
+          "text": "# D08：范围填充与独立测试\n五个文件各自展示；先读demo.c入口，再看fill.h约定、fill.c实现、test_fill.c验证、CMakeLists.txt构建。\n本课是主机教学模块，不是现成ECU固件或完整安全认证工程。\n\n在Ubuntu/WSL终端进入本目录，逐条执行：\ncmake -S . -B build-on -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON\ncmake --build build-on\nctest --test-dir build-on --output-on-failure\n./build-on/fill_demo\n输入一行十进制数字：2 3 165 8，回车。\n预期after=10 11 A5 A5 A5 15 16 17，status=0，changed_count=3。\n\n再用另一个目录验证不构建测试：\ncmake -S . -B build-off -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF\ncmake --build build-off\nctest --test-dir build-off -N\n预期Total Tests: 0；仍有fill_demo，没有fill_tests。\n必须用新目录，避免旧二进制残留让人误判OFF仍构建了测试。\n没有系统CMake时用learning_app/tools/linux-cmake/cmake/data/bin/cmake及ctest完整WSL路径。\n\n主机测试是工程常见组成；是否随交付构建由项目规则决定。关掉构建不等于已经通过测试。\n不实际执行越界memset；范围错误应在写入前被本模块拒绝。\n"
+        },
+        {
+          "name": "test_fill.c",
+          "language": "c",
+          "text": "/* 独立的主机单元测试入口；不是ECU业务入口，文件名不强制叫这个。 */\n#include \"fill.h\"\n#include <string.h> /* memcmp只判断被比较字节是否相同。 */\n#include <stdio.h>\n\nint main(void) {\n    uint8_t data[8] = {0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17};\n    const uint8_t expected[8] = {0x10,0x11,0xA5,0xA5,0xA5,0x15,0x16,0x17};\n    /* [测试1：完整预期] 预期手写，不再用被测算法来生成预期。\n     * 本课用if+return显式检查，不依赖assert/NDEBUG是否启用。 */\n    int status=Fill_Bytes(data,8,2,3,0xA5);\n    if (status != 0 || memcmp(data,expected,8) != 0) return 1;\n    /* [测试2：越界请求应拒绝] 剩1格却要2格，失败后仍与expected一致。 */\n    status=Fill_Bytes(data,8,7,2,0);\n    if (status != -2 || memcmp(data,expected,8) != 0) return 2;\n    /* [测试3：零长度] 起点恰好等于容量，成功但不写内存。 */\n    status=Fill_Bytes(data,8,8,0,0);\n    if (status != 0 || memcmp(data,expected,8) != 0) return 3;\n    /* [测试4：空地址] 本接口约定拒绝，不能调用memset(NULL,... )。 */\n    status=Fill_Bytes(NULL,8,0,1,0);\n    if (status != -1) return 4;\n    /* [测试5：起点超界] 先拒绝，避免后面的无符号减法下溢。 */\n    status=Fill_Bytes(data,8,9,0,0);\n    if (status != -2 || memcmp(data,expected,8) != 0) return 5;\n    /* [测试6：大size_t计数] (size_t)-1是size_t的最大值，应被空间检查拒绝。 */\n    status=Fill_Bytes(data,8,0,(size_t)-1,0);\n    if (status != -2 || memcmp(data,expected,8) != 0) return 6;\n    /* [测试7：转换为字节] 当前8位字节平台上-1转换后为255，即FF。 */\n    status=Fill_Bytes(data,8,7,1,-1);\n    if (status != 0 || data[7] != 255) return 7;\n    printf(\"checks_passed=7\\n\");\n    return 0; /* 任一检查失败提前非0退出；全部成功才到这里。 */\n}\n"
+        }
+      ],
+      "code": "/* 兼容旧阅读器的整合副本；网页默认逐文件，真实执行使用独立工程。 */\n/* fill.h：约定能做什么。这里声明接口，函数体只在fill.c里写一次。 */\n#ifndef ASW_FILL_H\n#define ASW_FILL_H\n#include <stdint.h> /* uint8_t：本课每个元素恰好一个8位字节。 */\n#include <stddef.h> /* size_t：容量、下标与字节数；无符号，不表达负数。 */\n\n/* 调用者必须保证data确实指向至少capacity个可写字节。\n * capacity是实际可用范围，不是函数自己测出来的。\n * start=起始下标；count=填写字节数；value先转换为unsigned char。\n * 返回0成功，-1空指针，-2范围非法；失败时全部保持原样。\n * count为0且start不超过capacity时成功，不写任何字节。 */\nint Fill_Bytes(uint8_t *data, size_t capacity, size_t start, size_t count, int value);\n#endif\n\n/* demo.c：演示入口。读输入、展示变化，不把打印塞进业务模块。 */\n#include <stdio.h> /* scanf读数；printf输出。 */\n\nint main(void) {\n    /* [1 初始化8格] 0x10是十六进制16，不是十进制10。下标为0到7。 */\n    uint8_t data[8] = {0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17};\n    uint8_t before[8] = {0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17};\n    int start, count, value, capacity;\n    /* [2 先用int接输入] int可保存负数；不能直接读成size_t再期待它保留-1。 */\n    if (scanf(\"%d %d %d %d\", &start, &count, &value, &capacity) != 4) return 1;\n    int status;\n    if (start < 0 || count < 0 || capacity < 0 || capacity > 8) {\n        status = -2; /* 输入层拒绝负长度和虚报超过真实8格的容量；不调用库。 */\n    } else {\n        /* [3 已确认非负，才显式转换类型] (size_t)不做范围检查，它只是转换。 */\n        status = Fill_Bytes(data, (size_t)capacity, (size_t)start, (size_t)count, value);\n    }\n    /* [4 用下标观察结果] 循环顺序是我们打印的顺序，不是证明memset内部写入顺序。 */\n    printf(\"status=%d\\nvalid=%d\\nfill_byte=%u\\n\", status, status == 0, (unsigned int)(unsigned char)value);\n    printf(\"before=\");\n    for (size_t i=0; i<8; ++i) printf(\"%02X%s\", (unsigned int)before[i], i==7 ? \"\\n\" : \" \");\n    printf(\"after=\");\n    for (size_t i=0; i<8; ++i) printf(\"%02X%s\", (unsigned int)data[i], i==7 ? \"\\n\" : \" \");\n    int changed=0, outside_unchanged=1;\n    for (int i=0; i<8; ++i) {\n        if (data[i] != before[i]) ++changed; /* 实际不同的格数；不一定等于count。 */\n        if ((status != 0 || i < start || i >= start + count) && data[i] != before[i]) outside_unchanged=0;\n    }\n    printf(\"changed_count=%d\\noutside_unchanged=%d\\n\", changed, outside_unchanged);\n    return 0; /* 演示程序正常完成；业务status=-2不等于进程必须失败退出。 */\n}\n\n/* fill.c：唯一实现。这里不知道键盘、网页或CAN，只处理接口约定。 */\n#include <string.h> /* memset声明在这里；没有自动的缓冲区容量检查。 */\n\nint Fill_Bytes(uint8_t *data, size_t capacity, size_t start, size_t count, int value) {\n    /* [先检查地址] NULL不是可写对象；本接口即使count=0也拒绝NULL。 */\n    if (data == NULL) return -1;\n    /* [再检查起点] 必须先做这一步，否则capacity-start可能无符号下溢。 */\n    if (start > capacity) return -2;\n    /* [检查剩余空间] capacity=8,start=2时只剩6字节，count最多为6。\n     * 不用start+count比较，避免一般size_t输入相加溢出。 */\n    if (count > capacity - start) return -2;\n    /* [最后执行] data+2指向data[2]，不是把data[0]的数值加2。\n     * memset(data+2,0xA5,3)使下标2/3/4都变成A5，其他位置不变。\n     * 标准约定最终覆盖范围，不约定CPU内部按哪个顺序发出写操作。 */\n    if (count > 0) memset(data + start, value, count);\n    return 0; /* 成功报告状态；它不是memset的返回值，memset本身返回原目标地址。 */\n}\n"
     }
   },
   "rules": {
@@ -4992,6 +5613,167 @@
           "迁移：54.3"
         ]
       ]
+    },
+    "8": {
+      "correct": {
+        "q1": 1,
+        "q2": 2,
+        "q3": 0,
+        "q4": 1,
+        "q5": 0,
+        "q6": 1,
+        "q7": 2,
+        "q8": 0,
+        "q9": 1,
+        "q10": 2
+      },
+      "explanations": {
+        "q1": "起点2、数量3，覆盖2/3/4。",
+        "q2": "标准只约定最终范围，打印顺序不证明CPU写入顺序。",
+        "q3": "memset第三参数单位是字节。",
+        "q4": "4660=0x1234，转8位无符号字节为34。",
+        "q5": "先检查起点，避免无符号减法下溢。",
+        "q6": "本接口允许末尾空区间，不调用memset。",
+        "q7": "独立主机测试很常见，但不强制文件名或进入固件。",
+        "q8": "OFF没有测试，不能冒称测试通过。",
+        "q9": "参数是指针，sizeof不能推回原数组容量。",
+        "q10": "changed统计实际不同，写同样值可以是0。"
+      },
+      "numeric": {
+        "last_index": [
+          4,
+          "3+2-1=4。"
+        ],
+        "unchanged_byte": [
+          21,
+          "下标5未改，0x15=21。"
+        ],
+        "test_count": [
+          1,
+          "CMake登记1个fill_contract。"
+        ],
+        "checks_passed": [
+          7,
+          "测试程序内部7项显式检查。"
+        ]
+      },
+      "labels": {
+        "q1": "第1题",
+        "q2": "第2题",
+        "q3": "第3题",
+        "q4": "第4题",
+        "q5": "第5题",
+        "q6": "第6题",
+        "q7": "第7题",
+        "q8": "第8题",
+        "q9": "第9题",
+        "q10": "第10题",
+        "last_index": "P1 · last_index",
+        "unchanged_byte": "P2 · unchanged_byte",
+        "test_count": "P3 · test_count",
+        "checks_passed": "P4 · checks_passed"
+      },
+      "needed": [
+        [
+          [
+            0,
+            3,
+            165,
+            8,
+            1
+          ],
+          "lab0",
+          "E01 · 从首格填3字节"
+        ],
+        [
+          [
+            2,
+            3,
+            165,
+            8,
+            1
+          ],
+          "lab1",
+          "E02 · 从中间填3字节"
+        ],
+        [
+          [
+            7,
+            2,
+            0,
+            8,
+            1
+          ],
+          "lab2",
+          "E03 · 越界请求先拒绝"
+        ],
+        [
+          [
+            8,
+            0,
+            0,
+            8,
+            1
+          ],
+          "lab3",
+          "E04 · 末尾空区间"
+        ],
+        [
+          [
+            -1,
+            1,
+            0,
+            8,
+            1
+          ],
+          "lab4",
+          "E05 · 负下标由入口拒绝"
+        ],
+        [
+          [
+            5,
+            2,
+            -1,
+            8,
+            1
+          ],
+          "lab5",
+          "E06 · 负填充值转字节"
+        ],
+        [
+          [
+            2,
+            2,
+            4660,
+            8,
+            1
+          ],
+          "lab6",
+          "E07 · 大填充值只取字节"
+        ],
+        [
+          [
+            2,
+            3,
+            165,
+            8,
+            0
+          ],
+          "lab7",
+          "E08 · 关闭独立测试"
+        ],
+        [
+          [
+            3,
+            2,
+            0,
+            8,
+            1
+          ],
+          "lab8",
+          "E09 · 迁移：中间清零"
+        ]
+      ]
     }
   },
   "curriculum": [
@@ -5066,14 +5848,18 @@
       "stage": "C／CAN与接口"
     },
     {
-      "主题": "信号时间戳与有效性",
+      "主题": "内存区间与独立工程测试（按D07反馈补强）",
       "实作与产物": "给VehicleSignal加stamp、valid、source；实现freshness检查",
       "概念检验": "接收成功是否意味着信号足够新？",
       "故障或改动检验": "模拟50ms、100ms、101ms信号年龄",
       "验收条件": "明确超时边界；未来时间戳拒绝；测试边界三例",
       "day": 8,
       "week": 2,
-      "stage": "时序／状态／汽车架构"
+      "stage": "时序／状态／汽车架构",
+      "实践小任务": "范围检查填充模块、8格对照、ON/OFF独立构建",
+      "要能回答": "填哪几字节？测试如何与业务分开？",
+      "具体化的动作": "memset起点/长度，拒绝越界，CTest开关",
+      "验收标准": "9个参考实验与迁移检测；自己的改写本地验收"
     },
     {
       "主题": "周期任务与dt",
@@ -5836,5 +6622,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "837f128b08de"
+  "release": "202c41fa78db"
 }

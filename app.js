@@ -106,27 +106,43 @@ function renderCode(){
 }
 function chooseFile(name){rememberFile();activeFile=name;$('codeNotes').value=fileNotes[name]?.text||sourceFile().text;showCodeView('original');$('codeFile').textContent=lesson.project_name?lesson.project_name+' / '+name:name;for(const b of $('fileTabs').children)b.classList.toggle('current',b.dataset.file===name);renderAnnotations();}
 function resizeCodeNotes(){const el=$('codeNotes');if(!el||el.closest('[hidden]'))return;el.style.height='auto';el.style.height=Math.max(500,el.scrollHeight+6)+'px';}
-function captureAnnotation(){
+const annotationColors={yellow:'#fff0a6',green:'#bdeccc',blue:'#bcdfff'};
+function openAnnotation(mark,rect){
+  pendingAnnotation={...mark};$('annotationSelection').textContent='已选中：'+mark.quote;$('annotationText').value=mark.comment||'';$('annotationColor').value=mark.color||'yellow';$('saveAnnotation').disabled=false;
+  const panel=$('annotationPanel');panel.hidden=false;panel.style.left=Math.max(8,Math.min(rect?.left??innerWidth-380,innerWidth-Math.min(350,innerWidth-16)-8))+'px';
+  const height=Math.min(panel.getBoundingClientRect().height,innerHeight-16);panel.style.top=Math.max(8,Math.min((rect?.bottom??60)+8,innerHeight-height-8))+'px';
+  $('annotationStatus').textContent='标记已保存；输入批注自动保存，点别处收起。';
+}
+function persistAnnotation(){
+  if(!pendingAnnotation)return;
+  const mark={...pendingAnnotation,comment:$('annotationText').value.slice(0,10000),color:$('annotationColor').value,updated:new Date().toISOString(),deleted:false};
+  annotations=annotations.filter(a=>a.id!==mark.id);annotations.push(mark);pendingAnnotation=mark;rememberDraft();renderAnnotations();
+}
+function closeAnnotation(){if(!$('annotationPanel').hidden){persistAnnotation();$('annotationPanel').hidden=true;pendingAnnotation=null;saveNotes().catch(e=>message(e.message));}}
+function captureAnnotation(event){
+  if(event?.target?.closest?.('#annotationPanel,#annotationsList'))return;
   const selected=window.getSelection();if(!selected||selected.isCollapsed||!selected.rangeCount)return;
   const range=selected.getRangeAt(0),node=range.commonAncestorContainer,scope=(node.nodeType===1?node:node.parentElement).closest?.('[data-annotation-scope]');
-  if(!scope||!$('learn').contains(scope)||range.toString().trim().length===0||range.toString().length>8000)return;
+  if(!scope||!$('learn').contains(scope)||!scope.contains(range.endContainer)||range.toString().trim().length===0||range.toString().length>8000)return;
   const prefix=range.cloneRange();prefix.selectNodeContents(scope);prefix.setEnd(range.startContainer,range.startOffset);
-  pendingAnnotation={scope:scope.dataset.annotationScope,quote:range.toString(),start:prefix.toString().length,end:prefix.toString().length+range.toString().length};
-  $('annotationSelection').textContent='已选中：'+pendingAnnotation.quote;$('saveAnnotation').disabled=false;$('annotationStatus').textContent='在下方写理解，再点击保存；可只保存划线。';
+  const mark={id:crypto.randomUUID(),scope:scope.dataset.annotationScope,quote:range.toString(),start:prefix.toString().length,end:prefix.toString().length+range.toString().length,color:'yellow',comment:'',updated:new Date().toISOString(),deleted:false};
+  const rect=range.getBoundingClientRect();openAnnotation(mark,rect);persistAnnotation();
 }
-document.addEventListener('mouseup',captureAnnotation);document.addEventListener('keyup',e=>{if(e.shiftKey)captureAnnotation();});
+document.addEventListener('mouseup',captureAnnotation);document.addEventListener('keyup',e=>{if(e.shiftKey)captureAnnotation(e);if(e.key==='Escape')closeAnnotation();});
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('#annotationPanel'))closeAnnotation();});
+$('annotationText').addEventListener('input',persistAnnotation);$('annotationColor').addEventListener('change',persistAnnotation);$('closeAnnotation').onclick=closeAnnotation;
 function rangeAt(root,start,end){const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node,offset=0,first=null,last=null;while(node=walker.nextNode()){const next=offset+node.textContent.length;if(!first&&start>=offset&&start<next)first=[node,start-offset];if(end>offset&&end<=next){last=[node,end-offset];break;}offset=next;}if(!first||!last)return null;const range=document.createRange();range.setStart(...first);range.setEnd(...last);return range;}
 function renderAnnotations(){
-  if(!$('annotationsList'))return;for(const old of $('learn').querySelectorAll('mark.annotation-mark')){const parent=old.parentNode;old.replaceWith(document.createTextNode(old.textContent));parent.normalize();}$('annotationsList').replaceChildren();const ranges=[];
+  if(!$('annotationsList'))return;for(const old of $('learn').querySelectorAll('mark.annotation-mark')){const parent=old.parentNode;old.replaceWith(document.createTextNode(old.textContent));parent.normalize();}$('annotationsList').replaceChildren();const ranges=[],colored={yellow:[],green:[],blue:[]};
   for(const mark of annotations.filter(a=>!a.deleted)){
     const scope=[...$('learn').querySelectorAll('[data-annotation-scope]')].find(el=>el.dataset.annotationScope===mark.scope);let stale=false;
-    if(scope){const text=scope.textContent;let start=mark.start,end=mark.end;if(text.slice(start,end)!==mark.quote){const index=text.indexOf(mark.quote);if(index>=0&&text.indexOf(mark.quote,index+1)<0){start=index;end=index+mark.quote.length;}else stale=true;}if(!stale){const range=rangeAt(scope,start,end);if(range)ranges.push(range);}}
-    const details=document.createElement('details'),summary=document.createElement('summary'),quote=document.createElement('blockquote'),p=document.createElement('p'),edit=document.createElement('button'),remove=document.createElement('button');summary.textContent=(mark.scope?.startsWith('code:')?mark.scope.slice(5):'讲解标注')+' · '+(mark.comment||'已划线').slice(0,45)+(stale?'（原文已更新，请核对）':'');quote.textContent=mark.quote;p.textContent=mark.comment||'只划线，未写批注';edit.textContent='编辑';edit.onclick=()=>{pendingAnnotation={...mark};$('annotationSelection').textContent='编辑：'+mark.quote;$('annotationText').value=mark.comment||'';$('saveAnnotation').disabled=false;$('annotationPanel').scrollIntoView({block:'center'});};remove.textContent='移除划线';remove.onclick=()=>{annotations=annotations.map(a=>a.id===mark.id?{...a,deleted:true,updated:new Date().toISOString()}:a);rememberDraft();renderAnnotations();saveNotes().catch(e=>message(e.message));};details.append(summary,quote,p,edit,remove);$('annotationsList').append(details);
+    if(scope){const text=scope.textContent;let start=mark.start,end=mark.end;if(text.slice(start,end)!==mark.quote){const index=text.indexOf(mark.quote);if(index>=0&&text.indexOf(mark.quote,index+1)<0){start=index;end=index+mark.quote.length;}else stale=true;}if(!stale){const range=rangeAt(scope,start,end);if(range){ranges.push(range);colored[annotationColors[mark.color]?mark.color:'yellow'].push(range);}}}
+    const details=document.createElement('details'),summary=document.createElement('summary'),quote=document.createElement('blockquote'),p=document.createElement('p'),edit=document.createElement('button'),remove=document.createElement('button');summary.textContent=(mark.scope?.startsWith('code:')?mark.scope.slice(5):'讲解标注')+' · '+(mark.comment||'已划线').slice(0,45)+(stale?'（原文已更新，请核对）':'');quote.textContent=mark.quote;p.textContent=mark.comment||'只划线，未写批注';edit.textContent='编辑';edit.onclick=()=>{openAnnotation(mark,edit.getBoundingClientRect());};remove.textContent='移除划线';remove.onclick=()=>{annotations=annotations.map(a=>a.id===mark.id?{...a,deleted:true,updated:new Date().toISOString()}:a);rememberDraft();renderAnnotations();saveNotes().catch(e=>message(e.message));};details.append(summary,quote,p,edit,remove);$('annotationsList').append(details);
   }
-  if(window.CSS?.highlights&&window.Highlight){CSS.highlights.set('aswAnnotations',new Highlight(...ranges));}
-  else{for(const range of ranges.reverse()){if(range.startContainer===range.endContainer){const mark=document.createElement('mark');mark.className='annotation-mark';try{range.surroundContents(mark);}catch{}}}}
+  if(window.CSS?.highlights&&window.Highlight){for(const [color,list] of Object.entries(colored))CSS.highlights.set(color==='yellow'?'aswAnnotations':'aswAnnotations'+color,new Highlight(...list));}
+  else{for(const range of ranges.reverse()){if(range.startContainer===range.endContainer){const mark=document.createElement('mark');mark.className='annotation-mark';mark.style.backgroundColor=Object.entries(colored).find(([,list])=>list.includes(range))?.[0]?annotationColors[Object.entries(colored).find(([,list])=>list.includes(range))[0]]:annotationColors.yellow;try{range.surroundContents(mark);}catch{}}}}
 }
-$('saveAnnotation').onclick=async()=>{if(!pendingAnnotation)return;const mark={...pendingAnnotation,id:pendingAnnotation.id||crypto.randomUUID(),comment:$('annotationText').value.slice(0,10000),updated:new Date().toISOString(),deleted:false};annotations=annotations.filter(a=>a.id!==mark.id);annotations.push(mark);rememberDraft();renderAnnotations();await saveNotes();pendingAnnotation=null;$('saveAnnotation').disabled=true;$('annotationText').value='';$('annotationStatus').textContent='划线与批注已自动保存；连接云端后可同步。';};
+$('saveAnnotation').onclick=async()=>{persistAnnotation();await saveNotes();$('annotationStatus').textContent='划线与批注已自动保存；连接云端后可同步。';$('annotationPanel').hidden=true;pendingAnnotation=null;};
 function showCodeView(view){
   codeView=view;$('codeNotesLabel').hidden=view!=='edit';$('code').hidden=view==='edit';
   if(view==='edit')resizeCodeNotes();
@@ -182,7 +198,7 @@ async function selectDay(d){
   if(!c.unlocked){message(`D${String(d).padStart(2,'0')} 尚未解锁：先完成前一天的检测，或对当前日自定义通关。`);return;}
   if(!c.published){$('workspace').hidden=true;$('waiting').hidden=false;$('waitingTitle').textContent=`D${String(d).padStart(2,'0')} · ${c.title}`;$('waitingText').textContent='前一天通关已记录。下一课会根据你的学习结果与反馈补充。回到当前课程，下载报告或复制下一课请求发给聊天。';return;}
   const result=await api('/api/lesson?day='+d);day=d;lesson=result.lesson;const record=result.record;
-  pendingAnnotation=null;$('annotationText').value='';$('saveAnnotation').disabled=true;$('annotationSelection').textContent='选中源码或讲解文字，添加批注。';
+  $('annotationPanel').hidden=true;pendingAnnotation=null;$('annotationText').value='';$('saveAnnotation').disabled=true;$('annotationSelection').textContent='选中源码或讲解文字，添加批注。';
   $('waiting').hidden=true;$('workspace').hidden=false;$('dayTag').textContent=`D${String(day).padStart(2,'0')} · 第${c.week}周 · ${c.stage}`;
   $('title').textContent=lesson.title;$('summary').textContent=lesson.summary;$('time').textContent=lesson.time;
   $('goals').replaceChildren();for(const goal of lesson.goals){const li=document.createElement('li');li.textContent=goal;$('goals').append(li);}
@@ -207,7 +223,16 @@ async function selectDay(d){
   drawRoute();completeUI();tab('learn');message('');
 }
 $('backCurrent').onclick=()=>selectDay(day).catch(e=>message(e.message));
-function setInputs(values,hint,guide){lesson.run_fields.forEach((f,i)=>$(f.id).value=values[i]);$('hint').textContent=hint||'';steps('experimentSteps',guide||['输入已经填好。','先写自己的预测，再点击运行案例。','检查结果后回到做检测继续。']);}
+function renderBytePreview(values,result){
+  const target=$('byteLab');target.hidden=lesson?.runner!=='memory_day08';if(target.hidden)return;target.replaceChildren();
+  const raw=values||lesson.run_fields.map(f=>$(f.id).value),v=raw.map(Number),[start,count,value,capacity]=v;
+  const valid=raw.every(n=>String(n).trim()!=='')&&v.every(n=>Number.isInteger(n)&&n>=-100000&&n<=100000)&&[0,1].includes(v[4])&&start>=0&&count>=0&&capacity>=0&&capacity<=8&&start<=capacity&&count<=capacity-start;
+  const before=result?.before||Array.from({length:8},(_,i)=>16+i),after=result?.after||before.map((x,i)=>valid&&i>=start&&i<start+count?((value%256)+256)%256:x);
+  const h=document.createElement('h4'),p=document.createElement('p');h.textContent=result?'运行后的8格对照':'8格范围预览（预测，不计为实验）';p.textContent='格子内容为十六进制；下标从0起。蓝色框表示请求覆盖范围，不代表CPU内部写入顺序。'+(!valid?' 当前请求会被拒绝，所有格保持。':'');target.append(h,p);
+  const board=document.createElement('div');board.className='byte-grid';for(let i=0;i<8;i++){const cell=document.createElement('div');cell.className='byte-cell'+(valid&&i>=start&&i<start+count?' requested':'');const label=document.createElement('span'),b=document.createElement('strong');label.textContent='下标 '+i;b.textContent=before[i].toString(16).toUpperCase().padStart(2,'0')+' → '+after[i].toString(16).toUpperCase().padStart(2,'0');cell.append(label,b);board.append(cell);}target.append(board);
+}
+$('runFields').addEventListener('input',()=>renderBytePreview());
+function setInputs(values,hint,guide){lesson.run_fields.forEach((f,i)=>$(f.id).value=values[i]);renderBytePreview(values);$('hint').textContent=hint||'';steps('experimentSteps',guide||['输入已经填好。','先写自己的预测，再点击运行案例。','检查结果后回到做检测继续。']);}
 $('transferRun').onclick=()=>{setInputs(lesson.practice.values,'迁移实验：输入已填好。请先保留你的手算答案，再点击运行案例。');tab('run');$('prediction').focus();};
 function item(label,value,cls){const d=document.createElement('div'),l=document.createElement('div'),v=document.createElement('div');l.className='muted';l.textContent=label;v.className='value '+(cls||'');v.textContent=value;d.append(l,v);return d;}
 $('runButton').onclick=async()=>{
@@ -215,7 +240,10 @@ $('runButton').onclick=async()=>{
   try{const values=lesson.run_fields.map(f=>$(f.id).value.trim());const result=await api('/api/run',{day,values});
     $('output').replaceChildren();const grid=document.createElement('div');grid.className='output-grid';
     let explanation,summaryText;
-    if(lesson.runner==='assessment_day07'){
+    if(lesson.runner==='memory_day08'){
+      grid.append(item('填写status',result.status,result.valid?'good':'bad'),item('转换后的字节（十进制）',result.fill_byte),item('实际不同格数',result.changed_count),item('选区外保持',result.outside_unchanged),item('测试目标',result.test_built?'已构建并运行':'未构建/未运行'),item('CTest登记数',result.test_count),item('独立检查数',result.checks_passed));renderBytePreview(values,result);
+      explanation=(result.valid?'范围合法；只填写指定区间。':'范围被拒绝；没有执行填写。')+(result.test_built?'本次独立测试7项检查完成。':'OFF不是在线练习通过，而是未构建、未运行测试。');summaryText='status='+result.status+'，after='+result.after.join(',')+'，测试数'+result.test_count;
+    }else if(lesson.runner==='assessment_day07'){
       grid.append(item('构建',result.build_status===0?'通过':'失败'),item('正常库测试',result.test_passed?'通过':'未通过'),item('当前实验断言',result.assertions_enabled?'启用':'关闭'));
       if(result.side_effect_count!==undefined){grid.append(item('assert内副作用计数',result.side_effect_count),item('故意失败是否终止',result.assert_failed?'是':'否'),item('是否继续到最后',result.continued?'是':'否'));explanation=result.assertions_enabled?'断言参数被求值：计数1；assert(0)故意为假，探针终止。正常库测试仍通过。':'NDEBUG使断言参数不求值，计数0；assert(0)也跳过，所以继续。探针用旧式副作用写法做对照，正常测试已经把调用放assert外。';}
       else{grid.append(item('业务status',result.status,result.valid?'good':'bad'));if(result.frame)grid.append(item('发送raw',result.raw),item('接收raw',result.received_raw),item('接收控制',result.received_control),item('解码status',result.decode_status));if(result.decoded_speed!==undefined)grid.append(item('有效解码km/h',result.decoded_speed.toFixed(1),'good'));if(result.header_enum_count!==undefined)grid.append(item('源码include次数',result.include_count),item('预处理enum定义次数',result.header_enum_count));explanation=!result.valid?'输入或长度拒绝，没有新帧。':result.decode_valid?'参考模块正常调用并还原；函数在各自.c，入口在demo。':'端序或模式非法，解码拒绝，没有新的速度输出。';}

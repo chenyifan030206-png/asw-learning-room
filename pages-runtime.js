@@ -90,6 +90,12 @@ function pagesSimulate(day,values){
     const faults={1:['missing_definition',2,'模拟链接诊断：undefined reference；只给demo，没有codec实现。'],2:['duplicate_definition',2,'模拟链接诊断：multiple definition；重复加入codec实现。'],3:['header_redefinition',1,'模拟编译诊断：redeclaration；无保护重复展开enum。']};
     if(faults[scenario]){const [error_kind,build_stage,compiler_log]=faults[scenario];result={build_status:-1,build_stage,error_kind,program_ran:0,test_passed:0,valid:0,compiler_log};}
     else {const status=length!==8?-1:!Number.isFinite(speed)||speed<0||speed>250||mode<0||mode>2||radar<0||radar>1?-2:0;result={build_status:0,build_stage:3,error_kind:'none',program_ran:1,test_passed:1,status,valid:Number(status===0),compiler_log:'模拟构建流程：头文件展开 → 各.c编译 → codec库 → demo/test分别链接 → 模拟测试通过。没有执行编译器或CTest。'};if(status===0){const raw=Math.round(f(speed*10));Object.assign(result,{raw,frame:[raw&255,(raw>>>8)&255,mode|(radar<<2),0,0,0,0,0],decode_status:0,decode_valid:1,decoded_speed:Number(f(raw*f(0.1)).toFixed(1))});}}
+  }else if(day===8){
+    const v=pagesNumbers(values,5),[start,count,value,capacity,on]=v;
+    if(!v.every(n=>Number.isInteger(n)&&n>=-100000&&n<=100000)||![0,1].includes(on))throw Error('D08需完整范围内整数，开关0或1。');
+    const valid=capacity>=0&&capacity<=8&&start>=0&&count>=0&&start<=capacity&&count<=capacity-start,before=Array.from({length:8},(_,i)=>16+i),after=[...before],fill_byte=((value%256)+256)%256;
+    if(valid)after.fill(fill_byte,start,start+count);
+    result={status:valid?0:-2,valid:Number(valid),before,after,fill_byte,changed_count:after.filter((x,i)=>x!==before[i]).length,outside_unchanged:1,test_built:on,test_count:on,checks_passed:on*7,build_status:0,program_ran:1,compiler_log:'浏览器模拟：ON登记1个测试、包含7项检查；OFF未构建未运行测试。没有在浏览器调用memset或实际构建。'};
   }else if(day===7){
     const v=pagesNumbers(values,5),speed=f(v[0]),[mode,radar,length,scenario]=v.slice(1);
     if(!v.slice(1).every(n=>Number.isInteger(n)&&n>=-100&&n<=100)||![0,1,2,3,4,5].includes(scenario))throw Error('实验开关0—5，其余需完整范围内整数。');
@@ -120,11 +126,12 @@ function pagesRegression(day){
   cases[5]=[['标准',[72.5,1,1,0,16,0,8],{frame:[213,2,5,0,0,0,0,0],decoded_speed:72.5}],['第二',[100,2,0,0,16,0,8],{frame:[232,3,2,0,0,0,0,0]}],['精细',[72.5,1,1,1,16,0,8],{raw:7250,frame:[82,28,5,0,0,0,0,0]}],['偏移',[72.5,1,1,2,16,0,8],{raw:825,decoded_speed:72.5}],['溢出',[72.5,1,1,0,8,0,8],{status:-2}],['模式',[72.5,1,1,0,16,1,8],{decode_status:-2}],['配置错',[72.5,1,1,0,16,3,8],{decoded_speed:7.25}],['迁移',[54.3,2,1,2,16,0,8],{raw:643,frame:[131,2,6,0,0,0,0,0],decoded_speed:54.3}],['8位边界',[25.5,1,1,0,8,0,8],{raw:255}],['精细边界',[2.55,1,1,1,8,0,8],{raw:255,decoded_speed:2.55}],['非法',['nan',1,1,0,16,0,8],{status:-2}]];
   cases[6]=[['模块标准',[72.5,1,1,8,0],{build_status:0,frame:[213,2,5,0,0,0,0,0],decoded_speed:72.5}],['缺实现',[72.5,1,1,8,1],{build_status:-1,build_stage:2,program_ran:0}],['重复定义',[72.5,1,1,8,2],{build_status:-1,build_stage:2,program_ran:0}],['无保护',[72.5,1,1,8,3],{build_status:-1,build_stage:1,program_ran:0}],['恢复保护',[72.5,1,1,8,4],{build_status:0,decoded_speed:72.5}],['长度',[72.5,1,1,7,0],{build_status:0,status:-1}],['非法模式',[72.5,3,1,8,0],{build_status:0,status:-2}],['迁移',[54.3,2,1,8,0],{raw:543,frame:[31,2,6,0,0,0,0,0]}]];
   cases[7]=[['标准',[72.5,1,1,8,0],{raw:725,decoded_speed:72.5}],['端序',[72.5,1,1,8,1],{received_raw:54530,decode_status:-2}],['模式',[72.5,1,1,8,2],{received_control:7,decode_status:-2}],['启用',[72.5,1,1,8,3],{assertions_enabled:1,assert_failed:1,side_effect_count:1}],['关闭',[72.5,1,1,8,4],{assertions_enabled:0,side_effect_count:0,continued:1}],['保护',[72.5,1,1,8,5],{include_count:2,header_enum_count:1}],['迁移',[54.3,2,1,8,0],{raw:543,frame:[31,2,6,0,0,0,0,0]}]];
+  cases[8]=[['middle',[2,3,165,8,1],{after:[16,17,165,165,165,21,22,23],changed_count:3,test_count:1,checks_passed:7}],['reject',[7,2,0,8,1],{status:-2,changed_count:0}],['empty',[8,0,0,8,1],{status:0,changed_count:0}],['negative',[-1,1,0,8,1],{status:-2}],['byte',[5,2,-1,8,1],{fill_byte:255}],['large',[2,2,4660,8,1],{fill_byte:52}],['off',[2,3,165,8,0],{test_built:0,test_count:0,checks_passed:0}],['transfer',[3,2,0,8,1],{after:[16,17,18,0,0,21,22,23]}]];
   return cases[day].map(([name,input,expected])=>{const actual=pagesSimulate(day,input),passed=Object.entries(expected).every(([k,v])=>Array.isArray(v)?JSON.stringify(actual[k])===JSON.stringify(v):Math.abs(actual[k]-v)<0.001);return {name:'浏览器模拟 · '+name,passed,expected,actual};});
 }
 function pagesValidateAnnotations(marks,files){
   if(!Array.isArray(marks)||!files||Array.isArray(files)||typeof files!=='object')throw Error('批注结构不正确。');
-  for(const m of marks)if(!m||['id','scope','quote','updated'].some(k=>typeof m[k]!=='string')||typeof (m.comment??'')!=='string'||!Number.isInteger(m.start)||!Number.isInteger(m.end)||m.start<0||m.end<m.start)throw Error('批注字段或划线位置不正确。');
+  for(const m of marks)if(!m||['id','scope','quote','updated'].some(k=>typeof m[k]!=='string')||typeof (m.comment??'')!=='string'||!Number.isInteger(m.start)||!Number.isInteger(m.end)||m.start<0||m.end<m.start||!['yellow','green','blue'].includes(m.color??'yellow'))throw Error('批注字段或划线位置不正确。');
   for(const f of Object.values(files))if(!f||typeof f.text!=='string'||typeof f.updated!=='string')throw Error('逐文件注释格式不正确。');
 }
 function pagesReport(day,bundle,db){

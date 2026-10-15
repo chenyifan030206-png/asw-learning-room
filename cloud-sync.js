@@ -74,7 +74,7 @@ async function cloudRefresh(jump=false){
   if(typeof state==='undefined'||!state)return;
   state=await api('/api/state');drawRoute();completeUI();
   if(jump){const ready=state.courses.filter(c=>c.unlocked&&c.published),next=ready.find(c=>!c.completed)||ready.at(-1);if(next)await selectDay(next.day);}
-  else if(!dirty&&!['notes','feedback','codeNotes'].includes(document.activeElement?.id)){
+  else if(!dirty&&!['notes','feedback','codeNotes','annotationText','annotationColor'].includes(document.activeElement?.id)){
     const n=pagesLoad().notes.find(n=>n.day===day);if(n){$('notes').value=n.notes;$('feedback').value=n.feedback;loadPersonalRecord(n);resizeCodeNotes();if(codeView==='personal')coloredCode($('code'),$('codeNotes').value);renderAnnotations();}
   }
   cloudHistory();
