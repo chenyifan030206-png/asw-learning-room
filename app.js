@@ -126,7 +126,7 @@ function captureAnnotation(event){
   if(!scope||!$('learn').contains(scope)||!scope.contains(range.endContainer)||range.toString().trim().length===0||range.toString().length>8000)return;
   const prefix=range.cloneRange();prefix.selectNodeContents(scope);prefix.setEnd(range.startContainer,range.startOffset);
   const mark={id:crypto.randomUUID(),scope:scope.dataset.annotationScope,quote:range.toString(),start:prefix.toString().length,end:prefix.toString().length+range.toString().length,color:'yellow',comment:'',updated:new Date().toISOString(),deleted:false};
-  const rect=range.getBoundingClientRect();openAnnotation(mark,rect);persistAnnotation();
+  const rect=range.getBoundingClientRect();openAnnotation(mark,rect);persistAnnotation();selected.removeAllRanges();
 }
 document.addEventListener('mouseup',captureAnnotation);document.addEventListener('keyup',e=>{if(e.shiftKey)captureAnnotation(e);if(e.key==='Escape')closeAnnotation();});
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#annotationPanel'))closeAnnotation();});
