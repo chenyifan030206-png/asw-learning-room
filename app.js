@@ -50,7 +50,7 @@ function drawRoute(){
   $('days').replaceChildren();
   for(const c of state.courses){const b=document.createElement('button');
     const status=c.completed?(c.method==='test'&&state.progress.find(p=>p.day===c.day)?.source==='local-c'?'本地真实C已通过':c.method==='test'?'在线练习通过':'手动通关'):!c.unlocked?'未解锁':!c.published?'待准备':'可学习';
-    b.textContent=`D${String(c.day).padStart(2,'0')} · ${c.title} · ${status}`;
+    b.textContent=`D${String(c.day).padStart(2,'0')} · ${c.title} · ${status}`;b.title='原计划：'+(c.planned_title||c.title)+(c.day===8?'；原主题补齐见D09附录A，完成D08内存课不代表已完成该主题。':'');
     if(c.day===day)b.className='current';b.onclick=()=>selectDay(c.day).catch(e=>message(e.message));$('days').append(b);}
 }
 function completeUI(){
@@ -91,7 +91,7 @@ $('prevStep').onclick=()=>showStep(stepIndex-1);$('nextStep').onclick=()=>showSt
 function renderCode(){
   $('downloadProject')?.remove();
   activeFile=lesson.project_name?(lesson.assets.find(a=>a.name==='demo.c')||lesson.assets.find(a=>a.name.endsWith('.c'))).name:lesson.source;
-  $('fileTabs').replaceChildren();if(lesson.project_name)for(const file of lesson.assets){const b=document.createElement('button');b.textContent=file.name;b.dataset.file=file.name;b.onclick=()=>chooseFile(file.name);$('fileTabs').append(b);}
+  renderProjectIntro();$('fileTabs').replaceChildren();let extraFiles=null;if(lesson.project_name)for(const file of lesson.assets){const b=document.createElement('button');b.textContent=file.name;b.dataset.file=file.name;b.onclick=()=>chooseFile(file.name);if(file.group==='appendix'){if(!extraFiles){extraFiles=document.createElement('details');extraFiles.id='appendixFileTabs';const summary=document.createElement('summary');summary.textContent='附录文件（补原D08；主课可先不读）';extraFiles.append(summary);$('fileTabs').append(extraFiles);}extraFiles.append(b);}else $('fileTabs').append(b);}
   coloredCode($('code'),sourceFile().text);$('code').dataset.annotationScope='code:'+activeFile;
   codeView='original';$('code').hidden=false;$('codeNotesLabel').hidden=true;
   $('architectureFlow').textContent=lesson.flow_text||'main入口 → 输入 → 业务函数 → 状态返回 → main决定是否显示结果';
@@ -104,7 +104,7 @@ function renderCode(){
   $('codeIntegrity').textContent=`当前文件 ${activeFile} · ${sourceFile().text.split('\n').length} 行。逐文件完整显示；下方可以对源码与讲解划线批注。`;
   $('architectureFlow').dataset.annotationScope='architecture';$('remediationText').dataset.annotationScope='remediation';
 }
-function chooseFile(name){rememberFile();activeFile=name;$('codeNotes').value=fileNotes[name]?.text||sourceFile().text;showCodeView('original');$('codeFile').textContent=lesson.project_name?lesson.project_name+' / '+name:name;for(const b of $('fileTabs').children)b.classList.toggle('current',b.dataset.file===name);renderAnnotations();}
+function chooseFile(name){rememberFile();activeFile=name;$('codeNotes').value=fileNotes[name]?.text||sourceFile().text;showCodeView('original');$('codeFile').textContent=lesson.project_name?lesson.project_name+' / '+name:name;for(const b of $('fileTabs').querySelectorAll('button[data-file]'))b.classList.toggle('current',b.dataset.file===name);renderAnnotations();}
 function resizeCodeNotes(){const el=$('codeNotes');if(!el||el.closest('[hidden]'))return;el.style.height='auto';el.style.height=Math.max(500,el.scrollHeight+6)+'px';}
 let annotationEditRecorded=false;
 const annotationColors={yellow:'#fff0a6',green:'#bdeccc',blue:'#bcdfff'};
@@ -194,6 +194,12 @@ function renderBitLab(){
 }
 $('expandCode').onclick=()=>{const expanded=$('code').classList.toggle('expanded');$('expandCode').textContent=expanded?'收起代码高度':'展开全部';$('expandCode').setAttribute('aria-expanded',String(expanded));};
 $('jumpMain').onclick=()=>{if(lesson.project_name&&activeFile!=='demo.c')chooseFile('demo.c');const index=sourceFile().text.split('\n').findIndex(line=>line.startsWith('int main('));const line=$('code').querySelector(`[data-line="${index+1}"]`);$('code').querySelectorAll('.selected-line').forEach(l=>l.classList.remove('selected-line'));if(line){line.classList.add('selected-line');line.scrollIntoView({block:'center'});}};
+function renderProjectIntro(){const target=$('projectIntro');target.replaceChildren();target.hidden=!lesson.project_intro;if(target.hidden)return;const h=document.createElement('h3');h.textContent=lesson.project_intro.title;target.append(h);target.dataset.annotationScope='project-intro';paragraphs(target,lesson.project_intro.paragraphs.join('\n'));}
+function updateTimingFields(){if(lesson?.runner!=='timing_day09'){$('timelineLab').hidden=true;return;}const part=$('chapter')?.value==='1'?'appendix':'main';for(const f of lesson.run_fields){const label=$(f.id)?.closest('label');if(label)label.hidden=!!f.group&&f.group!==part;}}
+function updateAppendixChecklist(items){const target=$('appendixChecklist');if(!target)return;target.replaceChildren();const rows=items||[];const text=document.createElement('p');text.textContent=`原D08补齐实作：${rows.filter(r=>r.passed).length}/${rows.length}已运行。未运行仍待补；已运行不等同独立掌握，不改变主课通关。`;target.append(text);for(const row of rows){const p=document.createElement('p');p.textContent=(row.passed?'✓ 已运行 · ':'○ 待补 · ')+row.label;target.append(p);}}
+function renderAppendices(items){const target=$('appendices');target.replaceChildren();target.hidden=!lesson.appendices?.length;for(const [i,a] of (lesson.appendices||[]).entries()){const details=document.createElement('details'),summary=document.createElement('summary'),body=document.createElement('div');summary.textContent=a.title;body.dataset.annotationScope='appendix:'+i;paragraphs(body,a.paragraphs.join('\n'));details.append(summary,body);for(const name of a.files||[]){const b=document.createElement('button');b.textContent='查看 '+name;b.onclick=()=>{if($('appendixFileTabs'))$('appendixFileTabs').open=true;chooseFile(name);$('codeFile').scrollIntoView({block:'start'});};details.append(b);}if(a.experiment_names){const box=document.createElement('div');box.id='appendixChecklist';details.append(box);for(const e of lesson.experiments.filter(e=>e.optional)){const b=document.createElement('button');b.textContent=e.name;b.onclick=()=>{setInputs(e.values,e.hint,e.steps);tab('run');};details.append(b);}}target.append(details);}updateAppendixChecklist(items);}
+function renderTimingTable(values,result){const target=$('timelineLab');target.replaceChildren();target.hidden=lesson.runner!=='timing_day09';if(target.hidden)return;const h=document.createElement('h4');h.textContent=result.chapter?'附录 · 数据年龄（不是主课dt）':'按程序返回结果展开的周期表';target.append(h);if(result.chapter||!result.valid){const p=document.createElement('p');p.textContent=result.chapter?(result.age_ms===undefined?'字段或未来时间拒绝；年龄不展示。':'当前时刻-'+values[4]+'ms的数据时刻 = '+result.age_ms+'ms；100ms包含在本例允许范围内。'):'输入被拒绝，没有有效周期表。';target.append(p);return;}
+ const speed=Number(values[0]),rows=[];let fixed=0,actual=0;for(let i=0;i<result.control_ms.length;i++){const dt=result.dt_ms[i],step=i?speed*dt/1000:0;if(i){fixed+=speed*0.010;actual+=step;}rows.push([result.control_ms[i],i?dt:'初始化',i?(dt/1000).toFixed(3):'—',step.toFixed(4),fixed.toFixed(4),actual.toFixed(4)]);}const headers=['控制到场ms','距上次dt(ms)','dt(s)','本段距离(m)','固定法累计(m)','实际法累计(m)'];target.append(makeTable(headers,rows));const p=document.createElement('p');p.textContent='观察员到场（ms）：'+result.perception_ms.join('、')+'。这里保存纸面任务表，不是电脑实测调度。';target.append(p);const button=document.createElement('button');button.id='downloadTimeline';button.textContent='下载本次周期表 CSV';button.onclick=()=>download('\uFEFF'+[headers,...rows].map(row=>row.join(',')).join('\n'),'D09-周期表.csv','text/csv;charset=utf-8');target.append(button);}
 function renderFields(id,fields,prefix=''){
   $(id).replaceChildren();for(const f of fields){const label=document.createElement('label');label.textContent=f.label;const el=document.createElement(f.kind==='select'?'select':'input');el.id=prefix+f.id;
     if(f.kind==='select'){if(prefix){const o=document.createElement('option');o.value='';o.textContent='请选择';el.append(o);}for(const [value,text] of f.options){const o=document.createElement('option');o.value=value;o.textContent=text;el.append(o);}}
@@ -202,7 +208,7 @@ function renderFields(id,fields,prefix=''){
   }
 }
 function drawChecklist(items){for(const id of ['runChecklist','testChecklist']){$(id).replaceChildren();for(const c of items){const row=document.createElement('div'),span=document.createElement('span');row.className='checklist-row';span.textContent=`${c.passed?'✓ 已运行':'○ 待运行'} · ${c.label}`;span.className=c.passed?'pass':'muted';row.append(span);if(!c.passed){const b=document.createElement('button');b.type='button';b.textContent='去运行';b.className='small';b.onclick=()=>{setInputs(c.values,`通关实验：${c.label}。输入已经填好，现在点击运行案例。`);tab('run');$('runButton').focus();};row.append(b);}$(id).append(row);}}}
-async function refreshChecklist(){const result=await api('/api/checklist?day='+day);drawChecklist(result.experiments);}
+async function refreshChecklist(){const result=await api('/api/checklist?day='+day);drawChecklist(result.experiments);updateAppendixChecklist(result.appendix_experiments);}
 async function selectDay(d){
   if(busy){message('正在运行或检测，请等待完成后再换课程。');return;}
   if(dirty)await saveNotes();
@@ -219,9 +225,10 @@ async function selectDay(d){
   if(!lesson.project_name)for(const asset of lesson.assets||[]){const section=document.createElement('section'),h=document.createElement('h3'),pre=document.createElement('pre'),button=document.createElement('button');h.textContent='完整文件 · '+asset.name;pre.textContent=asset.text;pre.style.maxHeight='none';button.textContent='下载 '+asset.name;button.onclick=()=>download(asset.text,asset.name,'text/plain;charset=utf-8');section.append(h,pre,button);$('reading').append(section);}
   if(lesson.project_name){const button=document.createElement('button');button.textContent='下载完整项目ZIP';button.id='downloadProject';button.className='primary';button.onclick=()=>download(projectZip(lesson.assets,lesson.project_name),lesson.project_name+'.zip','application/zip');$('architecture').append(button);}
   if(lesson.reference){const section=document.createElement('section'),h=document.createElement('h3'),p=document.createElement('p');h.textContent='独立工具实测参考 · 不是浏览器现场运行';p.textContent=`工具cantools ${lesson.reference.version}，实际读取DBC；每行同时与手工C和协议向量一致。`;section.append(h,p,makeTable(['输入速度／模式／雷达','factor／offset／width','工具编码字节','工具解码速度'],lesson.reference.vectors.map(v=>[v.values.slice(0,3).join(' / '),`${v.factor} / ${v.offset} / ${v.width}`,v.frame.map(x=>x.toString(16).toUpperCase().padStart(2,'0')).join(' '),v.decoded])));$('reading').append(section);}
+  renderAppendices(result.appendix_experiments);
   renderFields('runFields',lesson.run_fields);renderFields('answerFields',lesson.practice.fields,'answer-');
   steps('labSteps',lesson.lab_steps);steps('testSteps',lesson.test_steps);steps('practiceSteps',lesson.practice.steps);
-  $('presets').replaceChildren();for(const e of lesson.experiments){const b=document.createElement('button');b.textContent=e.name;b.onclick=()=>setInputs(e.values,e.hint,e.steps);$('presets').append(b);}
+  $('presets').replaceChildren();for(const e of lesson.experiments.filter(e=>!e.optional)){const b=document.createElement('button');b.textContent=e.name;b.onclick=()=>setInputs(e.values,e.hint,e.steps);$('presets').append(b);}
   setInputs(lesson.experiments[0].values,lesson.experiments[0].hint,lesson.experiments[0].steps);drawChecklist(result.experiments);
   $('notes').value=record.notes;$('feedback').value=record.feedback;loadPersonalRecord(record);dirty=false;
   try{const draft=JSON.parse(localStorage.getItem(draftKey(day))||'null');if(draft){$('notes').value=draft.notes;$('feedback').value=draft.feedback;loadPersonalRecord({...record,...draft});dirty=true;}}catch(e){}
@@ -244,7 +251,8 @@ function renderBytePreview(values,result){
   const board=document.createElement('div');board.className='byte-grid';for(let i=0;i<8;i++){const cell=document.createElement('div');cell.className='byte-cell'+(valid&&i>=start&&i<start+count?' requested':'');const label=document.createElement('span'),b=document.createElement('strong');label.textContent='下标 '+i;b.textContent=before[i].toString(16).toUpperCase().padStart(2,'0')+' → '+after[i].toString(16).toUpperCase().padStart(2,'0');cell.append(label,b);board.append(cell);}target.append(board);
 }
 $('runFields').addEventListener('input',()=>renderBytePreview());
-function setInputs(values,hint,guide){lesson.run_fields.forEach((f,i)=>$(f.id).value=values[i]);renderBytePreview(values);$('hint').textContent=hint||'';steps('experimentSteps',guide||['输入已经填好。','先写自己的预测，再点击运行案例。','检查结果后回到做检测继续。']);}
+$('runFields').addEventListener('change',updateTimingFields);
+function setInputs(values,hint,guide){lesson.run_fields.forEach((f,i)=>$(f.id).value=values[i]);renderBytePreview(values);updateTimingFields();$('timelineLab').hidden=true;$('hint').textContent=hint||'';steps('experimentSteps',guide||['输入已经填好。','先写自己的预测，再点击运行案例。','检查结果后回到做检测继续。']);}
 $('transferRun').onclick=()=>{setInputs(lesson.practice.values,'迁移实验：输入已填好。请先保留你的手算答案，再点击运行案例。');tab('run');$('prediction').focus();};
 function item(label,value,cls){const d=document.createElement('div'),l=document.createElement('div'),v=document.createElement('div');l.className='muted';l.textContent=label;v.className='value '+(cls||'');v.textContent=value;d.append(l,v);return d;}
 $('runButton').onclick=async()=>{
@@ -252,7 +260,9 @@ $('runButton').onclick=async()=>{
   try{const values=lesson.run_fields.map(f=>$(f.id).value.trim());const result=await api('/api/run',{day,values});
     $('output').replaceChildren();const grid=document.createElement('div');grid.className='output-grid';
     let explanation,summaryText;
-    if(lesson.runner==='memory_day08'){
+    if(lesson.runner==='timing_day09'){
+      grid.append(item(result.chapter?'附录状态':'主课状态',result.status,result.valid?'good':'bad'));if(result.chapter){if(result.age_ms!==undefined)grid.append(item('数据年龄（ms）',result.age_ms));explanation=result.status===0?'按本例约定数据新鲜。':result.status===-4?'超过100ms，拒绝过期数据。':result.status===-3?'时间戳来自未来，先拒绝，不展示假造年龄。':'有效标记、来源或数值/时间范围非法。';}else if(result.valid){grid.append(item('控制到场数（含0ms）',result.control_count),item('实际更新次数',result.update_count),item('固定dt累计（m）',result.fixed_distance_m),item('实际dt累计（m）',result.measured_distance_m));explanation='先看下方周期表：每次用本次-上次算dt，0ms只初始化。本例速度恒定，漏一次的20ms一段能补上距离，不代表补回安全决策。';}else explanation='输入被拒绝，不展示旧时间表。';renderTimingTable(values,result);summaryText='部分'+result.chapter+'，status='+result.status;
+    }else if(lesson.runner==='memory_day08'){
       grid.append(item('填写status',result.status,result.valid?'good':'bad'),item('转换后的字节（十进制）',result.fill_byte),item('实际不同格数',result.changed_count),item('选区外保持',result.outside_unchanged),item('测试目标',result.test_built?'已构建并运行':'未构建/未运行'),item('CTest登记数',result.test_count),item('独立检查数',result.checks_passed));renderBytePreview(values,result);
       explanation=(result.valid?'范围合法；只填写指定区间。':'范围被拒绝；没有执行填写。')+(result.test_built?'本次独立测试7项检查完成。':'OFF不是在线练习通过，而是未构建、未运行测试。');summaryText='status='+result.status+'，after='+result.after.join(',')+'，测试数'+result.test_count;
     }else if(lesson.runner==='assessment_day07'){
@@ -334,6 +344,7 @@ $('downloadLesson').onclick=()=>{
   for(const asset of lesson.assets||[])parts.push('## '+asset.name,'```\n'+asset.text+'\n```');
   for(const r of lesson.reading){parts.push('## '+r.title,r.text);for(const source of r.sources||[])parts.push(`[${source.title}](${source.url})`);if(r.table)parts.push(JSON.stringify(r.table,null,2));}
   for(const s of lesson.code_sections||[]){const source=s.file?sourceFile(s.file).text:lesson.code,start=source.indexOf(s.start),end=source.indexOf(s.end,start+s.start.length),finish=end<0?source.length:s.end.startsWith('    return 0;')?end+'    return 0;\n}'.length:end;parts.push('## '+s.title+' · '+(s.file||lesson.source),'```c\n'+source.slice(Math.max(0,start),finish)+'\n```','通用语法：'+s.pattern,s.text,'具体值：'+s.trace);}
+  if(lesson.project_intro)parts.push('## 项目目的',...lesson.project_intro.paragraphs);for(const a of lesson.appendices||[])parts.push('## '+a.title,...a.paragraphs);
   for(const e of lesson.experiments)parts.push('## 实验：'+e.name,'输入：'+e.values.join(' '),...e.steps);
   parts.push('## 迁移任务',lesson.practice.text,...lesson.practice.steps,'## 自测题（不附答案）',...lesson.questions.map(q=>q.text+'\n'+q.options.map((o,i)=>`${i+1}. ${o}`).join('\n')));
   download(parts.join('\n\n'),`D${String(day).padStart(2,'0')}-完整讲义.md`,'text/markdown;charset=utf-8');
