@@ -1,6 +1,6 @@
 {
   "compiler": "GCC (see c-tests.txt)",
-  "zip_sha256": "8841744966951cb8c1f53852958894c7d793a3e357dbf2f0031e88e999504bdc",
+  "zip_sha256": "d4e6584ea3c31c3a151864e7f980b01cb5b617e6bbdb71e081e725197aa17d2e",
   "cases": [
     {
       "input": [

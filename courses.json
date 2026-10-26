@@ -4826,7 +4826,7 @@
           "title": "demo.c：从哪个变量读结果？",
           "file": "demo.c",
           "start_line": 22,
-          "end_line": 34,
+          "end_line": 55,
           "focus_line": 22,
           "expected": "    printf(\"status=%d\\n\", status);",
           "markdown": "~~~c\nif (status != 0) return 0;\nfor (int i=0; i<result.control_count; ++i) { ... }\n~~~\n\n- main 中`result`是普通结构体对象，所以用点号`.`；函数参数`out`是指针，所以使用`->`或`*out`。\n- `result.control_count` 来自timing.h中定义的成员，**由 timing.c 的 draft 逐轮累加，并通过整体赋值拷贝回来**。\n- 漏30ms时 count=6，代表6行到场记录；第0行只是0ms初始化，因此真正参与积分的更新段数=5。\n- `?:` 只用来选择“最后一项用换行，其他用逗号”，与dt算法无关，先不深入也不影响本课理解。",
@@ -5046,6 +5046,12 @@
           "text": "# 构建工作清单：主课默认只有timing库、timeline_demo和timeline_tests。\ncmake_minimum_required(VERSION 3.16)\nproject(asw_timeline LANGUAGES C)\nset(CMAKE_C_STANDARD 17)\nset(CMAKE_C_STANDARD_REQUIRED ON)\nadd_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Werror)\nadd_library(timing STATIC timing.c)\ntarget_link_libraries(timing PUBLIC m)\ntarget_include_directories(timing PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\nadd_executable(timeline_demo demo.c)\ntarget_link_libraries(timeline_demo PRIVATE timing)\ninclude(CTest)\nif(BUILD_TESTING)\n    add_executable(timeline_tests test_timing.c)\n    target_link_libraries(timeline_tests PRIVATE timing)\n    add_test(NAME timeline_contract COMMAND timeline_tests)\nendif()\n# 新内容放附录：默认OFF，不影响主课。需要补原D08时再显式ON。\noption(BUILD_APPENDIX \"Build original D08 signal appendix\" OFF)\nif(BUILD_APPENDIX)\n    add_library(signal_check STATIC signal.c)\n    target_include_directories(signal_check PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\n    target_link_libraries(signal_check PUBLIC m)\n    add_executable(signal_demo demo_signal.c)\n    target_link_libraries(signal_demo PRIVATE signal_check)\n    if(BUILD_TESTING)\n        add_executable(signal_tests test_signal.c)\n        target_link_libraries(signal_tests PRIVATE signal_check)\n        add_test(NAME signal_contract COMMAND signal_tests)\n    endif()\nendif()\n"
         },
         {
+          "name": "README.md",
+          "language": "text",
+          "group": "main",
+          "text": "# Day09：控制漏次与dt\n\n这是真实C工程；网页中的JavaScript仅为教学模拟。\n\nmain读取速度、跳过轮次、迟到毫秒，创建result并把&result传给Timeline_Run。函数先在draft里计算，成功时用*out=draft写回。\n\n```sh\ngcc -std=c17 -Wall -Wextra -Wpedantic -Wconversion -Werror demo.c timing.c -o timeline_demo -lm\nprintf '10 3 0\\n' | ./timeline_demo\ncmake -S . -B build-main -DCMAKE_BUILD_TYPE=Release\ncmake --build build-main\nctest --test-dir build-main --output-on-failure\n```\n\nD08A独立补课：添加-DBUILD_APPENDIX=ON，另行构建signal示例与测试。\n本工程只模拟给定时刻，未测CPU调度，不保证漏控制后的实车安全。\n"
+        },
+        {
           "name": "demo.c",
           "language": "c",
           "group": "main",
@@ -5056,12 +5062,6 @@
           "language": "c",
           "group": "appendix",
           "text": "/* 附录的独立入口；主课demo只读三项，不必先理解这里五项。 */\n#include \"signal.h\"\n#include <stdio.h>\nint main(void) {\n    struct VehicleSignal s = {0};\n    long now_ms;\n    if (scanf(\"%f %ld %ld %d %d\",&s.value_mps,&now_ms,&s.stamp_ms,&s.valid,&s.source)!=5) return 1;\n    int status=Signal_Check(&s,now_ms);\n    printf(\"status=%d\\nvalid=%d\\n\",status,status==0);\n    if (status==0 || status==-4) printf(\"age_ms=%ld\\n\",now_ms-s.stamp_ms);\n    return 0;\n}\n"
-        },
-        {
-          "name": "README.md",
-          "language": "text",
-          "group": "main",
-          "text": "# Day09：控制漏次与dt\n\n这是真实C工程；网页中的JavaScript仅为教学模拟。\n\nmain读取速度、跳过轮次、迟到毫秒，创建result并把&result传给Timeline_Run。函数先在draft里计算，成功时用*out=draft写回。\n\n```sh\ngcc -std=c17 -Wall -Wextra -Wpedantic -Wconversion -Werror demo.c timing.c -o timeline_demo -lm\nprintf '10 3 0\\n' | ./timeline_demo\ncmake -S . -B build-main -DCMAKE_BUILD_TYPE=Release\ncmake --build build-main\nctest --test-dir build-main --output-on-failure\n```\n\nD08A独立补课：添加-DBUILD_APPENDIX=ON，另行构建signal示例与测试。\n本工程只模拟给定时刻，未测CPU调度，不保证漏控制后的实车安全。\n"
         },
         {
           "name": "signal.c",
@@ -5509,7 +5509,7 @@
           },
           {
             "title": "5. 漏30ms：逐轮完整变量变化表（课程核心可视化）",
-            "markdown": "输入`10 3 0`。控制一轮是否记录、last什么时候更新，要一眼看到。\n\n| tick | 计划ms | 控制是否执行 | 本轮写入下标 | last执行前ms | 实际时刻ms | dt(ms) | 固定法本段m | 实际法本段m |\n|---:|---:|---|---:|---:|---:|---:|---:|---:|\n| 0 | 0 | 是，初始化 | 0 | 0 | 0 | 0 | 0 | 0 |\n| 1 | 10 | 是 | 1 | 0 | 10 | 10 | 0.10 | 0.10 |\n| 2 | 20 | 是 | 2 | 10 | 20 | 10 | 0.10 | 0.10 |\n| 3 | 30 | **否，continue** | — | 20 | — | — | 0 | 0 |\n| 4 | 40 | 是 | 3 | 20 | 40 | **20** | **0.10** | **0.20** |\n| 5 | 50 | 是 | 4 | 40 | 50 | 10 | 0.10 | 0.10 |\n| 6 | 60 | 是 | 5 | 50 | 60 | 10 | 0.10 | 0.10 |\n| **合计** | | 6条记录、5段积分 | | | | 60ms | **0.50m** | **0.60m** |\n\n**观察员（独立传感事件）的时刻**始终为0、20、40、60ms，数量4。tick3虽然跳过控制，但观测代码在continue之前运行；这次tick3本来也不是偶数，故没有观测更新。\n\n主课页面必须可逐步选择任意tick：选中行时，源码高亮当前分支，右侧显示本轮各变量的“执行前→执行后”，同时实时显示两种累计值。"
+            "markdown": "输入`10 3 0`。控制一轮是否记录、last什么时候更新，要一眼看到。\n\n| tick | 计划ms | 控制是否执行 | 本轮写入下标 | last执行前ms | 实际时刻ms | dt(ms) | 固定法本段m | 实际法本段m |\n|---:|---:|---|---:|---:|---:|---:|---:|---:|\n| 0 | 0 | 是，初始化 | 0 | 0 | 0 | 0 | 0 | 0 |\n| 1 | 10 | 是 | 1 | 0 | 10 | 10 | 0.10 | 0.10 |\n| 2 | 20 | 是 | 2 | 10 | 20 | 10 | 0.10 | 0.10 |\n| 3 | 30 | **否，continue** | — | 20 | — | — | 0 | 0 |\n| 4 | 40 | 是 | 3 | 20 | 40 | **20** | **0.10** | **0.20** |\n| 5 | 50 | 是 | 4 | 40 | 50 | 10 | 0.10 | 0.10 |\n| 6 | 60 | 是 | 5 | 50 | 60 | 10 | 0.10 | 0.10 |\n| **合计** | | 6条记录、5段积分 | | | | 60ms | **0.50m** | **0.60m** |\n\n**独立传感更新的时刻**始终为0、20、40、60ms，数量4。tick3虽然跳过控制，但传感处理代码在continue之前运行；这次tick3本来也不是偶数，故没有传感更新。\n\n主课页面必须可逐步选择任意tick：选中行时，源码高亮当前分支，右侧显示本轮各变量的“执行前→执行后”，同时实时显示两种累计值。"
           },
           {
             "title": "6. 两个常见混淆一次说明白",
@@ -5542,9 +5542,9 @@
         ],
         "source_hashes": {
           "CMakeLists.txt": "995be7b116b47ab26be6fbae66a0a76306ef0671c9bb043ad26adc017effa9ae",
+          "README.md": "dc7e5af8bb685153c8a1f106c394e9ded98be8ec3940a55d5e668ea3743a0213",
           "demo.c": "149111c67099243a5e27b1eab4b0611a1f450a0761f56ecceafd0145d4e339a9",
           "demo_signal.c": "e636a815a36e9411c282a5a3fcc4d8c50a8d2e87a89e7cd530cf0a0f32624c3f",
-          "README.md": "dc7e5af8bb685153c8a1f106c394e9ded98be8ec3940a55d5e668ea3743a0213",
           "signal.c": "b9c199d6d1a6aebd039920808ef4b5fbb58211700b26356f6c6fc2f6653dd2f8",
           "signal.h": "d1869026d17573fa0e5c14891c88c2ad3c967d16c54a8995781ff3fd6db003b4",
           "test_signal.c": "b261f3ab60cb9f0a30d7edfe5318184d2daa7af4e8e822a44f8d0b20c27c2ffe",
@@ -8612,5 +8612,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "1cd864f98bf5"
+  "release": "7e9a218a94fa"
 }

@@ -7,7 +7,9 @@ def write(p,x):(ROOT/p).write_text(json.dumps(x,ensure_ascii=False,indent=2)+'\n
 def build():
     bundle=load('courses.json');old=load('tools/day09-v1.json');lesson=json.loads(json.dumps(old))
     doc=(ROOT/'docs/day09-v2/01_DAY09_LESSON.md').read_text(encoding='utf-8')
-    files={p.name:p.read_text(encoding='utf-8') for p in sorted((ROOT/'examples/day09').iterdir()) if p.is_file()}
+    doc=doc.replace('观察员（独立传感事件）','独立传感更新').replace('观测代码','传感处理代码').replace('观测更新','传感更新')
+    # WindowsPath compares case-insensitively; use strings for identical ordering on Linux/Windows.
+    files={p.name:p.read_text(encoding='utf-8') for p in sorted((ROOT/'examples/day09').iterdir(),key=lambda p:p.name) if p.is_file()}
     def line(file,anchor):
         hits=[i+1 for i,l in enumerate(files[file].splitlines()) if anchor in l and (anchor!='struct Timeline' or l.strip()==anchor)]
         assert len(hits)==1,(file,anchor,hits)
@@ -17,7 +19,7 @@ def build():
     steps=[]
     for id,file,start,end in anchors:
         match=re.search(r'### '+id+r'｜([^\n]+)\n(.*?)(?=\n### S|\n## 5\.|\Z)',doc,re.S);assert match,id
-        first=line(file,start);last=line(file,end)-(0 if id=='S10' else 1)
+        first=line(file,start);last=len(files[file].splitlines()) if id=='S11' else line(file,end)-(0 if id=='S10' else 1)
         steps.append(dict(id=id,title=match[1],file=file,start_line=first,end_line=last,focus_line=first,expected=files[file].splitlines()[first-1],markdown=match[2].strip(),origin_symbol={'S01':'speed_mps','S02':'result','S03':'draft','S04':'tick','S05':'perception_ms','S06':'last_control_ms','S07':'index','S08':'dt_s','S09':'last_control_ms','S10':'out','S11':'result.control_count'}[id]))
     specs=[
       ('struct Timeline','timing.h','struct Timeline','类型','timing.h 文件作用域','规定对象有哪些成员','result和draft共享类型，不共享变量','改成员布局时所有使用文件都要重新编译','demo.c','struct Timeline result'),

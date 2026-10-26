@@ -517,8 +517,8 @@ Total Test time (real) =   0.02 sec
 EXIT_CODE=0
 
 $ /mnt/c/Users/user/Desktop/asw/learning_app/tools/linux-cmake/cmake/data/bin/cmake -S <repo>/.test-build/downloaded/day09_project -B <repo>/.test-build/cmake-appendix -DCMAKE_BUILD_TYPE=Release -DBUILD_APPENDIX=ON
--- Configuring done (1.0s)
--- Generating done (1.1s)
+-- Configuring done (0.9s)
+-- Generating done (1.2s)
 -- Build files have been written to: <repo>/.test-build/cmake-appendix
 
 EXIT_CODE=0
