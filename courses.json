@@ -5660,8 +5660,12 @@
           "text": "AccContext next = *context; 先复制一份旧状态，让本函数在next里作决定。参数无效时提前return，不会对context做一半的更新。成功后*context=next;把整个新状态复制回main的context。output->state/spacing_alert/valid则是本轮对外报告的结果。\n这是与D09中* out = draft 同一种结构体整体赋值思想：左边指针解引用得到调用者的对象；右边是函数局部临时对象。函数return负责报告status，不是负责传输状态机成员。"
         },
         {
-          "title": "7 · CMakeLists逐行入门：先从GCC命令找到对应动作",
-          "text": "先独立能运行：gcc -std=c17 -Wall -Wextra -Wpedantic -g demo.c acc_state.c -o acc_demo -lm。demo.c提供main，acc_state.c定义Acc_Step，头文件提供共同的接口，不把头文件当成第三份要执行的程序。\nCMakeLists不是C语言代码，它是构建配置：cmake_minimum_required表示最低版本；project指定工程和C语言；set(CMAKE_C_STANDARD 17)指定标准；add_library(acc_state STATIC acc_state.c)让acc_state.c成为静态库；add_executable(acc_demo demo.c)创建程序；target_link_libraries(acc_demo PRIVATE acc_state)让它链接库；include(CTest)和add_test组织另一个测试入口。这里STATIC是静态库种类，不是C函数static。\n实际构建分三步：cmake -S . -B build 生成构建目录；cmake --build build 编译链接；ctest --test-dir build --output-on-failure 执行独立测试。程序入口仍是./build/acc_demo，不是运行CMakeLists文件。"
+          "title": "7A · CMakeLists 不是C语言：读懂一条命令的格式",
+          "text": "先从最基本的语法学：CMake通常使用“命令名(参数1 参数2 …)”；括号里参数通常用空格分开，和C函数参数用逗号分隔不同。\ncmake_minimum_required(VERSION 3.16)：命令名cmake_minimum_required；VERSION是CMake规定的关键词；3.16是所需最低版本，不是在调用C函数。\nproject(asw_acc_state LANGUAGES C)：创建名字为asw_acc_state的构建工程，LANGUAGES C指定C语言。\nset(CMAKE_C_STANDARD 17)：把一个名为CMAKE_C_STANDARD的CMake变量设为17；set(CMAKE_C_STANDARD_REQUIRED ON)表示要求遵守这个标准。ON是CMake中的真值写法，不是C里的1。\nadd_library(acc_state STATIC acc_state.c)：目标名是acc_state，STATIC说明要生成静态库，acc_state.c是输入源文件。这行让acc_state.c中的Acc_Step参与编译，但不是执行它；C语言函数声明中的static与这里STATIC无关。\n${CMAKE_CURRENT_SOURCE_DIR}是CMake变量展开语法：用当前源码目录作为路径；它不是C指针、不是struct成员，也不是Linux shell的C代码。"
+        },
+        {
+          "title": "7B · CMake如何把头文件、实现文件、两个main连起来？",
+          "text": "target_include_directories(acc_state PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})：告诉编译业务库的工具在当前源码目录查找头文件；PUBLIC还把头文件搜索目录传递给链接这个库的目标。\ntarget_link_libraries(acc_state PUBLIC m)：在常见Linux/GCC工程中把数学库m加入依赖，供使用isfinite等数学功能的实现使用；具体工具链需求可能不同。PUBLIC意味着依赖信息可传给下游链接目标。\nadd_executable(acc_demo demo.c)：由demo.c的main创建演示可执行程序；target_link_libraries(acc_demo PRIVATE acc_state)：把包含Acc_Step实现的业务库链接给演示程序。PRIVATE表示这条库依赖不向它的下游公开传播。\ninclude(CTest)：加载CTest支持并提供BUILD_TESTING配置；if(BUILD_TESTING)表示仅打开测试时才处理区块；CMake使用endif()结束条件块，没有C语言的花括号。add_executable(acc_tests test_acc_state.c)是另一个具有main的程序，因此不会与demo.c的main冲突；add_test(NAME acc_state_checks COMMAND acc_tests)登记一个可以由ctest执行的测试。\n三条命令按阶段理解：cmake -S . -B build创建配置/生成构建规则；cmake --build build编译链接；ctest --test-dir build --output-on-failure执行测试。若还不懂CMake，先用README里的gcc命令完成真实C，不阻挡本课状态机理解。"
         },
         {
           "title": "8 · 本地C实作与在线模拟的界限",
@@ -5740,6 +5744,15 @@
           "pattern": "*context=next整体结构体赋值；output->member只写指定成员；return0单独报告成功状态。",
           "text": "main里的context才会记住当前状态；output只报告这一帧。*context=next与D09的*out=draft同类语法。函数返回后局部next消失但写回的数据还在。",
           "trace": "场景1第1帧后context.spacing_alert=1；第2帧又读到该1，36m因此不会误关闭。"
+        },
+        {
+          "title": "09 · CMake逐行：头文件不是自动链接",
+          "file": "CMakeLists.txt",
+          "start": "cmake_minimum_required(VERSION 3.16)",
+          "end": "endif()",
+          "pattern": "CMake格式是命令名(空格分隔的参数)。set赋值构建变量；${...}展开变量；if(BUILD_TESTING) ... endif()是CMake条件段。",
+          "text": "先理解编译/链接：add_library将acc_state.c做成静态库目标；add_executable把demo.c做成有main的程序；target_link_libraries让函数实现参与链接。另一个test_acc_state.c的main只进入acc_tests目标。",
+          "trace": "gcc demo.c acc_state.c -o acc_demo -lm与CMake里的add_library+add_executable+target_link_libraries对应。CMake配置、编译、CTest是三种不同动作。"
         }
       ],
       "experiments": [
