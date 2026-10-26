@@ -2619,7 +2619,7 @@
               0,
               0
             ],
-            "decoded": 100.0
+            "decoded": 100
           },
           {
             "values": [
@@ -5467,6 +5467,517 @@
         }
       ],
       "code": "/* 兼容整合副本，实际运行和网页阅读均用独立文件。 */\n/* timing.h像工作说明卡：约定输入和记账本的格式；这里不做计算。 */\n#ifndef ASW_TIMING_H\n#define ASW_TIMING_H\n\n/* struct把相关数据装进同一本账，不是多个同时运行的程序。\n * control_ms记控制任务到场时间；dt_ms记距上次到场隔了多久，单位ms。\n * 第0项是0ms初始化，不做位移累加；最多7次到场，数组容量就是7。\n * perception_ms记另一位“观察员”在0/20/40/60ms到场。 */\nstruct Timeline {\n    int control_ms[7];\n    int dt_ms[7];\n    int perception_ms[4];\n    int control_count;\n    int perception_count;\n    float fixed_distance_m;    /* 每次都假装只过10ms的对照算法。 */\n    float measured_distance_m; /* 根据两次到场时间差累加。 */\n};\n\n/* speed_mps单位m/s，允许0—50；skip_tick=-1表示不漏，1—5表示漏第几次。\n * late_ms=0—9，只把原定30ms那次控制更新推迟这么多毫秒。\n * return0成功；-1空输出地址；-2参数非法。失败不改调用者的账本。 */\nint Timeline_Run(float speed_mps, int skip_tick, int late_ms, struct Timeline *out);\n#endif\n\n/* demo.c是接待员：读三项输入、请计算者做事、把账本展示给人。 */\n#include <stdio.h>\n\nint main(void) {\n    float speed_mps; /* 车速是m/s，不是之前CAN课的km/h；10m/s=36km/h。 */\n    int skip_tick, late_ms;\n    /* %f读float，%d读int；&给出变量存放位置，scanf才能写进去。 */\n    if (scanf(\"%f %d %d\", &speed_mps, &skip_tick, &late_ms) != 3) return 1;\n    struct Timeline result = {0}; /* main的结果账本，目前全0。 */\n    int status = Timeline_Run(speed_mps, skip_tick, late_ms, &result);\n    printf(\"status=%d\\nvalid=%d\\n\", status, status == 0);\n    if (status != 0) return 0; /* 参数被拒绝，不能把旧账本当成新结果展示。 */\n    printf(\"control_ms=\");\n    for (int i=0; i<result.control_count; ++i) printf(\"%d%s\",result.control_ms[i],i+1==result.control_count?\"\\n\":\",\");\n    printf(\"dt_ms=\");\n    for (int i=0; i<result.control_count; ++i) printf(\"%d%s\",result.dt_ms[i],i+1==result.control_count?\"\\n\":\",\");\n    printf(\"perception_ms=\");\n    for (int i=0; i<result.perception_count; ++i) printf(\"%d%s\",result.perception_ms[i],i+1==result.perception_count?\"\\n\":\",\");\n    /* ?:是选择字符串：最后一项换行，其余逗号；与计算dt无关。 */\n    printf(\"control_count=%d\\nupdate_count=%d\\nperception_count=%d\\n\",result.control_count,result.control_count-1,result.perception_count);\n    printf(\"fixed_distance_m=%.6f\\nmeasured_distance_m=%.6f\\n\",result.fixed_distance_m,result.measured_distance_m);\n    return 0;\n}\n\n/* timing.c是做计算的人；没有main，不决定从键盘还是网页拿输入。 */\n#include <stddef.h> /* NULL：没有可写对象的地址。 */\n#include <math.h>   /* isfinite：普通有限数为真，NaN/正负无限为假。 */\n\nint Timeline_Run(float speed_mps, int skip_tick, int late_ms, struct Timeline *out) {\n    /* [1 检查再开始] ||表示或者；!表示把真/假反过来。 */\n    if (out == NULL) return -1;\n    if (!isfinite(speed_mps) || speed_mps < 0 || speed_mps > 50) return -2;\n    if (skip_tick != -1 && (skip_tick < 1 || skip_tick > 5)) return -2;\n    if (late_ms < 0 || late_ms > 9) return -2;\n\n    /* [2 自己先写草稿] {0}使成员从0开始；只有全部做完才交回out。 */\n    struct Timeline draft = {0};\n    int last_control_ms = 0;\n    /* [3 纸面时刻表] tick取0/1/2/3/4/5/6，计划时刻=0/10/.../60ms。 */\n    for (int tick = 0; tick <= 6; ++tick) {\n        int scheduled_ms = tick * 10;\n        /* 观察员每20ms一次。%是求余：偶数tick除2余0。\n         * 先记录观察员，所以漏掉控制更新不会让观察员也消失。 */\n        if (tick % 2 == 0) {\n            draft.perception_ms[draft.perception_count] = scheduled_ms;\n            ++draft.perception_count;\n        }\n        /* continue是跳过这一轮剩余内容，进入下一轮；不是结束整个函数。 */\n        if (tick == skip_tick) continue;\n        int now_ms = scheduled_ms;\n        if (tick == 3) now_ms = now_ms + late_ms;\n        /* [4 到场就记一行] .访问本地draft里的成员。 */\n        int index = draft.control_count;\n        draft.control_ms[index] = now_ms;\n        if (index > 0) { /* 第一次0ms只定起点；没有上一段可累加。 */\n            int elapsed_ms = now_ms - last_control_ms;\n            draft.dt_ms[index] = elapsed_ms;\n            /* 毫秒变秒要除1000.0f，不能整数相除把10/1000截成0。 */\n            float dt_s = (float)elapsed_ms / 1000.0f;\n            /* +=表示“旧值加右边，再存回”。m/s乘s得到m。 */\n            draft.fixed_distance_m += speed_mps * 0.010f;\n            draft.measured_distance_m += speed_mps * dt_s;\n        }\n        /* 必须在算完差值后，才把本次时刻作为下一次的“上次”。 */\n        last_control_ms = now_ms;\n        ++draft.control_count;\n    }\n    /* [5 正式交回] *out代表调用者提供的整个对象；同类结构体可整体赋值。 */\n    *out = draft;\n    return 0;\n}\n"
+    },
+    "10": {
+      "day": 10,
+      "revision": "2026-10-26-acc-state-v1",
+      "title": "ACC状态机与滞环：四个状态怎样跨帧改变？",
+      "source": "demo.c",
+      "runner": "acc_state_day10",
+      "project_name": "day10_acc_state",
+      "time": "建议分两次学习：先结构体/状态来源/5帧执行链，再10帧滞环与本地GCC。CMake为独立选学补课。",
+      "summary": "从D09的结构体/函数来源困惑切入。先追踪main创建context与output、Acc_Step怎么通过指针更新；再学OFF/READY/ACTIVE/FAULT转换与35/41m双阈值滞环。网页仅模拟，真实C请在WSL执行。",
+      "goals": [
+        "不翻找也能指出每个函数、每个结构体类型和核心参数在哪个文件定义，由谁创建、在哪使用。",
+        "能解释main中的context如何保留状态、output为何每一帧重新创建，以及Acc_Step通过&、*、->读写哪些对象。",
+        "独立追踪OFF/READY/ACTIVE/FAULT状态优先级，能讲出雷达失效、故障锁存与复位条件。",
+        "能手算10帧距离序列的告警变化，说明进入35m、退出41m两个阈值为什么能抑制抖动。",
+        "能把gcc的单行编译命令逐步映射到CMakeLists；在线测验不等于真实C构建。"
+      ],
+      "flow_text": "main() 选场景数组 → 创建context与calibration → for每帧创建output → Acc_Step(&context,&frames[i],&calibration,&output) → 校验→更新next状态→滞环→*context=next→填output→return → main打印；下一帧继续使用同一context",
+      "remediation_title": "开课补桥 · D09的result/draft和D10的context/output在哪里定义？",
+      "project_intro": {
+        "title": "今天的问题：为什么状态不能每一帧都重新判断成一个新值？",
+        "paragraphs": [
+          "先想一个常见情形：前方距离在35～41米附近波动。若只用单阈值38米，每一帧可能从“提示”跳到“不提示”，形成反复切换。今天要通过10个明确的输入帧学会双阈值滞环；这些数字是教学设定，不是实车安全距离。",
+          "要实现“记住上一帧”，程序必须有能跨函数调用保留的对象：main只创建一次AccContext context；Acc_Step收到&context，先读上一帧状态，再更新它。AccOutput output每一帧重新创建，只表示本轮输出。",
+          "本节仍是OFF/READY/ACTIVE/FAULT的监视器，不产生任何油门、刹车命令。先看状态转换表，再看完整代码；CMake放在最后独立讲，不要求先懂CMake才能学状态机。"
+        ]
+      },
+      "architecture": {
+        "headers": [
+          "函数/变量或成员",
+          "第一次定义位置",
+          "类型及参数意义",
+          "调用/读写位置"
+        ],
+        "rows": [
+          [
+            "AccState与ACC_OFF/READY/ACTIVE/FAULT",
+            "acc_state.h 的 typedef enum",
+            "枚举类型与4种模式（0、1、2、3）",
+            "acc_state.c在条件分支中赋值；demo.c打印"
+          ],
+          [
+            "AccInput（driver_enable, radar_valid, fault_present, fault_reset, distance_m）",
+            "acc_state.h typedef struct",
+            "单帧输入结构体：使能、雷达有效、故障、复位、距离",
+            "demo.c的各帧数组创建；acc_state.c以input->读取"
+          ],
+          [
+            "AccCalibration（alert_enter_m,alert_exit_m）",
+            "acc_state.h typedef struct",
+            "滞环阈值35m/41m，退出值必须大于进入值",
+            "demo.c定义calibration；Acc_Step只读"
+          ],
+          [
+            "AccContext（state,spacing_alert）",
+            "acc_state.h typedef struct",
+            "跨帧保存状态和提示的结构体类型",
+            "demo.c创建context；acc_state.c用next暂存、*context写回"
+          ],
+          [
+            "AccOutput（state,spacing_alert,valid）",
+            "acc_state.h typedef struct",
+            "每轮结果；valid=0时不得当有效决策",
+            "demo.c for里创建output；Acc_Step写回"
+          ],
+          [
+            "Acc_Step(context,input,calibration,output)",
+            "acc_state.h声明；acc_state.c定义",
+            "返回int状态：0成功、-1空地址、-2参数无效；形参是4个指针",
+            "demo.c 每一帧调用一次"
+          ],
+          [
+            "main(void)",
+            "demo.c",
+            "程序唯一演示入口，无形参，返回int",
+            "读scenario、选择frames、调用Acc_Step、打印"
+          ],
+          [
+            "scenario",
+            "demo.c main",
+            "int场景号0～4；scanf通过&scenario写入",
+            "main的switch选择不同数组"
+          ],
+          [
+            "NORMAL/JITTER/RADAR_DROP/FAULT_RESET/INVALID",
+            "demo.c文件作用域",
+            "5组const AccInput数组；static表示仅供本文件使用",
+            "main根据scenario选择其中一个"
+          ],
+          [
+            "frames 与 count",
+            "demo.c main",
+            "const AccInput * + size_t；保存首元素地址及有效帧数",
+            "main的for用&frames[i]传第i帧"
+          ],
+          [
+            "context",
+            "demo.c main 的 AccContext context = ...",
+            "真实结构体对象，一次创建跨多次调用；不是指针",
+            "Acc_Step收到它的地址；下一帧读取新状态"
+          ],
+          [
+            "next",
+            "acc_state.c Acc_Step 中 AccContext next = *context",
+            "函数内结构体副本，计算成功后一次写回",
+            "*context=next，防止失败留下半次更新"
+          ],
+          [
+            "input/output",
+            "acc_state.c 的 Acc_Step形参",
+            "input是只读指针；output是可写结果结构体指针",
+            "input->成员读取；output->成员赋值"
+          ],
+          [
+            "status",
+            "demo.c for 中 int status = Acc_Step(...)",
+            "每帧独立的函数整数返回值",
+            "printf打印，与output.state不是一回事"
+          ],
+          [
+            "scanf/printf",
+            "C标准库stdio.h声明",
+            "读场景号/打印结果",
+            "demo.c main调用；不在业务函数内做IO"
+          ],
+          [
+            "test_acc_state.c 的 main",
+            "test_acc_state.c",
+            "另一个可执行测试程序的入口",
+            "只在acc_tests执行；不与demo的main混在同一程序"
+          ]
+        ]
+      },
+      "run_fields": [
+        {
+          "id": "scenario",
+          "label": "场景号（0入门、1抖动、2雷达、3故障、4非法输入）",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "0 · 基本状态转换"
+            ],
+            [
+              "1",
+              "1 · 10帧滞环"
+            ],
+            [
+              "2",
+              "2 · 雷达失效与恢复"
+            ],
+            [
+              "3",
+              "3 · 故障锁存与复位"
+            ],
+            [
+              "4",
+              "4 · 非法距离处理"
+            ]
+          ]
+        }
+      ],
+      "reading": [
+        {
+          "title": "先补D09遗漏的定义链",
+          "text": "D09的timing.h写int control_count;是结构体成员定义；demo.c 的struct Timeline result={0}一次创建包含这个成员的整个对象；timing.c 里的draft是函数内另一个结构体；*out=draft整体写回，main才能读取result.control_count。\n今天照着这条链：acc_state.h定义AccContext/AccOutput → demo.c创建context与output → Acc_Step收到&context和&output → 函数内部用->和*修改同一对象。别把结构体类型、对象、指针参数当成同一个变量。\n先学习D10状态机。不需要先懂CMake才开始；完整工程与CMake对照在后面单独给出。"
+        },
+        {
+          "title": "1 · 本课到底要做什么？先看五个实测场景",
+          "text": "核心任务：以一帧一帧的输入，模拟ACC监视器状态与距离偏小提示；不产生车辆控制指令。第一遍只选场景0：OFF→READY→ACTIVE→ACTIVE→OFF。每一帧都调用一次Acc_Step，但context不重建，所以记住上一帧。\n再选场景1看10帧距离36,34,36,40,39,35,34,37,42,38m。用35m作为进入提示阈值、41m作为退出阈值；距离34时开始提示，40仍提示，直到42才解除。不要把这两个阈值当成碰撞安全标准。"
+        },
+        {
+          "title": "2 · 程序如何从main到函数再回来？",
+          "text": "demo.c 的main通过scanf读一个scenario场景号；switch选择一个const AccInput数组。frames保存这个数组第0元素的地址，count保存该数组的元素数量。main创建AccContext context（初始OFF）和AccCalibration calibration（35/41m）。\n进入for后，每一轮创建AccOutput output={0}；调用Acc_Step(&context,&frames[i],&calibration,&output)。四个参数都是地址：context保留跨帧状态，frames[i]是本次输入对象，calibration只读阈值，output接本次结果。函数return 0以后main打印状态，然后进行下一帧。"
+        },
+        {
+          "title": "3 · 为什么有状态（state），还要有事件/输入？",
+          "text": "state表示上次执行后系统处于什么状态：OFF关闭、READY等待必要条件、ACTIVE有效监视、FAULT故障锁存。driver_enable、radar_valid、fault_present、fault_reset与distance_m表示这一次收到的输入；它们不是四个新状态。\n同样输入有时会得到不同结果：如果上一次已经FAULT，故障信号本轮变0也不会自动变ACTIVE；需要同时满足“故障已清除、使能关闭、请求复位”才退出FAULT。这就说明结果不仅由当前输入决定，也由之前保存的context决定。"
+        },
+        {
+          "title": "4 · 精确的状态优先级",
+          "text": "一帧处理时首先完成参数合法性检查。通过后，复制旧上下文成next。先看fault_present：为1立即进入FAULT；否则如果旧状态是FAULT，就保持，只有fault_reset=1并且driver_enable=0才回OFF；再否则driver_enable=0→OFF；否则雷达无效→READY；最后才是ACTIVE。\n这不是标准AUTOSAR状态机定义，而是本课的明确规则。错误输入让Acc_Step返回-2、output.valid=0、旧context保持不变；与输入中的fault_present=1导致的可确认FAULT状态区分。"
+        },
+        {
+          "title": "5 · 什么是滞环？为什么需要两个阈值？",
+          "text": "只有ACTIVE状态才判断距离偏小提示。若旧alert=0，距离<=35m才设为1；若旧alert=1，距离>=41m才清为0；距离处于35～41m之间时保留上一帧。ACTIVE之外强制清0。\n注意这不叫“延迟几帧才改变”，而是两个不同的进入/退出阈值让输出具有记忆。10帧测试中在第1帧34m进入提示，在第8帧42m退出，共切换2次；若每帧用单阈值38m，可能反复切换。"
+        },
+        {
+          "title": "6 · 为什么先写next，最后才*context=next？",
+          "text": "AccContext next = *context; 先复制一份旧状态，让本函数在next里作决定。参数无效时提前return，不会对context做一半的更新。成功后*context=next;把整个新状态复制回main的context。output->state/spacing_alert/valid则是本轮对外报告的结果。\n这是与D09中* out = draft 同一种结构体整体赋值思想：左边指针解引用得到调用者的对象；右边是函数局部临时对象。函数return负责报告status，不是负责传输状态机成员。"
+        },
+        {
+          "title": "7 · CMakeLists逐行入门：先从GCC命令找到对应动作",
+          "text": "先独立能运行：gcc -std=c17 -Wall -Wextra -Wpedantic -g demo.c acc_state.c -o acc_demo -lm。demo.c提供main，acc_state.c定义Acc_Step，头文件提供共同的接口，不把头文件当成第三份要执行的程序。\nCMakeLists不是C语言代码，它是构建配置：cmake_minimum_required表示最低版本；project指定工程和C语言；set(CMAKE_C_STANDARD 17)指定标准；add_library(acc_state STATIC acc_state.c)让acc_state.c成为静态库；add_executable(acc_demo demo.c)创建程序；target_link_libraries(acc_demo PRIVATE acc_state)让它链接库；include(CTest)和add_test组织另一个测试入口。这里STATIC是静态库种类，不是C函数static。\n实际构建分三步：cmake -S . -B build 生成构建目录；cmake --build build 编译链接；ctest --test-dir build --output-on-failure 执行独立测试。程序入口仍是./build/acc_demo，不是运行CMakeLists文件。"
+        },
+        {
+          "title": "8 · 本地C实作与在线模拟的界限",
+          "text": "在线场景按钮只运行浏览器JavaScript实现的同样规则，不会在网页上真实运行C/CMake/CTest。若要验证C，下载完整项目ZIP，在WSL进入包含demo.c/acc_state.c的目录，按README用gcc构建并运行，再单独编译test_acc_state.c；可保存自己的终端输出作为实作记录。\n不要将单次模拟结论外推到真实ACC控制、制动安全性、真实传感器超时或硬实时调度。本节只验证C接口、状态保持与教学滞环规则。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "01 · 从main找到scenario的定义和读取",
+          "file": "demo.c",
+          "start": "int main(void)",
+          "end": "    /* 根据场景选一个输入数组",
+          "pattern": "int main(void)是程序入口。scanf(\"%d\", &scenario)先取得变量地址，让输入写到scenario；检查返回值。",
+          "text": "main在demo.c定义，不在acc_state.c。先找到int scenario=0；用户只输入一个场景号，其他帧数据是写在demo.c顶部的固定数组。",
+          "trace": "输入0→scenario=0。输入1→scenario=1。不是函数调用次数。"
+        },
+        {
+          "title": "02 · main怎样选择数组和count",
+          "file": "demo.c",
+          "start": "    const AccInput *frames = NULL;",
+          "end": "    /* 这两个对象只在main创建一次",
+          "pattern": "switch(整数)按case选择；sizeof(数组)/sizeof(首元素)得到该固定数组的容量；frames只保存首地址，count保存元素数量。",
+          "text": "NORMAL/JITTER等固定数组在demo.c的main上方定义。const AccInput *frames是指向只读输入元素的指针；没有复制整个数组。",
+          "trace": "scenario=0→frames=NORMAL,count=5；scenario=1→frames=JITTER,count=10。"
+        },
+        {
+          "title": "03 · main创建context，并按帧调用函数",
+          "file": "demo.c",
+          "start": "    AccContext context =",
+          "end": "    return 0;\n}",
+          "pattern": "AccContext context创建真实结构体；&context取地址。&frames[i]取本轮输入结构体地址；AccOutput output每次循环重新创建。",
+          "text": "这是贯穿整课的变量链：context只创建一次、每帧都传地址；output每帧新建；calibration只定义一次；status接收Acc_Step的整数返回值。",
+          "trace": "场景0共5次调用Acc_Step；for中i=0..4，下一轮时context已经被上一轮函数更新。"
+        },
+        {
+          "title": "04 · 在h文件找到每个类型与函数原型",
+          "file": "acc_state.h",
+          "start": "typedef enum {",
+          "end": "#endif",
+          "pattern": "typedef enum定义AccState；typedef struct定义输入/标定/上下文/输出四类结构体；函数结尾分号表示声明。",
+          "text": "AccContext不是函数也不是变量；它是结构体类型。main里的context才是具体对象。AccOutput的valid=1表示本次结果可以读取。",
+          "trace": "看AccContext中的state和spacing_alert两个成员，再找main的AccContext context=...。"
+        },
+        {
+          "title": "05 · 进入Acc_Step：检查指针与参数",
+          "file": "acc_state.c",
+          "start": "int Acc_Step(",
+          "end": "    /* 先复制旧状态",
+          "pattern": "返回类型int；四个形参是指针。->读取成员；NULL检查；isfinite检测有限数，||表示或者。",
+          "text": "首先输出指针必须可写，随后将output标记无效。其他指针、距离和两个阈值必须合法。遇到-1或-2立即返回，既不做状态更新，也不把坏结果标记有效。",
+          "trace": "场景4第0帧distance=-1→status=-2, output.valid=0, context.state仍OFF。"
+        },
+        {
+          "title": "06 · 用next理解四种状态转换优先级",
+          "file": "acc_state.c",
+          "start": "    AccContext next = *context;",
+          "end": "    /* 滞环仅在ACTIVE中生效",
+          "pattern": "AccContext next = *context复制整个结构体值；if/else if依次优先匹配一个分支。",
+          "text": "先检测fault_present，再看旧状态是不是FAULT，再看使能和雷达有效。FAULT锁存规则必须先于ACTIVE执行，避免故障刚清除就自动恢复。",
+          "trace": "场景3：ACTIVE→FAULT→FAULT→OFF（需关闭使能并复位）→ACTIVE。"
+        },
+        {
+          "title": "07 · 用35m和41m滞环解决抖动",
+          "file": "acc_state.c",
+          "start": "    /* 滞环仅在ACTIVE中生效",
+          "end": "    /* 写回：context保存跨帧状态",
+          "pattern": "若旧alert为0且distance<=35则置1；若旧alert为1且distance>=41则清0；中间区间不改变。",
+          "text": "一定注意这是有记忆的判断，不是每一帧简单写alert = (distance<38)。先算完next.state，只有ACTIVE才允许提示，否则一律清0。",
+          "trace": "场景1第1帧34m开启；第2帧36m依然开启；第8帧42m关闭。"
+        },
+        {
+          "title": "08 · 先把上下文写回，再交付单帧输出",
+          "file": "acc_state.c",
+          "start": "    /* 写回：context保存跨帧状态",
+          "end": "    return 0;\n}",
+          "pattern": "*context=next整体结构体赋值；output->member只写指定成员；return0单独报告成功状态。",
+          "text": "main里的context才会记住当前状态；output只报告这一帧。*context=next与D09的*out=draft同类语法。函数返回后局部next消失但写回的数据还在。",
+          "trace": "场景1第1帧后context.spacing_alert=1；第2帧又读到该1，36m因此不会误关闭。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "M01 · 入口与状态转换",
+          "values": [
+            0
+          ],
+          "hint": "5帧状态0,1,2,2,0；提示0,0,0,1,0。",
+          "optional": false,
+          "steps": [
+            "先读函数/变量大表，指出main、Acc_Step、context、output的定义位置。",
+            "在纸上预测每帧状态：OFF→READY→ACTIVE→ACTIVE→OFF。",
+            "点运行，比较每帧state与alert；记录为什么context要放for外。"
+          ]
+        },
+        {
+          "name": "M02 · 10帧阈值抖动",
+          "values": [
+            1
+          ],
+          "hint": "alert=0,1,1,1,1,1,1,1,0,0；进入35m，退出41m。",
+          "optional": false,
+          "steps": [
+            "在纸上写10帧距离列表，先预测只有哪几帧改变alert。",
+            "点运行并查看逐帧表；解释36m/40m为什么不马上关提示。",
+            "与只用38m单阈值的频繁切换比较。"
+          ]
+        },
+        {
+          "name": "M03 · 雷达有效位变化",
+          "values": [
+            2
+          ],
+          "hint": "状态ACTIVE,ACTIVE,READY,ACTIVE；失效帧清alert。",
+          "optional": false,
+          "steps": [
+            "预测雷达从有效→无效→有效，state如何改变。",
+            "按同一个context跨帧观察；为什么READY时alert必须清零？"
+          ]
+        },
+        {
+          "name": "M04 · 故障锁存与复位",
+          "values": [
+            3
+          ],
+          "hint": "ACTIVE→FAULT→FAULT→OFF→ACTIVE；故障清除不等于立刻恢复。",
+          "optional": false,
+          "steps": [
+            "观察fault_present=1时优先进入FAULT；下一帧变0仍保持FAULT。",
+            "只有关闭使能+fault_reset=1时才回OFF；写出对应if分支。"
+          ]
+        },
+        {
+          "name": "M05 · 非法距离拒绝",
+          "values": [
+            4
+          ],
+          "hint": "第0帧status=-2、valid=0、context不变；第1帧可恢复正常计算。",
+          "optional": false,
+          "steps": [
+            "将-1m与有效34m分两帧看，区分“参数非法”与“真实的FAULT锁存”。",
+            "解释为什么无效帧不能自动修改context。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "先看第0屏目的以及“函数/变量在哪里定义”的架构大表；找到AccContext、context、next、output及Acc_Step的四个参数。",
+        "按M01→M02→M03→M04→M05运行在线模拟；每组先预测，再核对每帧输出并写一句因果关系。",
+        "点击源码旁讲解，按demo.c main→acc_state.h接口→acc_state.c函数体→回main的顺序阅读；自己的源码注释和划线批注会自动保存。",
+        "下载完整项目ZIP，进入WSL用gcc编译demo.c+acc_state.c运行，再编译test_acc_state.c验证；CMake选学，不能把在线通过写成本地C通过。"
+      ],
+      "test_steps": [
+        "确认五组指定场景均运行；在线仅检查JavaScript模拟和迁移题，不宣称真实C已验证。",
+        "第1—10题必须理解结构体/函数来源、跨帧状态、故障优先、滞环阈值与CMake链接关系。",
+        "完成三道数值迁移：抖动第一次开启下标1、首次关闭下标8、故障无复位时应保持状态3。",
+        "本地实作：GCC构建demo与test两个独立入口；完成后在学习笔记附真实终端证据，成绩来源单独注明。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "AccContext 这个类型最初在哪定义？",
+          "options": [
+            "acc_state.h 中的 typedef struct",
+            "demo.c 中的 scanf",
+            "CMakeLists.txt 中的 add_executable"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "main中的context和Acc_Step函数形参context是什么关系？",
+          "options": [
+            "同一个C变量、同一个作用域",
+            "main的context是结构体，形参是保存该对象地址的指针",
+            "两个都只是头文件里的类型声明"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "每一帧都调用Acc_Step，为何上一帧状态不会丢？",
+          "options": [
+            "因为output在for里每次重新创建",
+            "因为函数返回status=0",
+            "因为context在for外只创建一次，并通过*context=next更新"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "若现在alert=0、距离36m、进入阈值35m，会开启提示吗？",
+          "options": [
+            "不会；尚未达到<=35m",
+            "会；已经低于退出阈值41m",
+            "与printf输出格式有关"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "若现在alert=1、距离40m、退出阈值41m，会关闭提示吗？",
+          "options": [
+            "会；40m比35m大",
+            "不会；仍未达到>=41m",
+            "必然进入FAULT"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "故障已经FAULT，本轮fault_present=0、enable=1、fault_reset=0，将是什么状态？",
+          "options": [
+            "ACTIVE",
+            "READY",
+            "仍为FAULT"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "哪个条件能在本课中解除FAULT锁存？",
+          "options": [
+            "只要fault_present变0",
+            "雷达有效就自动恢复",
+            "故障已清除且driver_enable=0且fault_reset=1"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "输入distance=-1m时，函数有什么行为？",
+          "options": [
+            "返回-2，output.valid=0，context不改变",
+            "直接把状态改成ACC_ACTIVE",
+            "返回0并把-1当真实距离"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "为什么demo.c需要#include \"acc_state.h\"，而链接时还要包含acc_state.c或业务库？",
+          "options": [
+            "头文件只有声明/类型；实现来自acc_state.c，最终需链接",
+            "include头文件会自动执行所有.c",
+            "只要有printf就能调用任意未定义函数"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "CMake的add_library(acc_state STATIC acc_state.c) 中STATIC含义是什么？",
+          "options": [
+            "C函数只能执行一次",
+            "把acc_state.c编译进一个静态库目标",
+            "要求所有变量变成const"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "不看答案，用场景1的距离36,34,36,40,39,35,34,37,42,38m，进入<=35m，退出>=41m，初始alert=0。找第一次开启和第一次关闭提示的数组下标；再判断场景3故障信号解除但没有复位时状态值。下标从0开始。",
+        "values": [
+          1
+        ],
+        "fields": [
+          {
+            "id": "first_on",
+            "label": "P1 · 首次开启alert的下标",
+            "kind": "number"
+          },
+          {
+            "id": "first_off",
+            "label": "P2 · 开启后首次关闭alert的下标",
+            "kind": "number"
+          },
+          {
+            "id": "fault_hold",
+            "label": "P3 · 故障已清除但未复位时状态值",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "先列场景1的10帧；不要把[1]看成第1号输出位置以外的含义，下标从0开始。",
+          "36>35不进入；34<=35在下标1进入；中间保持直到下标8的42>=41。",
+          "故障锁存条件要看旧context.state，不是只看本轮fault_present。"
+        ]
+      },
+      "pass_rule": "需完成指定5个在线模拟场景、10道概念题和3道迁移题，在线完成仅记为浏览器练习通过；真实C通关需在自己的WSL终端编译并测试，不能由网页模拟代替。",
+      "assets": [
+        {
+          "name": "acc_state.h",
+          "group": "main",
+          "language": "c",
+          "text": "#ifndef ASW_ACC_STATE_H\n#define ASW_ACC_STATE_H\n\n/* 只定义类型与函数接口，不在头文件中执行状态机。 */\ntypedef enum {\n    ACC_OFF = 0,\n    ACC_READY = 1,\n    ACC_ACTIVE = 2,\n    ACC_FAULT = 3\n} AccState;\n\ntypedef struct {\n    int driver_enable;   /* 驾驶员使能：0或1 */\n    int radar_valid;     /* 雷达数据有效：0或1 */\n    int fault_present;   /* 故障标志：0或1 */\n    int fault_reset;     /* 请求复位故障：0或1 */\n    float distance_m;    /* 前方距离，单位m */\n} AccInput;\n\ntypedef struct {\n    float alert_enter_m; /* 距离<=此值，进入距离偏小提示 */\n    float alert_exit_m;  /* 距离>=此值，退出提示；必须比进入值大 */\n} AccCalibration;\n\ntypedef struct {\n    AccState state;      /* 本轮前的状态会保留到下一轮 */\n    int spacing_alert;  /* 0关闭、1提示 */\n} AccContext;\n\ntypedef struct {\n    AccState state;      /* 本轮计算的状态 */\n    int spacing_alert;  /* 本轮是否有距离偏小提示 */\n    int valid;          /* 本轮输出是否有效 */\n} AccOutput;\n\n/* 声明：上下文地址、输入地址、标定地址、输出地址；返回0/-1/-2。 */\nint Acc_Step(AccContext *context, const AccInput *input,\n             const AccCalibration *calibration, AccOutput *output);\n\n#endif\n"
+        },
+        {
+          "name": "acc_state.c",
+          "group": "main",
+          "language": "c",
+          "text": "#include \"acc_state.h\"\n#include <stddef.h>\n#include <math.h>\n\n/* 一个调用只处理一帧；本文件没有main，也不连接真实车辆。 */\nint Acc_Step(AccContext *context, const AccInput *input,\n             const AccCalibration *calibration, AccOutput *output)\n{\n    /* 输出对象必须存在；先清成无效，防止旧值被误用。 */\n    if (output == NULL) return -1;\n    *output = (AccOutput){.state = ACC_FAULT, .valid = 0};\n\n    if (context == NULL || input == NULL || calibration == NULL) return -1;\n    if (!isfinite(input->distance_m) || input->distance_m < 0.0f ||\n        input->distance_m > 500.0f) return -2;\n    if (!isfinite(calibration->alert_enter_m) ||\n        !isfinite(calibration->alert_exit_m) ||\n        calibration->alert_enter_m < 0.0f ||\n        calibration->alert_enter_m >= calibration->alert_exit_m ||\n        calibration->alert_exit_m > 500.0f) return -2;\n    if ((input->driver_enable != 0 && input->driver_enable != 1) ||\n        (input->radar_valid != 0 && input->radar_valid != 1) ||\n        (input->fault_present != 0 && input->fault_present != 1) ||\n        (input->fault_reset != 0 && input->fault_reset != 1)) return -2;\n    if (context->state < ACC_OFF || context->state > ACC_FAULT ||\n        (context->spacing_alert != 0 && context->spacing_alert != 1)) return -2;\n\n    /* 先复制旧状态；本次成功后才写回调用者的context。 */\n    AccContext next = *context;\n\n    /* 故障优先；已进入故障后，需要故障清除+关闭使能+请求复位。 */\n    if (input->fault_present != 0) {\n        next.state = ACC_FAULT;\n    } else if (next.state == ACC_FAULT) {\n        if (input->fault_reset != 0 && input->driver_enable == 0) {\n            next.state = ACC_OFF;\n        }\n    } else if (input->driver_enable == 0) {\n        next.state = ACC_OFF;\n    } else if (input->radar_valid == 0) {\n        next.state = ACC_READY;\n    } else {\n        next.state = ACC_ACTIVE;\n    }\n\n    /* 滞环仅在ACTIVE中生效；非ACTIVE重置提示。 */\n    if (next.state != ACC_ACTIVE) {\n        next.spacing_alert = 0;\n    } else if (next.spacing_alert == 0 &&\n               input->distance_m <= calibration->alert_enter_m) {\n        next.spacing_alert = 1;\n    } else if (next.spacing_alert == 1 &&\n               input->distance_m >= calibration->alert_exit_m) {\n        next.spacing_alert = 0;\n    }\n\n    /* 写回：context保存跨帧状态；output只表示当前这一帧。 */\n    *context = next;\n    output->state = next.state;\n    output->spacing_alert = next.spacing_alert;\n    output->valid = 1;\n    return 0;\n}\n"
+        },
+        {
+          "name": "demo.c",
+          "group": "main",
+          "language": "c",
+          "text": "#include \"acc_state.h\"\n#include <stdio.h>\n#include <stddef.h>\n\n/* 五组固定输入；每个大括号是一次Acc_Step调用所用的一帧。 */\nstatic const AccInput NORMAL[] = {\n    {.distance_m = 50.0f},\n    {.driver_enable = 1, .distance_m = 50.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 50.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.radar_valid = 1, .distance_m = 34.0f}\n};\nstatic const AccInput JITTER[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 36.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 36.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 40.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 39.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 35.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 37.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 42.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 38.0f}\n};\nstatic const AccInput RADAR_DROP[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f}\n};\nstatic const AccInput FAULT_RESET[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .fault_present = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.radar_valid = 1, .fault_reset = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f}\n};\nstatic const AccInput INVALID[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = -1.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f}\n};\n\nint main(void)\n{\n    int scenario = 0;\n    if (scanf(\"%d\", &scenario) != 1) {\n        printf(\"input_error=1\\n\");\n        return 1;\n    }\n\n    /* 根据场景选一个输入数组；count是该数组的实际元素个数。 */\n    const AccInput *frames = NULL;\n    size_t count = 0U;\n    switch (scenario) {\n        case 0: frames = NORMAL; count = sizeof(NORMAL) / sizeof(NORMAL[0]); break;\n        case 1: frames = JITTER; count = sizeof(JITTER) / sizeof(JITTER[0]); break;\n        case 2: frames = RADAR_DROP; count = sizeof(RADAR_DROP) / sizeof(RADAR_DROP[0]); break;\n        case 3: frames = FAULT_RESET; count = sizeof(FAULT_RESET) / sizeof(FAULT_RESET[0]); break;\n        case 4: frames = INVALID; count = sizeof(INVALID) / sizeof(INVALID[0]); break;\n        default: printf(\"input_error=2\\n\"); return 1;\n    }\n\n    /* 这两个对象只在main创建一次，for循环内重复使用。 */\n    AccContext context = {.state = ACC_OFF, .spacing_alert = 0};\n    AccCalibration calibration = {.alert_enter_m = 35.0f, .alert_exit_m = 41.0f};\n\n    printf(\"scenario=%d count=%zu\\n\", scenario, count);\n    printf(\"legend: OFF=0 READY=1 ACTIVE=2 FAULT=3\\n\");\n    for (size_t i = 0U; i < count; ++i) {\n        AccOutput output = {0};\n        int status = Acc_Step(&context, &frames[i], &calibration, &output);\n        printf(\"frame=%zu status=%d valid=%d state=%d alert=%d distance=%.1f\\n\",\n               i, status, output.valid, (int)output.state,\n               output.spacing_alert, (double)frames[i].distance_m);\n    }\n\n    return 0;\n}\n"
+        },
+        {
+          "name": "test_acc_state.c",
+          "group": "main",
+          "language": "c",
+          "text": "#include \"acc_state.h\"\n#include <stdio.h>\n\n/* 简单的实际C自测：失败立即返回非0，不依赖NDEBUG/断言开关。 */\nint main(void)\n{\n    AccCalibration cfg = {35.0f, 41.0f};\n    AccContext ctx = {ACC_OFF, 0};\n    AccOutput out = {0};\n    AccInput in = {.driver_enable = 1, .radar_valid = 1, .distance_m = 36.0f};\n\n    if (Acc_Step(&ctx, &in, &cfg, &out) != 0 ||\n        out.state != ACC_ACTIVE || out.spacing_alert != 0) return 1;\n    in.distance_m = 34.0f;\n    if (Acc_Step(&ctx, &in, &cfg, &out) != 0 || out.spacing_alert != 1) return 2;\n    in.distance_m = 40.0f;\n    if (Acc_Step(&ctx, &in, &cfg, &out) != 0 || out.spacing_alert != 1) return 3;\n    in.distance_m = 42.0f;\n    if (Acc_Step(&ctx, &in, &cfg, &out) != 0 || out.spacing_alert != 0) return 4;\n\n    in.fault_present = 1;\n    if (Acc_Step(&ctx, &in, &cfg, &out) != 0 || out.state != ACC_FAULT) return 5;\n    in.fault_present = 0;\n    if (Acc_Step(&ctx, &in, &cfg, &out) != 0 || out.state != ACC_FAULT) return 6;\n    in.driver_enable = 0;\n    in.fault_reset = 1;\n    if (Acc_Step(&ctx, &in, &cfg, &out) != 0 || out.state != ACC_OFF) return 7;\n\n    in.distance_m = -1.0f;\n    if (Acc_Step(&ctx, &in, &cfg, &out) != -2 ||\n        out.valid != 0 || ctx.state != ACC_OFF) return 8;\n\n    printf(\"PASS: hysteresis, fault latch/reset, invalid input\\n\");\n    return 0;\n}\n"
+        },
+        {
+          "name": "CMakeLists.txt",
+          "group": "main",
+          "language": "cmake",
+          "text": "# CMake是构建说明，不是C语言函数，也不在程序运行时执行。\ncmake_minimum_required(VERSION 3.16)\nproject(asw_acc_state LANGUAGES C)\nset(CMAKE_C_STANDARD 17)\nset(CMAKE_C_STANDARD_REQUIRED ON)\n\n# 编译业务实现；头文件只提供声明，不是一个单独执行目标。\nadd_library(acc_state STATIC acc_state.c)\ntarget_include_directories(acc_state PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\ntarget_link_libraries(acc_state PUBLIC m)\n\n# demo.c的main与acc_state.c实现链接为一个程序。\nadd_executable(acc_demo demo.c)\ntarget_link_libraries(acc_demo PRIVATE acc_state)\n\n# 另一个main生成独立的测试可执行程序，不会与demo冲突。\ninclude(CTest)\nif(BUILD_TESTING)\n    add_executable(acc_tests test_acc_state.c)\n    target_link_libraries(acc_tests PRIVATE acc_state)\n    add_test(NAME acc_state_checks COMMAND acc_tests)\nendif()\n"
+        },
+        {
+          "name": "README.md",
+          "group": "main",
+          "language": "markdown",
+          "text": "# D10 ACC状态机与滞环（教学模拟）\n\n**非实车控制器**：只输出模拟状态和距离偏小提示，不生成油门或制动命令。阈值35/41米、状态切换规则与故障复位规则是本课人为约定，不是量产ACC要求。\n\n文件职责：\n- acc_state.h：结构体/枚举类型定义、Acc_Step函数原型。\n- acc_state.c：Acc_Step函数定义；每次处理一帧，使用context保留跨帧状态。\n- demo.c：main读取场景号、选择数组、反复调用Acc_Step并打印每帧结果。\n- test_acc_state.c：独立的main，对四组关键契约进行真实C检查。\n- CMakeLists.txt：定义demo、业务库、测试如何构建；不是C代码。\n\n## 第一步：不懂CMake也能执行\n在WSL进入本项目目录（先检查ls能看到上述文件）：\n\n```bash\ngcc -std=c17 -Wall -Wextra -Wpedantic -g demo.c acc_state.c -o acc_demo -lm\n./acc_demo\n```\n\n输入0、1、2、3或4（每次只输入1个场景号，再回车）：\n- 0：OFF→READY→ACTIVE→ACTIVE→OFF；告警0,0,0,1,0。\n- 1：10帧抖动；告警0,1,1,1,1,1,1,1,0,0。\n- 2：雷达信号从有效→无效→有效，状态ACTIVE,ACTIVE,READY,ACTIVE。\n- 3：故障优先且锁存，直到故障清除、关闭使能并复位，才回OFF。\n- 4：第一帧距离-1被拒绝（status=-2、valid=0），第二帧重新成功。\n\n独立测试：\n```bash\ngcc -std=c17 -Wall -Wextra -Wpedantic -g test_acc_state.c acc_state.c -o acc_tests -lm\n./acc_tests\n```\n\n## 第二步：学会CMake后再使用\n```bash\ncmake -S . -B build\ncmake --build build\nctest --test-dir build --output-on-failure\n./build/acc_demo\n```\n对应关系：add_library把acc_state.c编译为库；add_executable分别为demo.c/test_acc_state.c生成可执行程序；target_link_libraries把库连接给二者。CMake中的STATIC指静态库，与C文件作用域static内部链接不是同一个概念。\n\n## 学习边界\n- 前五帧与10帧来自预设数组，浏览器显示的是JS模拟，**不是浏览器编译C**。\n- 用户需在自己的WSL终端执行以上命令，保存独立测试证据；在线练习通过不等于真实C通关。\n- OFF/READY/ACTIVE/FAULT及雷达处理仅为教学规则；真实车辆还需要传感器时效、使能条件、安全监督、时间与故障策略等。\n"
+        }
+      ],
+      "code": "#include \"acc_state.h\"\n#include <stdio.h>\n#include <stddef.h>\n\n/* 五组固定输入；每个大括号是一次Acc_Step调用所用的一帧。 */\nstatic const AccInput NORMAL[] = {\n    {.distance_m = 50.0f},\n    {.driver_enable = 1, .distance_m = 50.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 50.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.radar_valid = 1, .distance_m = 34.0f}\n};\nstatic const AccInput JITTER[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 36.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 36.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 40.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 39.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 35.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 37.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 42.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 38.0f}\n};\nstatic const AccInput RADAR_DROP[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f}\n};\nstatic const AccInput FAULT_RESET[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .fault_present = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.radar_valid = 1, .fault_reset = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f}\n};\nstatic const AccInput INVALID[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = -1.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f}\n};\n\nint main(void)\n{\n    int scenario = 0;\n    if (scanf(\"%d\", &scenario) != 1) {\n        printf(\"input_error=1\\n\");\n        return 1;\n    }\n\n    /* 根据场景选一个输入数组；count是该数组的实际元素个数。 */\n    const AccInput *frames = NULL;\n    size_t count = 0U;\n    switch (scenario) {\n        case 0: frames = NORMAL; count = sizeof(NORMAL) / sizeof(NORMAL[0]); break;\n        case 1: frames = JITTER; count = sizeof(JITTER) / sizeof(JITTER[0]); break;\n        case 2: frames = RADAR_DROP; count = sizeof(RADAR_DROP) / sizeof(RADAR_DROP[0]); break;\n        case 3: frames = FAULT_RESET; count = sizeof(FAULT_RESET) / sizeof(FAULT_RESET[0]); break;\n        case 4: frames = INVALID; count = sizeof(INVALID) / sizeof(INVALID[0]); break;\n        default: printf(\"input_error=2\\n\"); return 1;\n    }\n\n    /* 这两个对象只在main创建一次，for循环内重复使用。 */\n    AccContext context = {.state = ACC_OFF, .spacing_alert = 0};\n    AccCalibration calibration = {.alert_enter_m = 35.0f, .alert_exit_m = 41.0f};\n\n    printf(\"scenario=%d count=%zu\\n\", scenario, count);\n    printf(\"legend: OFF=0 READY=1 ACTIVE=2 FAULT=3\\n\");\n    for (size_t i = 0U; i < count; ++i) {\n        AccOutput output = {0};\n        int status = Acc_Step(&context, &frames[i], &calibration, &output);\n        printf(\"frame=%zu status=%d valid=%d state=%d alert=%d distance=%.1f\\n\",\n               i, status, output.valid, (int)output.state,\n               output.spacing_alert, (double)frames[i].distance_m);\n    }\n\n    return 0;\n}\n"
     }
   },
   "rules": {
@@ -6763,6 +7274,98 @@
           "M07 · 迁移12.5m/s漏一次"
         ]
       ]
+    },
+    "10": {
+      "correct": {
+        "q1": 0,
+        "q2": 1,
+        "q3": 2,
+        "q4": 0,
+        "q5": 1,
+        "q6": 2,
+        "q7": 2,
+        "q8": 0,
+        "q9": 0,
+        "q10": 1
+      },
+      "explanations": {
+        "q1": "AccContext类型在acc_state.h的typedef struct中定义，demo.c的context才是具体对象。",
+        "q2": "main的context是对象；形参AccContext *context是保存它地址的指针，两者并非同一个变量。",
+        "q3": "context在for外创建，*context=next会修改调用者对象，下一帧重新读取其更新后的成员。",
+        "q4": "旧alert=0时只有距离<=35m才进入提示。",
+        "q5": "旧alert=1时只有距离>=41m才关闭。",
+        "q6": "FAULT为锁存状态；不能因fault_present单独变0就退出。",
+        "q7": "故障已清除且driver_enable=0且fault_reset=1，才由FAULT回OFF。",
+        "q8": "无效输入返回-2，先把output标为无效，不能修改context。",
+        "q9": "头文件声明接口，acc_state.c定义实现；编译链接两者才能建立调用。",
+        "q10": "CMake的STATIC用于静态库，与C函数前的static关键字不同。"
+      },
+      "numeric": {
+        "first_on": [
+          1,
+          "数组下标1的34m是首次<=35m。"
+        ],
+        "first_off": [
+          8,
+          "下标8的42m首次>=41m；中间保持告警。"
+        ],
+        "fault_hold": [
+          3,
+          "FAULT枚举值3，未完成复位条件会持续保持。"
+        ]
+      },
+      "labels": {
+        "q1": "第1题",
+        "q2": "第2题",
+        "q3": "第3题",
+        "q4": "第4题",
+        "q5": "第5题",
+        "q6": "第6题",
+        "q7": "第7题",
+        "q8": "第8题",
+        "q9": "第9题",
+        "q10": "第10题",
+        "first_on": "P1 · 首次开启的下标",
+        "first_off": "P2 · 首次关闭的下标",
+        "fault_hold": "P3 · FAULT保持状态值"
+      },
+      "needed": [
+        [
+          [
+            0
+          ],
+          "lab0",
+          "M01 · 入口与状态转换"
+        ],
+        [
+          [
+            1
+          ],
+          "lab1",
+          "M02 · 10帧阈值抖动"
+        ],
+        [
+          [
+            2
+          ],
+          "lab2",
+          "M03 · 雷达有效位变化"
+        ],
+        [
+          [
+            3
+          ],
+          "lab3",
+          "M04 · 故障锁存与复位"
+        ],
+        [
+          [
+            4
+          ],
+          "lab4",
+          "M05 · 非法距离拒绝"
+        ]
+      ]
     }
   },
   "curriculum": [
@@ -7607,5 +8210,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "58a3942968b9"
+  "release": "day10-20261026-v1"
 }
