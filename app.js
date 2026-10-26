@@ -72,7 +72,7 @@ function coloredCode(target,source,firstLine=1){
   const token=/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:0[xX][\da-fA-F]+|\b(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)[uUlLfF]*|\b[a-zA-Z_]\w*\b|[\s\S]/g;
   for(const match of source.matchAll(token)){const t=match[0];let cls='';
     if(t.startsWith('/*')||t.startsWith('//'))cls='syntax-comment';else if(t[0]==='"'||t[0]==="'")cls='syntax-string';else if(/^\d/.test(t))cls='syntax-number';
-    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|Codec_Encode|Codec_Decode|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process)$/.test(t))cls='syntax-function';
+    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|Codec_Encode|Codec_Decode|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process|Acc_Step|Timeline_Run)$/.test(t))cls='syntax-function';
     t.split('\n').forEach((part,i)=>{if(i)newLine();if(part){const span=document.createElement('span');span.className=cls;span.textContent=part;content.append(span);}});
   }
 }
@@ -260,7 +260,19 @@ $('runButton').onclick=async()=>{
   try{const values=lesson.run_fields.map(f=>$(f.id).value.trim());const result=await api('/api/run',{day,values});
     $('output').replaceChildren();const grid=document.createElement('div');grid.className='output-grid';
     let explanation,summaryText;
-    if(lesson.runner==='timing_day09'){
+    if(lesson.runner==='acc_state_day10'){
+      const stateNames=['OFF','READY','ACTIVE','FAULT'],rows=result.frames;
+      grid.append(item('教学场景',result.scenario),item('本次输入帧数',result.frame_count),
+        item('最后一帧state',stateNames[rows.at(-1).state]),item('最后一帧status',result.status,result.valid?'good':'bad'),
+        item('告警开关变化次数',result.alert_changes));
+      explanation=result.scenario===1?
+        '双阈值滞环：旧提示0时距离<=35m才开启；旧提示1时距离>=41m才关闭。中间区间保留上一帧，不是每次重新比较38m。':
+        result.scenario===3?'故障优先且锁存：fault_present清除后不能立即恢复；须使能关闭且fault_reset=1才回OFF。':
+        result.scenario===4?'第一帧距离为负，status=-2、valid=0且不改context；第二帧合法则正常进入ACTIVE。':
+        result.scenario===2?'雷达无效时切换READY并清除告警，恢复有效后才重新ACTIVE。':
+        '依次OFF→READY→ACTIVE→ACTIVE→OFF；context在main的for外创建，因此每次Acc_Step都能读取上一帧状态。';
+      summaryText='场景'+result.scenario+'，states='+result.states.join(',')+'，alerts='+result.alerts.join(',')+'；本次只是JS模拟';
+    }else if(lesson.runner==='timing_day09'){
       grid.append(item(result.chapter?'附录状态':'主课状态',result.status,result.valid?'good':'bad'));if(result.chapter){if(result.age_ms!==undefined)grid.append(item('数据年龄（ms）',result.age_ms));explanation=result.status===0?'按本例约定数据新鲜。':result.status===-4?'超过100ms，拒绝过期数据。':result.status===-3?'时间戳来自未来，先拒绝，不展示假造年龄。':'有效标记、来源或数值/时间范围非法。';}else if(result.valid){grid.append(item('控制到场数（含0ms）',result.control_count),item('实际更新次数',result.update_count),item('固定dt累计（m）',result.fixed_distance_m),item('实际dt累计（m）',result.measured_distance_m));explanation='先看下方周期表：每次用本次-上次算dt，0ms只初始化。本例速度恒定，漏一次的20ms一段能补上距离，不代表补回安全决策。';}else explanation='输入被拒绝，不展示旧时间表。';renderTimingTable(values,result);summaryText='部分'+result.chapter+'，status='+result.status;
     }else if(lesson.runner==='memory_day08'){
       grid.append(item('填写status',result.status,result.valid?'good':'bad'),item('转换后的字节（十进制）',result.fill_byte),item('实际不同格数',result.changed_count),item('选区外保持',result.outside_unchanged),item('测试目标',result.test_built?'已构建并运行':'未构建/未运行'),item('CTest登记数',result.test_count),item('独立检查数',result.checks_passed));renderBytePreview(values,result);
@@ -303,6 +315,14 @@ $('runButton').onclick=async()=>{
       summaryText=`${mode}，status=${result.status}，valid=${result.valid}${result.valid?`，期望=${result.desired}m，误差=${result.error}m`:''}`;
     }
     $('output').append(grid);const p=document.createElement('p');p.textContent=explanation;$('output').append(p);
+    if(lesson.runner==='acc_state_day10'){
+      const help=document.createElement('p');help.textContent='状态值对照：0 OFF关闭、1 READY等待雷达、2 ACTIVE正常监视、3 FAULT故障锁存。逐帧数据来自浏览器模拟，非真实C执行。';
+      $('output').append(help,makeTable(
+        ['帧下标','距离m','enable','radar','fault','reset','进入前state','结果state','告警','status / valid'],
+        result.frames.map(r=>[r.frame,r.distance_m,r.enable,r.radar_valid,r.fault,r.reset,
+          ['OFF','READY','ACTIVE','FAULT'][r.old_state],
+          ['OFF','READY','ACTIVE','FAULT'][r.state],r.alert,r.status+' / '+r.valid])));
+    }
     if(lesson.runner==='module_day06'){
       $('output').append(makeTable(['构建顺序','本次结果'],[['1 · 预处理/编译',result.build_stage===1?'在这里失败':'编译阶段已通过'],['2 · 链接实现和依赖',result.build_stage===1?'未到此处':result.build_stage===2?'在这里失败':'demo/test分别链接完成'],['3 · 测试与运行',result.program_ran?'测试后运行demo':'程序未生成，不运行']]));
       if(result.frame)$('output').append(makeTable(['字节下标','十六进制','职责'],result.frame.map((v,i)=>[i,v.toString(16).toUpperCase().padStart(2,'0'),['车速低8位','车速高8位','模式与雷达'][i]||'保留0'])));

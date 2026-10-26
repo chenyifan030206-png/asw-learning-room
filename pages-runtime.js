@@ -96,6 +96,39 @@ function pagesSimulate(day,values){
     result={chapter,build_status:0,program_ran:1,test_count:1+chapter,compiler_log:'浏览器模拟：主课默认只构建时间轴；附录另行启用。没有实际执行C、实时调度或ROS节点。'};
     if(chapter){const status=signalValid!==1||![1,2].includes(source)||!Number.isFinite(speed)||speed<0||speed>50||now<0||now>1000000||stamp<0||stamp>1000000?-2:stamp>now?-3:now-stamp>100?-4:0;Object.assign(result,{status,valid:Number(status===0)});if(status===0||status===-4)result.age_ms=now-stamp;}
     else{const status=!Number.isFinite(speed)||speed<0||speed>50||(skip!==-1&&(skip<1||skip>5))||late<0||late>9?-2:0;Object.assign(result,{status,valid:Number(status===0)});if(status===0){const control_ms=[],dt_ms=[],perception_ms=[0,20,40,60];let fixed=0,measured=0,last=0;for(let tick=0;tick<=6;tick++){if(tick===skip)continue;const now=tick*10+(tick===3?late:0),dt=control_ms.length?now-last:0;control_ms.push(now);dt_ms.push(dt);if(control_ms.length>1){fixed=f(fixed+f(speed*f(0.010)));measured=f(measured+f(speed*f(f(dt)/f(1000))));}last=now;}Object.assign(result,{control_ms,dt_ms,perception_ms,control_count:control_ms.length,update_count:control_ms.length-1,perception_count:4,fixed_distance_m:Number(fixed.toFixed(6)),measured_distance_m:Number(measured.toFixed(6))});}}
+  }else if(day===10){
+    // D10只有场景号1个输入；浏览器严格标注为JS模拟，真实C由用户在WSL运行。
+    const v=pagesNumbers(values,1),scenario=v[0];
+    if(!Number.isInteger(scenario)||scenario<0||scenario>4)throw Error('D10场景号只能是0、1、2、3或4。');
+    const frame=(driver_enable,radar_valid,fault_present,fault_reset,distance_m)=>({driver_enable,radar_valid,fault_present,fault_reset,distance_m});
+    const groups=[
+      [frame(0,0,0,0,50),frame(1,0,0,0,50),frame(1,1,0,0,50),frame(1,1,0,0,34),frame(0,1,0,0,34)],
+      [36,34,36,40,39,35,34,37,42,38].map(d=>frame(1,1,0,0,d)),
+      [frame(1,1,0,0,34),frame(1,1,0,0,34),frame(1,0,0,0,34),frame(1,1,0,0,34)],
+      [frame(1,1,0,0,34),frame(1,1,1,0,34),frame(1,1,0,0,34),frame(0,1,0,1,34),frame(1,1,0,0,34)],
+      [frame(1,1,0,0,-1),frame(1,1,0,0,34)]
+    ],frames=groups[scenario],rows=[];let state=0,alert=0;
+    for(const [i,input] of frames.entries()){
+      const old_state=state,old_alert=alert,finite=Number.isFinite(input.distance_m),range=finite&&input.distance_m>=0&&input.distance_m<=500;
+      let status=0,valid=1,outputState=state,outputAlert=alert;
+      if(!range){status=-2;valid=0;outputState=3;outputAlert=0;}
+      else {
+        if(input.fault_present===1)state=3;
+        else if(state===3){if(input.fault_reset===1&&input.driver_enable===0)state=0;}
+        else if(input.driver_enable===0)state=0;
+        else if(input.radar_valid===0)state=1;
+        else state=2;
+        if(state!==2)alert=0;
+        else if(alert===0&&input.distance_m<=35)alert=1;
+        else if(alert===1&&input.distance_m>=41)alert=0;
+        outputState=state;outputAlert=alert;
+      }
+      rows.push({frame:i,enable:input.driver_enable,radar_valid:input.radar_valid,fault:input.fault_present,reset:input.fault_reset,distance_m:input.distance_m,old_state,old_alert,status,valid,state:outputState,alert:outputAlert});
+    }
+    result={scenario,status:rows.at(-1).status,valid:rows.at(-1).valid,frames:rows,frame_count:rows.length,
+      states:rows.map(x=>x.state),alerts:rows.map(x=>x.alert),statuses:rows.map(x=>x.status),
+      valids:rows.map(x=>x.valid),alert_changes:rows.filter((x,i)=>i>0&&x.alert!==rows[i-1].alert).length,
+      compiler_log:'浏览器JavaScript模拟同一状态机规则，未编译C文件；用户须在WSL独立执行GCC/CTest。'};
   }else if(day===8){
     const v=pagesNumbers(values,5),[start,count,value,capacity,on]=v;
     if(!v.every(n=>Number.isInteger(n)&&n>=-100000&&n<=100000)||![0,1].includes(on))throw Error('D08需完整范围内整数，开关0或1。');
@@ -134,6 +167,13 @@ function pagesRegression(day){
   cases[7]=[['标准',[72.5,1,1,8,0],{raw:725,decoded_speed:72.5}],['端序',[72.5,1,1,8,1],{received_raw:54530,decode_status:-2}],['模式',[72.5,1,1,8,2],{received_control:7,decode_status:-2}],['启用',[72.5,1,1,8,3],{assertions_enabled:1,assert_failed:1,side_effect_count:1}],['关闭',[72.5,1,1,8,4],{assertions_enabled:0,side_effect_count:0,continued:1}],['保护',[72.5,1,1,8,5],{include_count:2,header_enum_count:1}],['迁移',[54.3,2,1,8,0],{raw:543,frame:[31,2,6,0,0,0,0,0]}]];
   cases[8]=[['middle',[2,3,165,8,1],{after:[16,17,165,165,165,21,22,23],changed_count:3,test_count:1,checks_passed:7}],['reject',[7,2,0,8,1],{status:-2,changed_count:0}],['empty',[8,0,0,8,1],{status:0,changed_count:0}],['negative',[-1,1,0,8,1],{status:-2}],['byte',[5,2,-1,8,1],{fill_byte:255}],['large',[2,2,4660,8,1],{fill_byte:52}],['off',[2,3,165,8,0],{test_built:0,test_count:0,checks_passed:0}],['transfer',[3,2,0,8,1],{after:[16,17,18,0,0,21,22,23]}]];
   cases[9]=[['normal',[10,-1,0,1000,950,1,1,0],{control_ms:[0,10,20,30,40,50,60],measured_distance_m:0.6}],['miss',[10,3,0,1000,950,1,1,0],{dt_ms:[0,10,10,20,10,10],fixed_distance_m:0.5,measured_distance_m:0.6}],['late',[10,-1,5,1000,950,1,1,0],{dt_ms:[0,10,10,15,5,10,10]}],['reject',[-1,-1,0,1000,950,1,1,0],{status:-2}],['age50',[10,-1,0,1000,950,1,1,1],{age_ms:50,status:0}],['age100',[10,-1,0,1000,900,1,1,1],{age_ms:100,status:0}],['age101',[10,-1,0,1000,899,1,1,1],{status:-4}],['future',[10,-1,0,1000,1001,1,1,1],{status:-3}]];
+  cases[10]=[
+    ['基本状态',[0],{states:[0,1,2,2,0],alerts:[0,0,0,1,0],statuses:[0,0,0,0,0]}],
+    ['十帧滞环',[1],{states:[2,2,2,2,2,2,2,2,2,2],alerts:[0,1,1,1,1,1,1,1,0,0],alert_changes:2}],
+    ['雷达失效',[2],{states:[2,2,1,2],alerts:[1,1,0,1]}],
+    ['故障锁存',[3],{states:[2,3,3,0,2],alerts:[1,0,0,0,1]}],
+    ['非法输入',[4],{statuses:[-2,0],valids:[0,1],states:[3,2]}]
+  ];
   return cases[day].map(([name,input,expected])=>{const actual=pagesSimulate(day,input),passed=Object.entries(expected).every(([k,v])=>Array.isArray(v)?JSON.stringify(actual[k])===JSON.stringify(v):Math.abs(actual[k]-v)<0.001);return {name:'浏览器模拟 · '+name,passed,expected,actual};});
 }
 function pagesValidateAnnotations(marks,files){
