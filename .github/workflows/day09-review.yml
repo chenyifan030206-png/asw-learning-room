@@ -1,0 +1,38 @@
+name: Day09 review verification
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/day09-v2]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Verify content references, unchanged D01-D08 and release
+        run: python tools/verify_content.py
+      - name: Real browser interaction, synthetic records and ZIP download
+        run: npm test
+      - name: GCC and CMake/CTest on downloaded ZIP; actual C versus browser
+        run: python tools/verify_c.py
+      - name: Upload screenshots and execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: day09-review-${{ github.sha }}
+          path: reports/day09-v2/
+          retention-days: 30

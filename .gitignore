@@ -2,3 +2,8 @@
 *.log
 .env
 *.zip
+node_modules/
+.tools/
+.test-build/
+test-results/
+__pycache__/
