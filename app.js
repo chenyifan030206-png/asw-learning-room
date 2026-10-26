@@ -15,6 +15,7 @@ async function api(url,data){
   if(!res.ok)throw Error(result.error||'本地服务未响应。');return result;
 }
 function tab(name){
+  if(name==='run'&&window.Day09V2?.active){tab('learn');Day09V2.focusLab();return;}
   for(const n of ['learn','run','test']){$(n).hidden=n!==name;$('tab-'+n).setAttribute('aria-selected',String(n===name));}
 }
 for(const n of ['learn','run','test'])$('tab-'+n).onclick=()=>tab(n);
@@ -65,6 +66,7 @@ $('enterNext').onclick=()=>selectDay(day+1).catch(e=>message(e.message));
 function steps(id,items){$(id).replaceChildren();for(const text of items||[]){const li=document.createElement('li');li.textContent=text;$(id).append(li);}}
 function makeTable(headers,rows){const wrap=document.createElement('div'),t=document.createElement('table'),head=document.createElement('thead'),tr=document.createElement('tr');wrap.className='table-wrap';for(const text of headers){const th=document.createElement('th');th.scope='col';th.textContent=text;tr.append(th);}head.append(tr);t.append(head);const body=document.createElement('tbody');for(const row of rows){const tr=document.createElement('tr');for(const text of row){const td=document.createElement('td');td.textContent=text;tr.append(td);}body.append(tr);}t.append(body);wrap.append(t);return wrap;}
 function coloredCode(target,source,firstLine=1){
+  if(lesson?.ui==='day09-v2')return Day09V2.color(target,source,firstLine);
   target.replaceChildren();let line,content,lineNo=firstLine;
   function newLine(){line=document.createElement('span');line.className='code-line';line.dataset.line=lineNo;const n=document.createElement('span');n.className='line-number';n.textContent=lineNo++;n.setAttribute('aria-hidden','true');content=document.createElement('span');line.append(n,content);target.append(line);}newLine();
   // 先识别完整注释和字符串，再识别语法；不使用innerHTML，用户文本不会变成HTML。
@@ -79,6 +81,7 @@ function coloredCode(target,source,firstLine=1){
 let stepIndex=0;
 function paragraphs(target,text){for(const value of text.split('\n')){const p=document.createElement('p');p.textContent=value;target.append(p);}}
 function showStep(index){
+  if(lesson.ui==='day09-v2'){if(Day09V2.active)Day09V2.selectStep(index);return;}
   stepIndex=index;const s=lesson.code_sections[index],source=s.file?sourceFile(s.file).text:lesson.code,start=source.indexOf(s.start),end=source.indexOf(s.end,start+s.start.length);
   const finish=end<0?source.length:s.end.startsWith('    return 0;')?end+'    return 0;\n}'.length:end;
   $('stepTitle').textContent=s.title+(s.file?' · '+s.file:'');coloredCode($('stepCode'),source.slice(Math.max(start,0),finish).trimEnd(),source.slice(0,Math.max(start,0)).split('\n').length);
@@ -99,7 +102,7 @@ function renderCode(){
   $('executionFlow').textContent=lesson.flow_text||'main创建变量 → 读输入 → 调用业务函数（main暂停）→ 校验与计算 → 返回main → 检查状态后使用结果';
   $('remediationTitle').textContent=lesson.remediation_title||'开课补习 · 先看本课所需基础';
   $('walkthrough').hidden=!lesson.code_sections;$('codeSteps').replaceChildren();
-  if(lesson.code_sections){$('remediationText').replaceChildren();paragraphs($('remediationText'),lesson.reading[0].text);if(lesson.protocol)$('remediationText').append(makeTable(lesson.protocol.headers,lesson.protocol.rows));lesson.code_sections.forEach((s,i)=>{const b=document.createElement('button');b.textContent=s.title;b.onclick=()=>showStep(i);$('codeSteps').append(b);});showStep(0);}
+  if(lesson.code_sections){$('remediationText').replaceChildren();paragraphs($('remediationText'),lesson.reading[0]?.text||'');if(lesson.protocol)$('remediationText').append(makeTable(lesson.protocol.headers,lesson.protocol.rows));lesson.code_sections.forEach((s,i)=>{const b=document.createElement('button');b.textContent=s.title;b.onclick=()=>showStep(i);$('codeSteps').append(b);});showStep(0);}
   $('codeFile').textContent=lesson.project_name?lesson.project_name+' / '+activeFile:activeFile;$('code').classList.add('expanded');$('expandCode').textContent='折叠长代码';$('expandCode').setAttribute('aria-expanded','true');
   $('codeIntegrity').textContent=`当前文件 ${activeFile} · ${sourceFile().text.split('\n').length} 行。逐文件完整显示；下方可以对源码与讲解划线批注。`;
   $('architectureFlow').dataset.annotationScope='architecture';$('remediationText').dataset.annotationScope='remediation';
@@ -146,9 +149,9 @@ function rangeAt(root,start,end){const walker=document.createTreeWalker(root,Nod
 function renderAnnotations(){
   if(!$('annotationsList'))return;for(const old of $('learn').querySelectorAll('mark.annotation-mark')){const parent=old.parentNode;old.replaceWith(document.createTextNode(old.textContent));parent.normalize();}$('annotationsList').replaceChildren();const ranges=[],colored={yellow:[],green:[],blue:[]};
   for(const mark of annotations.filter(a=>!a.deleted)){
-    const scope=[...$('learn').querySelectorAll('[data-annotation-scope]')].find(el=>el.dataset.annotationScope===mark.scope);let stale=false;
+    const scope=[...$('learn').querySelectorAll('[data-annotation-scope]')].find(el=>el.dataset.annotationScope===mark.scope&&(!el.closest('[hidden]')||el.closest('[hidden]')===$('learn')));let stale=!scope;
     if(scope){const text=scope.textContent;let start=mark.start,end=mark.end;if(text.slice(start,end)!==mark.quote){const index=text.indexOf(mark.quote);if(index>=0&&text.indexOf(mark.quote,index+1)<0){start=index;end=index+mark.quote.length;}else stale=true;}if(!stale){const range=rangeAt(scope,start,end);if(range){ranges.push(range);colored[annotationColors[mark.color]?mark.color:'yellow'].push(range);}}}
-    const details=document.createElement('details'),summary=document.createElement('summary'),quote=document.createElement('blockquote'),p=document.createElement('p'),edit=document.createElement('button'),remove=document.createElement('button');summary.textContent=(mark.scope?.startsWith('code:')?mark.scope.slice(5):'讲解标注')+' · '+(mark.comment||'已划线').slice(0,45)+(stale?'（原文已更新，请核对）':'');quote.textContent=mark.quote;p.textContent=mark.comment||'只划线，未写批注';edit.textContent='编辑';edit.onclick=()=>{openAnnotation(mark,edit.getBoundingClientRect());};remove.textContent='清除此标注';remove.onclick=()=>removeAnnotationById(mark.id);details.append(summary,quote,p,edit);const row=document.createElement('div');row.className='annotation-entry';row.append(details,remove);$('annotationsList').append(row);
+    const details=document.createElement('details'),summary=document.createElement('summary'),quote=document.createElement('blockquote'),p=document.createElement('p'),edit=document.createElement('button'),remove=document.createElement('button');summary.textContent=(mark.scope?.startsWith('code:')?mark.scope.slice(5):'讲解标注')+' · '+(mark.comment||'已划线').slice(0,45)+(stale?'（需要复核：定位或原文已更新）':'');quote.textContent=mark.quote;p.textContent=mark.comment||'只划线，未写批注';edit.textContent='编辑';edit.onclick=()=>{openAnnotation(mark,edit.getBoundingClientRect());};remove.textContent='清除此标注';remove.onclick=()=>removeAnnotationById(mark.id);details.append(summary,quote,p,edit);if(stale&&window.Day09V2?.active){const text=Day09V2.legacyText(mark.scope);if(text){const old=document.createElement('details'),caption=document.createElement('summary'),pre=document.createElement('pre');caption.textContent='查看改版前原文（保留旧批注）';pre.textContent=text;old.append(caption,pre);details.append(old);}}const row=document.createElement('div');row.className='annotation-entry';row.append(details,remove);$('annotationsList').append(row);
   }
   const undoAvailable=annotationUndoHistory().length>0;$('undoAnnotation').disabled=!undoAvailable;$('undoAnnotationPopup').disabled=!undoAvailable;
   if(window.CSS?.highlights&&window.Highlight){for(const [color,list] of Object.entries(colored))CSS.highlights.set(color==='yellow'?'aswAnnotations':'aswAnnotations'+color,new Highlight(...list));}
@@ -207,13 +210,14 @@ function renderFields(id,fields,prefix=''){
     el.value=prefix?'':f.value??'';label.append(el);$(id).append(label);
   }
 }
-function drawChecklist(items){for(const id of ['runChecklist','testChecklist']){$(id).replaceChildren();for(const c of items){const row=document.createElement('div'),span=document.createElement('span');row.className='checklist-row';span.textContent=`${c.passed?'✓ 已运行':'○ 待运行'} · ${c.label}`;span.className=c.passed?'pass':'muted';row.append(span);if(!c.passed){const b=document.createElement('button');b.type='button';b.textContent='去运行';b.className='small';b.onclick=()=>{setInputs(c.values,`通关实验：${c.label}。输入已经填好，现在点击运行案例。`);tab('run');$('runButton').focus();};row.append(b);}$(id).append(row);}}}
+function drawChecklist(items){for(const id of ['runChecklist','testChecklist']){$(id).replaceChildren();for(const c of items){const row=document.createElement('div'),span=document.createElement('span');row.className='checklist-row';span.textContent=`${c.passed?'✓ 已运行':'○ 待运行'} · ${c.label}`;span.className=c.passed?'pass':'muted';row.append(span);if(!c.passed){const b=document.createElement('button');b.type='button';b.textContent='去运行';b.className='small';b.onclick=()=>{setInputs(c.values,`通关实验：${c.label}。输入已经填好，现在点击运行案例。`);tab('run');(Day09V2.active?$('v2Run'):$('runButton')).focus();};row.append(b);}$(id).append(row);}}}
 async function refreshChecklist(){const result=await api('/api/checklist?day='+day);drawChecklist(result.experiments);updateAppendixChecklist(result.appendix_experiments);}
 async function selectDay(d){
   if(busy){message('正在运行或检测，请等待完成后再换课程。');return;}
   if(dirty)await saveNotes();
   const c=state.courses[d-1];
   if(!c.unlocked){message(`D${String(d).padStart(2,'0')} 尚未解锁：先完成前一天的检测，或对当前日自定义通关。`);return;}
+  window.Day09V2?.unmount();
   if(!c.published){$('workspace').hidden=true;$('waiting').hidden=false;$('waitingTitle').textContent=`D${String(d).padStart(2,'0')} · ${c.title}`;$('waitingText').textContent='前一天通关已记录。下一课会根据你的学习结果与反馈补充。回到当前课程，下载报告或复制下一课请求发给聊天。';return;}
   const result=await api('/api/lesson?day='+d);day=d;lesson=result.lesson;const record=result.record;
   $('annotationPanel').hidden=true;pendingAnnotation=null;$('annotationText').value='';$('saveAnnotation').disabled=true;$('annotationSelection').textContent='选中源码或讲解文字，添加批注。';
@@ -238,7 +242,12 @@ async function selectDay(d){
   $('questions').replaceChildren();for(const [qi,q] of lesson.questions.entries()){const f=document.createElement('fieldset'),leg=document.createElement('legend');f.className='question';leg.textContent=`第${qi+1}题（${q.id}） · ${q.text}`;f.append(leg);q.options.forEach((o,i)=>{const label=document.createElement('label'),input=document.createElement('input'),span=document.createElement('span');input.type='radio';input.name=q.id;input.value=i;span.textContent=`${String.fromCharCode(65+i)}. ${o}`;label.append(input,span);f.append(label);});$('questions').append(f);}
   $('output').replaceChildren();const empty=document.createElement('p');empty.className='muted';empty.textContent='选一个场景，点击运行。';$('output').append(empty);
   $('engine').textContent='';$('runStatus').textContent='';$('prediction').value='';$('overrideReason').value='';$('result').replaceChildren();$('requestFallback').hidden=true;
-  if(record.attempt){const answers=JSON.parse(record.attempt.answers);for(const q of lesson.questions){const value=answers[q.id];const input=$('quiz').querySelector(`input[name="${q.id}"][value="${value}"]`);if(input)input.checked=true;}for(const f of lesson.practice.fields)$('answer-'+f.id).value=answers[f.id]??'';const priorResult=JSON.parse(record.attempt.result);if(record.attempt.source==='local-c')priorResult.source='local-c';showResult(priorResult);}
+  if(record.attempt){
+    const priorResult=JSON.parse(record.attempt.result);
+    if(lesson.ui==='day09-v2'&&priorResult.revision!==lesson.revision){const p=document.createElement('p');p.textContent='改版前检测记录与成绩已保留；题目已调整，请重新完成v2检测。旧答案不自动填入新题。';$('result').append(p);}
+    else{const answers=JSON.parse(record.attempt.answers);for(const q of lesson.questions){const value=answers[q.id];const input=$('quiz').querySelector(`input[name="${q.id}"][value="${value}"]`);if(input)input.checked=true;}for(const f of lesson.practice.fields)$('answer-'+f.id).value=answers[f.id]??'';if(record.attempt.source==='local-c')priorResult.source='local-c';showResult(priorResult);}
+  }
+  if(lesson.ui==='day09-v2')Day09V2.mount({lesson,attempt:record.attempt,file:()=>activeFile,chooseFile,api,showCodeView,tab,download,renderAnnotations});
   drawRoute();completeUI();tab('learn');message('');
 }
 $('backCurrent').onclick=()=>selectDay(day).catch(e=>message(e.message));
@@ -252,8 +261,8 @@ function renderBytePreview(values,result){
 }
 $('runFields').addEventListener('input',()=>renderBytePreview());
 $('runFields').addEventListener('change',updateTimingFields);
-function setInputs(values,hint,guide){lesson.run_fields.forEach((f,i)=>$(f.id).value=values[i]);renderBytePreview(values);updateTimingFields();$('timelineLab').hidden=true;$('hint').textContent=hint||'';steps('experimentSteps',guide||['输入已经填好。','先写自己的预测，再点击运行案例。','检查结果后回到做检测继续。']);}
-$('transferRun').onclick=()=>{setInputs(lesson.practice.values,'迁移实验：输入已填好。请先保留你的手算答案，再点击运行案例。');tab('run');$('prediction').focus();};
+function setInputs(values,hint,guide){lesson.run_fields.forEach((f,i)=>$(f.id).value=values[i]);if(window.Day09V2?.active)Day09V2.setInputs(values);renderBytePreview(values);updateTimingFields();$('timelineLab').hidden=true;$('hint').textContent=hint||'';steps('experimentSteps',guide||['输入已经填好。','先写自己的预测，再点击运行案例。','检查结果后回到做检测继续。']);}
+$('transferRun').onclick=()=>{setInputs(lesson.practice.values,'迁移实验：输入已填好。请先保留你的手算答案，再点击运行案例。');tab('run');(Day09V2.active?$('v2Prediction'):$('prediction')).focus();};
 function item(label,value,cls){const d=document.createElement('div'),l=document.createElement('div'),v=document.createElement('div');l.className='muted';l.textContent=label;v.className='value '+(cls||'');v.textContent=value;d.append(l,v);return d;}
 $('runButton').onclick=async()=>{
   if(busy)return;busy=true;const b=$('runButton');b.disabled=true;b.textContent='正在浏览器模拟…';
@@ -323,9 +332,10 @@ $('runButton').onclick=async()=>{
   }catch(e){message(e.message);$('runStatus').textContent='运行未完成，请检查提示后重试。';}finally{busy=false;b.disabled=false;b.textContent='运行案例';}
 };
 function showResult(result){
+  if(lesson.ui==='day09-v2'&&Day09V2.active)Day09V2.markAssessment(result);
   $('result').replaceChildren();const h=document.createElement('h3');h.className=result.passed?'pass':'fail';h.textContent=result.passed?(result.source==='local-c'?'✓ 原本地真实C检测已通过':'✓ 今日检测通过（在线练习）'):'还没有通关：按下面提示补齐，再试一次';$('result').append(h);
   const names={q1:'地址',q2:'状态与输出',q3:'间距计算',q4:'const输入',q5:'无效结果',speed_ms:'迁移速度',desired:'迁移间距',error:'迁移误差',mode:'迁移模式',normal:'正常实验',fault:'故障实验',transfer:'迁移实验'};
-  const ul=document.createElement('ul');ul.className='test-checks';for(const c of result.checks){const li=document.createElement('li');li.className=c.passed?'pass':'fail';const qi=lesson.questions.findIndex(q=>q.id===c.id);li.textContent=`${c.passed?'✓':'✗'} ${qi>=0?'第'+(qi+1)+'题（'+c.id+'） · ':''}${c.label||names[c.id]||c.id}：${c.passed?'通过':c.message}`;if(!c.passed&&c.values){const b=document.createElement('button');b.type='button';b.textContent='去运行';b.className='small';b.onclick=()=>{setInputs(c.values,`补齐实验：${c.label}；输入已填好，请点击运行案例。`);tab('run');$('runButton').focus();};li.append(document.createTextNode(' '),b);}ul.append(li);}$('result').append(ul);
+  const ul=document.createElement('ul');ul.className='test-checks';for(const c of result.checks){const li=document.createElement('li');li.className=c.passed?'pass':'fail';const qi=lesson.questions.findIndex(q=>q.id===c.id);li.textContent=`${c.passed?'✓':'✗'} ${qi>=0?'第'+(qi+1)+'题（'+c.id+'） · ':''}${c.label||names[c.id]||c.id}：${c.passed?'通过':c.message}`;if(!c.passed&&c.values){const b=document.createElement('button');b.type='button';b.textContent='去运行';b.className='small';b.onclick=()=>{setInputs(c.values,`补齐实验：${c.label}；输入已填好，请点击运行案例。`);tab('run');(Day09V2.active?$('v2Run'):$('runButton')).focus();};li.append(document.createTextNode(' '),b);}if(!c.passed&&c.review_step&&lesson.ui==='day09-v2'){const b=document.createElement('button');b.type='button';b.textContent='回到'+c.review_step+'源码与解释';b.onclick=()=>Day09V2.revisit(c.review_step);li.append(b);}ul.append(li);}$('result').append(ul);
   const det=document.createElement('details'),sum=document.createElement('summary');sum.textContent=`${result.source==='local-c'?'原本地真实C回归':'浏览器模拟回归'}：${result.tests.filter(t=>t.passed).length}/${result.tests.length}通过`;det.append(sum);
   for(const t of result.tests){const p=document.createElement('p');p.className=t.passed?'pass':'fail';p.textContent=`${t.passed?'✓':'✗'} ${t.name}`;det.append(p);}$('result').append(det);
 }
@@ -343,7 +353,7 @@ $('downloadLesson').onclick=()=>{
   if(!lesson.project_name)parts.push('## 完整中文源码','```c\n'+lesson.code+'```');
   for(const asset of lesson.assets||[])parts.push('## '+asset.name,'```\n'+asset.text+'\n```');
   for(const r of lesson.reading){parts.push('## '+r.title,r.text);for(const source of r.sources||[])parts.push(`[${source.title}](${source.url})`);if(r.table)parts.push(JSON.stringify(r.table,null,2));}
-  for(const s of lesson.code_sections||[]){const source=s.file?sourceFile(s.file).text:lesson.code,start=source.indexOf(s.start),end=source.indexOf(s.end,start+s.start.length),finish=end<0?source.length:s.end.startsWith('    return 0;')?end+'    return 0;\n}'.length:end;parts.push('## '+s.title+' · '+(s.file||lesson.source),'```c\n'+source.slice(Math.max(0,start),finish)+'\n```','通用语法：'+s.pattern,s.text,'具体值：'+s.trace);}
+  for(const s of lesson.code_sections||[]){if(lesson.ui==='day09-v2'){parts.push('## '+s.id+' · '+s.title,s.markdown);continue;}const source=s.file?sourceFile(s.file).text:lesson.code,start=source.indexOf(s.start),end=source.indexOf(s.end,start+s.start.length),finish=end<0?source.length:s.end.startsWith('    return 0;')?end+'    return 0;\n}'.length:end;parts.push('## '+s.title+' · '+(s.file||lesson.source),'```c\n'+source.slice(Math.max(0,start),finish)+'\n```','通用语法：'+s.pattern,s.text,'具体值：'+s.trace);}
   if(lesson.project_intro)parts.push('## 项目目的',...lesson.project_intro.paragraphs);for(const a of lesson.appendices||[])parts.push('## '+a.title,...a.paragraphs);
   for(const e of lesson.experiments)parts.push('## 实验：'+e.name,'输入：'+e.values.join(' '),...e.steps);
   parts.push('## 迁移任务',lesson.practice.text,...lesson.practice.steps,'## 自测题（不附答案）',...lesson.questions.map(q=>q.text+'\n'+q.options.map((o,i)=>`${i+1}. ${o}`).join('\n')));

@@ -1,0 +1,79 @@
+{
+  "browser": "156.0.4314.42",
+  "playwright": "1.56.1",
+  "platform": "win32",
+  "viewport_desktop": "1440x900",
+  "viewport_mobile": "390x844",
+  "records": "synthetic only",
+  "tests": [
+    {
+      "test": "first screen: three inputs, D08A separate, no auto-scroll",
+      "status": "PASS"
+    },
+    {
+      "test": "lossless mature highlighting across all three full files",
+      "status": "PASS"
+    },
+    {
+      "test": "11 numeric source locations and forward/back steps",
+      "status": "PASS"
+    },
+    {
+      "test": "19 origins: definition/use, keyboard declaration, return to call",
+      "status": "PASS"
+    },
+    {
+      "test": "clipboard, individual file and actual project ZIP downloads",
+      "status": "PASS"
+    },
+    {
+      "test": "four required cases, rejected output hidden, all 7 ticks, keyboard/reset, 20ms",
+      "status": "PASS"
+    },
+    {
+      "test": "19 browser model fixtures exported for actual C comparison",
+      "status": "PASS"
+    },
+    {
+      "test": "D08A old run mapped independently, own files/results, restores main state",
+      "status": "PASS"
+    },
+    {
+      "test": "legacy notes visible; select-only no color; color/save/undo; personal code reload",
+      "status": "PASS"
+    },
+    {
+      "test": "unprefilled transfer incl dt sequence; wrong links; actual four-case gate",
+      "status": "PASS"
+    },
+    {
+      "test": "D01-D08 all four record tables unchanged byte-for-byte",
+      "status": "PASS"
+    },
+    {
+      "test": "D08/D09 navigation restores original DOM without duplicate IDs",
+      "status": "PASS"
+    },
+    {
+      "test": "backup import + mocked actual GitHub sync preserve history/local-C priority",
+      "status": "PASS"
+    },
+    {
+      "test": "390x844 real browser: no overflow, tick cards, code/explain retains file/step",
+      "status": "PASS"
+    },
+    {
+      "test": "D01-D08 browser regression cases: 71",
+      "status": "PASS"
+    },
+    {
+      "test": "actual GitHub Pages subpath loads relative assets and existing storage namespace",
+      "status": "PASS"
+    },
+    {
+      "test": "no uncaught JavaScript exceptions",
+      "status": "PASS"
+    }
+  ],
+  "uncaught_errors": []
+}

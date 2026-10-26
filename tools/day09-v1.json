@@ -1,0 +1,821 @@
+{
+  "day": 9,
+  "revision": "2026-10-16-timing-v1",
+  "title": "周期任务与dt：漏掉一次，为什么会少算距离？",
+  "source": "day09.c",
+  "runner": "timing_day09",
+  "project_name": "day09_project",
+  "project_intro": {
+    "title": "先弄明白：这个小项目到底要做什么？",
+    "paragraphs": [
+      "想象车上有两位工作人员。观察员每20毫秒报告一次情况；记账员每10毫秒根据车速，算“这一小段又走了多少米”。两人的工作频率不同，但共享同一张时间表。10/20ms是本课选定的教学参数，不是所有车辆的统一规定。",
+      "平时记账员在0、10、20、30、40、50、60ms到场。假如30ms那次漏掉，下一次是40ms：距离上次20ms已经过了20毫秒。若他还按“只过了10毫秒”记账，就会少算距离。这个项目就是让你亲眼比较这两种算法。",
+      "你输入车速、漏掉哪次、是否迟到，程序给出两位工作人员的到场表、每段实际间隔，以及两种累计距离。你最后要能解释：漏一次时，为什么错误算法得到0.5米、按时间差算得到0.6米。",
+      "这里的时间是我们写在表里的数字，用C执行计算；没有让电脑真的每10ms睡醒，也没有实际控制车辆。它帮助你先理解时间和算法的关系，后面再接真实任务、ROS 2时钟与控制器。"
+    ]
+  },
+  "summary": "在线练习版：浏览器模拟，不执行C、不进行服务端检测。这个小项目模拟两份按时做的工作，比较漏记一次后两种距离账本。先说清为什么做、输入什么、会看到什么，再一步步看文件和代码。主课沿用原D09；补习和原D08欠项单独放附录。",
+  "time": "主课约180分钟：生活例子与文件关系20；语法和执行链35；原计划实作75；故障定位20；编号检测30。附录单独约45—60分钟，默认折叠、不占主课时间，也不冒称已经完成。",
+  "review_provenance": "已请求既有GPT学习会话审阅；未取得可读取的回复正文或6 high配置证明。本课结合原路线、一手文档和真实C实验制作。",
+  "goals": [
+    "说清这个项目的输入、处理和结果，而不是先背文件术语",
+    "画出10ms控制和20ms感知的同一张时刻表",
+    "用本次时刻减上次时刻计算dt，正确把ms换成s",
+    "复现漏周期时固定dt少算距离，并说明本例的恒速假设",
+    "按职责找到接待、计算、说明、测试和构建文件，解释主课main顺序"
+  ],
+  "flow_text": "人填三项输入 → demo.c的main接收 → 建立result账本 → 请timing.c的Timeline_Run计算 → 它按时间表逐次记到场时间和dt → 完成后交回账本 → main先看status，再展示。timing.h规定账本格式和如何调用；test_timing.c另起一个程序核对；CMake只负责把文件组成程序。",
+  "remediation_title": "先跟着0→10→20→40ms走一遍，再看语法",
+  "architecture": {
+    "headers": [
+      "文件",
+      "像谁？具体做什么",
+      "与其他文件如何配合"
+    ],
+    "rows": [
+      [
+        "demo.c",
+        "接待员：接收3个输入、请人计算、展示结果",
+        "有main；调用Timeline_Run，把结果账本地址给它"
+      ],
+      [
+        "timing.h",
+        "说明卡：写明账本有哪些格、函数需要哪几个参数",
+        "demo/计算/测试都照同一份说明，不在这里计算"
+      ],
+      [
+        "timing.c",
+        "记账员：按规则计算时间差和距离",
+        "没有main；实现说明卡上声明的Timeline_Run"
+      ],
+      [
+        "test_timing.c",
+        "核对员：用固定例子和手算答案检查",
+        "另一个main；单独运行，不与demo同时争一个入口"
+      ],
+      [
+        "CMakeLists.txt",
+        "装配清单：把计算代码组成库，再接到演示和测试程序",
+        "构建时读取；不是main运行时调用的业务程序"
+      ]
+    ]
+  },
+  "run_fields": [
+    {
+      "id": "speed",
+      "label": "车速（m/s，10m/s=36km/h）",
+      "kind": "text",
+      "value": 10
+    },
+    {
+      "id": "skip",
+      "label": "漏哪次控制：-1不漏，3漏30ms",
+      "kind": "number",
+      "value": -1,
+      "group": "main"
+    },
+    {
+      "id": "late",
+      "label": "30ms那次迟到多少ms（0—9）",
+      "kind": "number",
+      "value": 0,
+      "group": "main"
+    },
+    {
+      "id": "now",
+      "label": "当前时刻now（ms）",
+      "kind": "number",
+      "value": 1000,
+      "group": "appendix"
+    },
+    {
+      "id": "stamp",
+      "label": "数据标记时刻stamp（ms）",
+      "kind": "number",
+      "value": 950,
+      "group": "appendix"
+    },
+    {
+      "id": "signalValid",
+      "label": "发送方有效标记",
+      "kind": "select",
+      "value": 1,
+      "options": [
+        [
+          "1",
+          "1有效"
+        ],
+        [
+          "0",
+          "0无效"
+        ]
+      ],
+      "group": "appendix"
+    },
+    {
+      "id": "signalSource",
+      "label": "数据来源",
+      "kind": "select",
+      "value": 1,
+      "options": [
+        [
+          "1",
+          "1雷达"
+        ],
+        [
+          "2",
+          "2车辆"
+        ],
+        [
+          "0",
+          "0未知"
+        ]
+      ],
+      "group": "appendix"
+    },
+    {
+      "id": "chapter",
+      "label": "当前实验部分",
+      "kind": "select",
+      "value": 0,
+      "options": [
+        [
+          "0",
+          "D09主课：周期与dt"
+        ],
+        [
+          "1",
+          "附录：补原D08信号时效"
+        ]
+      ]
+    }
+  ],
+  "reading": [
+    {
+      "title": "先算一个不含代码的例子",
+      "text": "正常时两次记账在20ms和30ms，间隔30-20=10ms=0.010s。速度10m/s，这段走10×0.010=0.10m。\n漏掉30ms那次后，下次40ms才到：间隔40-20=20ms=0.020s，走10×0.020=0.20m。错误算法仍加0.10m，少0.10m。\n0ms到60ms共0.060s，恒速10m/s走0.6m。正常有6段；漏30ms后只有5次加法，其中一段20ms，所以按实际间隔仍加到0.6m，而每次硬加0.1m只得到0.5m。\n我们把“这一次与上一次之间的时间差”简称dt，d可理解为差，t指时间。不是从电脑循环次数推算时间；这些时刻由纸面模型明确提供。"
+    },
+    {
+      "title": "1 · 文件为什么这样拆？先用人来比喻",
+      "text": "你自己写时，先说清要做什么：输入车速和漏/迟到设置，输出时间表和两种距离。然后分工作。\n需要与人打交道的是demo：它问输入、打印，不把计算规则写成一堆printf。需要重复使用的是timing：只给它参数和一份可写账本，它负责算。为了双方不把账本格式认错，把格式和函数声明放timing.h。\n核对员test使用同一个计算实现，但手算预期独立写：10m/s、60ms应0.6m。它不靠再调用同一算法生成所谓答案。CMake告诉构建工具谁与谁组成程序。\n文件不是五个自动并行跑的人：启动timeline_demo时，从demo的main开始；main调用计算函数时暂停在那一行，函数做完return后main接着走。test的main属于另外一个timeline_tests。比喻只是分工帮助理解，不代表这里创建了线程。"
+    },
+    {
+      "title": "2 · 用一张账本把相关结果放一起：struct、.、&和*",
+      "text": "以前一个float speed只装一个数字。现在要一起交回到场数组、dt数组、计数和两个距离，总不能把十几个互不相干的变量到处传。struct Timeline就是这种“账本格式”的名字，花括号里每一行说明账本的一种内容；它本身没有开始运行。\nstruct Timeline result={0};按格式创建main的一本具体账，开始成员为0。result.control_count用点号取这本账里的计数；result.control_ms[3]取到场数组的第3号格。下标从0开始。\n&result给出这本账放在哪里。形参struct Timeline *out表示函数收一个指向这种账本的地址。*out代表地址指向的整个对象，*out=draft把草稿各成员的值交到调用者账本；这是同类型结构体赋值，不是把地址数字相加，也不需要memset或memcmp整块struct。\n函数里新建draft先算完，再整体交回。输入非法提前return，不写* out，main也不展示旧数据。参数返回的int status只是告诉成功/失败，不负责装下整张表。"
+    },
+    {
+      "title": "3 · 主课只用三个输入，先逐个代值",
+      "text": "speed_mps=10.0f：每秒10米，mps是meters per second的命名提示；不是C关键字。skip_tick=-1：不漏，3表示跳过计划30ms的控制更新。late_ms=5：本来30ms那次改成35ms。\nmain用scanf读取三个数：%f对应float，%d对应int。&给变量地址；scanf返回实际读到的项数，!=3表示没有成功读到三项，main返回1。网页先做完整数值检查再把合规文本送给参考C程序。\nTimeline_Run(speed_mps,skip_tick,late_ms,&result)按位置传参数。你看到函数名被调用，可先去.h读它的约定，再到同名.c找带花括号的函数体，读完return再回main下一行。\nint可以表示负数，所以读入-1不是类型不匹配。这里-1在漏次设置里有“不漏”的业务含义；车速为负则被另一个检查拒绝。同一个数是否合法，取决于接口约定。"
+    },
+    {
+      "title": "4 · 循环里到底按什么先后做？",
+      "text": "for(int tick=0;tick<=6;++tick)：先令tick0；只要<=6就进入；做完一轮加1再检查。每轮scheduled_ms=tick×10，所以得到0到60ms，不是凭电脑跑得快慢计时。\n先看tick%2==0，把观察员在0/20/40/60ms的到场记下。%是整数除法的余数：3%2=1，4%2=0。观察员这一项不被控制漏次影响。\n再看tick==skip_tick；真时continue，跳过本轮剩余控制计算，进入下一轮。它不是return，也不会结束观察员或后续整场实验。\n例如tick3漏了：控制的last_control_ms还停在20；tick4到40时算40-20=20。必须先算差值，再把last_control_ms改为40；如果先把它改成40，差值会错误地变成0。\n迟到例子：30变35，下段40-35=5ms，上段35-20=15ms。观察员仍按原表到场。如果同时选择漏30ms和迟到5ms，30ms那次已经不执行，迟到设置不会再生效。这个模型没有调度竞争、线程或中断，先练清时间差。"
+    },
+    {
+      "title": "5 · 公式、单位和+=必须连着看",
+      "text": "每段位移=速度×时间。单位m/s×s=m。elapsed_ms=10时，dt_s=(float)10/1000.0f=0.010；20时为0.020。这里(float)是显式转float，分母1000.0f也是float。\n若写两个整数10/1000，C整数除法得到0，再存到float也是0，不能指望变量类型替你补回小数。0.010f就是10ms对应的秒数。\ndraft.measured_distance_m += speed_mps*dt_s等价于“旧距离+本段距离，再写回距离”。从0开始，漏30ms时依次加0.1、0.1、0.2、0.1、0.1，得到0.6m。对照算法不看时间差，每次只加0.1，共5次得到0.5m。\n第0次到场只记录初始时刻，没有上一段，所以dt_ms[0]=0，不能给它也加0.1m。control_count包含初始到场；真正累加的次数是control_count-1。\n速度在本例一直不变，所以合并成20ms一段可得到相同距离；真实车速变化时还涉及采样/数值积分误差，补一个dt也补不回漏周期期间未执行的安全决策。"
+    },
+    {
+      "title": "6 · 新符号和库函数，用本例看清",
+      "text": "isfinite来自math.h，判断是否普通有限数；10为真，NaN/无限为假，!isfinite就是“不是有限数”。||是或者，&&是并且，!是把真假反过来。skip!= -1 && (...)表示：不是“不漏”设置，并且不在1到5之内，才拒绝。\n{0}是本地草稿的初始化，不是运行中再次调用memset。数组按容量7/4建好，而实际填写了几项靠control_count/perception_count记；printf循环只读这些已填项。\nprintf里的%.6f表示保留6位小数展示。float传给printf这类可变参数函数时按C调用规则提升成double，所以这里用%f。%d输出int；?:选择最后一项换行还是逗号，只管显示。\nfabsf把float差值取绝对值；例如0.60000006-0.6的差很小，用0.0001的容差检查，而不是要求每个小数位完全相同。\n函数return -2是业务拒绝；demo接到拒绝后可以正常打印状态再return0。独立测试main一旦发现错误则返回非0，让CTest报告失败。这两个return的职责不同。"
+    },
+    {
+      "title": "7 · 怎样对照文件调试，而不是从头硬背",
+      "text": "先预测输入10 3 0的结果。到demo的调用行停一下，写下三个实参和&result。进入timing，过输入检查后看草稿全0。逐轮画tick/控制是否执行/last/now/dt。尤其停在tick3的continue和tick4的减法。\n回到main时检查status0，再读结果表。若control_ms没有30而dt40那行仍10，优先查是否把10写死、last是否提前更新，而不是先怀疑printf。\n最后看test_timing：它检查正常0.6、漏周期0.5对0.6、迟到15/5、观察员表不变、错误输入不改结果、空输出、非法漏次。if检查不依赖assert，所以Release里的NDEBUG不会把这些检查删除。\n可在本地复制工程故意把实际积分中的dt_s改成0.010f，再跑CTest；漏周期那项应失败。网页不执行你的个人代码副本，在线按钮只运行参考模拟；自己的修改仍需本地编译。"
+    },
+    {
+      "title": "8 · 与真实智驾/ROS 2的联系，先知道问题所在",
+      "text": "实际控制算法要约定时间来源、单位、暂停和回跳的处理。ROS 2区分不同时间抽象，仿真/回放也可能暂停或回跳；后续ROS课程会实际操作。本课所有时刻来自同一纸面时间轴，没有把不同机器、不同种类时钟直接相减。\n10ms控制和20ms感知是本例设定；实际任务周期、超时阈值和故障策略由项目设计决定。今天只验收原D09的任务表、漏周期和dt积分证据，暂不增加新的控制算法。",
+      "sources": [
+        {
+          "title": "ROS 2官方：时钟与时间设计（后续ROS课的背景）",
+          "url": "https://design.ros2.org/articles/clock_and_time.html"
+        }
+      ]
+    }
+  ],
+  "code_sections": [
+    {
+      "title": "1 · main先接待：三项输入放在哪里",
+      "file": "demo.c",
+      "start": "int main",
+      "end": "    struct Timeline result",
+      "pattern": "scanf(格式,&变量...)把输入写入地址；返回读到的项数。",
+      "text": "只读车速、漏次和迟到三项。先看单位和-1的含义，不用先读附录五项。",
+      "trace": "10 3 0 → speed10、skip3、late0。"
+    },
+    {
+      "title": "2 · main准备账本并请计算者工作",
+      "file": "demo.c",
+      "start": "    struct Timeline result",
+      "end": "    printf(\"control_ms",
+      "pattern": "struct Timeline result={0}建账；&result给地址；int status接状态。",
+      "text": "函数调用时main等待；return后先查status，不成功不使用账本。",
+      "trace": "成功status0；若speed=-1得到-2，后面表不打印。"
+    },
+    {
+      "title": "3 · 说明卡：数组和计数各管什么",
+      "file": "timing.h",
+      "start": "struct Timeline {",
+      "end": "/* speed_mps",
+      "pattern": "struct把关联结果放一起；[7]表示容量，不表示已经填了7项。",
+      "text": "control_count记实际到场项数；每一行control_ms与dt_ms下标对应。",
+      "trace": "漏30ms时control_count6，实际更新5次，观察员4次。"
+    },
+    {
+      "title": "4 · 计算者先检查，再建立草稿",
+      "file": "timing.c",
+      "start": "int Timeline_Run",
+      "end": "    /* [3",
+      "pattern": "先验证out地址、有限车速、漏次范围、迟到范围。",
+      "text": "任一失败就return，尚未对*out写入。!isfinite反转真假；&&与||按条件组合。",
+      "trace": "-1车速拒绝；skip=-1合法；skip0非法。"
+    },
+    {
+      "title": "5 · 先记观察员，再决定是否漏控制",
+      "file": "timing.c",
+      "start": "    for (int tick",
+      "end": "        int now_ms",
+      "pattern": "for逐轮走纸面时刻；%2==0挑每20ms；continue跳过控制更新。",
+      "text": "先记录观察员，再判断漏次，两者不会一起消失。",
+      "trace": "tick3漏控制，tick4仍先记观察员40ms。"
+    },
+    {
+      "title": "6 · 本次减上次，毫秒换秒后积分",
+      "file": "timing.c",
+      "start": "        int now_ms",
+      "end": "        /* 必须",
+      "pattern": "now-last得到ms；/1000.0f得到s；+=把本段位移加到账上。",
+      "text": "第0行只初始化。漏一次时last不动，下一次自然得到更大间隔。",
+      "trace": "last20/now40→20ms→0.020s→0.20m；固定法只加0.10m。"
+    },
+    {
+      "title": "7 · 什么时候更新last，怎样交回main",
+      "file": "timing.c",
+      "start": "        /* 必须",
+      "end": "\n}",
+      "pattern": "先算再更新last；*out=draft将草稿整体交回调用者对象。",
+      "text": "last只在实际执行过控制的轮次更新；结束后再写正式输出。",
+      "trace": "漏30ms后last20保持，40ms算完才更新40；最终0.6m。"
+    },
+    {
+      "title": "8 · 回main打印：每一行和计数对应",
+      "file": "demo.c",
+      "start": "    printf(\"control_ms",
+      "end": "\n}",
+      "pattern": ".访问成员，[]选一格；循环只走实际已填项。",
+      "text": "control_count包含初始行，update_count减1。?:只决定分隔符。",
+      "trace": "0,10,20,40,50,60对应0,10,10,20,10,10。"
+    },
+    {
+      "title": "9 · 独立测试与构建清单",
+      "file": "test_timing.c",
+      "start": "int main",
+      "end": "\n}",
+      "pattern": "先调用，再if比对手算预期；错误返回非0。",
+      "text": "主课默认构建一个测试程序，包含7项检查；附录默认不构建。",
+      "trace": "把dt_s错误替换为0.010f，应被漏周期预期识别。"
+    },
+    {
+      "title": "10 · CMake装配清单：主课先只接三部分",
+      "file": "CMakeLists.txt",
+      "start": "add_library",
+      "end": "# 新内容",
+      "pattern": "add_library把计算文件编成可复用部分；add_executable给有main的文件组装程序。",
+      "text": "target_link_libraries把计算部分接到demo和test；PRIVATE表示只为当前程序使用这个依赖。PUBLIC的数学库m和头文件路径会沿依赖给使用者。include(CTest)登记测试，BUILD_APPENDIX默认OFF，所以主课不必编译附录。STATIC在这里是库的种类，不是C函数static语法。",
+      "trace": "默认生成timing库、timeline_demo、timeline_tests；CTest只运行timeline_contract一个测试程序。"
+    }
+  ],
+  "experiments": [
+    {
+      "name": "M01 · 正常10ms与20ms",
+      "values": [
+        10,
+        -1,
+        0,
+        1000,
+        950,
+        1,
+        1,
+        0
+      ],
+      "hint": "控制0/10/20/30/40/50/60，观察员0/20/40/60；两种距离0.6m。",
+      "optional": false,
+      "steps": [
+        "点击“M01 · 正常10ms与20ms”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：控制0/10/20/30/40/50/60，观察员0/20/40/60；两种距离0.6m。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "M02 · 漏30ms控制",
+      "values": [
+        10,
+        3,
+        0,
+        1000,
+        950,
+        1,
+        1,
+        0
+      ],
+      "hint": "40ms那行dt20；固定0.5m，实际0.6m，差0.1m。",
+      "optional": false,
+      "steps": [
+        "点击“M02 · 漏30ms控制”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：40ms那行dt20；固定0.5m，实际0.6m，差0.1m。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "M03 · 30ms那次迟到5ms",
+      "values": [
+        10,
+        -1,
+        5,
+        1000,
+        950,
+        1,
+        1,
+        0
+      ],
+      "hint": "控制到场35ms再到40ms，两个dt是15和5；观察员不变。",
+      "optional": false,
+      "steps": [
+        "点击“M03 · 30ms那次迟到5ms”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：控制到场35ms再到40ms，两个dt是15和5；观察员不变。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "M04 · 漏50ms控制",
+      "values": [
+        10,
+        5,
+        0,
+        1000,
+        950,
+        1,
+        1,
+        0
+      ],
+      "hint": "最后60ms那行距40ms为20；固定0.5m，实际0.6m。",
+      "optional": false,
+      "steps": [
+        "点击“M04 · 漏50ms控制”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：最后60ms那行距40ms为20；固定0.5m，实际0.6m。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "M05 · 恒速换成20m/s",
+      "values": [
+        20,
+        3,
+        0,
+        1000,
+        950,
+        1,
+        1,
+        0
+      ],
+      "hint": "固定1.0m，实际1.2m；别把m/s误当km/h。",
+      "optional": false,
+      "steps": [
+        "点击“M05 · 恒速换成20m/s”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：固定1.0m，实际1.2m；别把m/s误当km/h。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "M06 · 负车速拒绝",
+      "values": [
+        -1,
+        -1,
+        0,
+        1000,
+        950,
+        1,
+        1,
+        0
+      ],
+      "hint": "status-2；没有有效时间表与累计距离。",
+      "optional": false,
+      "steps": [
+        "点击“M06 · 负车速拒绝”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：status-2；没有有效时间表与累计距离。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "M07 · 迁移12.5m/s漏一次",
+      "values": [
+        12.5,
+        3,
+        0,
+        1000,
+        950,
+        1,
+        1,
+        0
+      ],
+      "hint": "实际0.75m，固定0.625m，差0.125m。",
+      "optional": false,
+      "steps": [
+        "点击“M07 · 迁移12.5m/s漏一次”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：实际0.75m，固定0.625m，差0.125m。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "A01 · 年龄50ms",
+      "values": [
+        10,
+        -1,
+        0,
+        1000,
+        950,
+        1,
+        1,
+        1
+      ],
+      "hint": "age50，新鲜status0。",
+      "optional": true,
+      "steps": [
+        "点击“A01 · 年龄50ms”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：age50，新鲜status0。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "A02 · 年龄恰好100ms",
+      "values": [
+        10,
+        -1,
+        0,
+        1000,
+        900,
+        1,
+        1,
+        1
+      ],
+      "hint": "age100，仍新鲜status0。",
+      "optional": true,
+      "steps": [
+        "点击“A02 · 年龄恰好100ms”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：age100，仍新鲜status0。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "A03 · 年龄101ms",
+      "values": [
+        10,
+        -1,
+        0,
+        1000,
+        899,
+        1,
+        1,
+        1
+      ],
+      "hint": "age101，超时status-4。",
+      "optional": true,
+      "steps": [
+        "点击“A03 · 年龄101ms”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：age101，超时status-4。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "A04 · 未来时间戳",
+      "values": [
+        10,
+        -1,
+        0,
+        1000,
+        1001,
+        1,
+        1,
+        1
+      ],
+      "hint": "status-3；不能将负年龄当新鲜。",
+      "optional": true,
+      "steps": [
+        "点击“A04 · 未来时间戳”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：status-3；不能将负年龄当新鲜。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "A05 · 发送方无效",
+      "values": [
+        10,
+        -1,
+        0,
+        1000,
+        950,
+        0,
+        1,
+        1
+      ],
+      "hint": "status-2，即使时间新也拒绝。",
+      "optional": true,
+      "steps": [
+        "点击“A05 · 发送方无效”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：status-2，即使时间新也拒绝。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    },
+    {
+      "name": "A06 · 来源未知",
+      "values": [
+        10,
+        -1,
+        0,
+        1000,
+        950,
+        1,
+        0,
+        1
+      ],
+      "hint": "status-2，不仅看数值和时间。",
+      "optional": true,
+      "steps": [
+        "点击“A06 · 来源未知”填入参数；主课只显示车速/漏次/迟到，附录显示数据时刻等。",
+        "先在纸上预测；主课用本次-上次求dt，附录用当前-数据时刻求年龄。",
+        "点击“运行案例”。本地执行固定C工程，在线明确为浏览器模拟。",
+        "核对：status-2，不仅看数值和时间。",
+        "把你发现的一处因果关系选中后选择颜色并加批注；不选色不保存标注。"
+      ]
+    }
+  ],
+  "lab_steps": [
+    "先读最上方项目说明，口头说清它为何要比较两个累计距离。",
+    "完成M01—M07；保存/下载时刻表，指出40ms那一行怎样算。",
+    "原D09实作仍是主线；A01—A06放附录，不计主课通关，不默认当作已经补会。",
+    "自己的C修改照README在本地构建；个人注释不是实际执行来源。"
+  ],
+  "test_steps": [
+    "核对7项主课实验均已点击运行；只预览不计。",
+    "做第1—10题和P1—P4；依据12.5m/s漏30ms的时刻表计算。",
+    "提交后按编号修正；附录不替代主课答案，也不额外阻挡主课通关。",
+    "D10仍按原路线进入状态机与滞环，等待本次反馈后再制作。"
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "text": "这项目主要要演示什么？",
+      "options": [
+        "用两种dt累加位移，观察漏周期的影响",
+        "如何给8字节填A5",
+        "电脑一定能每10ms准时唤醒"
+      ]
+    },
+    {
+      "id": "q2",
+      "text": "漏30ms后40ms到场，上次20ms，dt是多少？",
+      "options": [
+        "10ms",
+        "20ms",
+        "40ms"
+      ]
+    },
+    {
+      "id": "q3",
+      "text": "20ms变成秒是多少？",
+      "options": [
+        "20s",
+        "0.2s",
+        "0.020s"
+      ]
+    },
+    {
+      "id": "q4",
+      "text": "为什么不能把执行次数直接当经过时间？",
+      "options": [
+        "可能漏周期或迟到，次数不包含真实间隔",
+        "因为for不能计数",
+        "只要没有崩溃就时间正确"
+      ]
+    },
+    {
+      "id": "q5",
+      "text": "10m/s、漏一次，固定法与实际法的最终距离？",
+      "options": [
+        "0.6与0.5m",
+        "0.5与0.6m",
+        "两者都是5m"
+      ]
+    },
+    {
+      "id": "q6",
+      "text": "控制漏30ms会让20ms观察员也漏吗？",
+      "options": [
+        "一定同时漏",
+        "观察员从此不执行",
+        "本模型不会，两份记录独立"
+      ]
+    },
+    {
+      "id": "q7",
+      "text": "last_control_ms应该什么时候更新？",
+      "options": [
+        "先用旧last算dt，再更新",
+        "先更新成本次时刻再相减",
+        "每轮包括跳过轮次都必须更新"
+      ]
+    },
+    {
+      "id": "q8",
+      "text": "0ms初始化那行要积分吗？",
+      "options": [
+        "要直接加0.1m",
+        "不要，它只建立起点，没有上一段",
+        "要按1秒加"
+      ]
+    },
+    {
+      "id": "q9",
+      "text": "struct Timeline和result是什么关系？",
+      "options": [
+        "两个独立运行的程序",
+        "同一地址的别名关键字",
+        "前者是账本格式，后者是按格式创建的对象"
+      ]
+    },
+    {
+      "id": "q10",
+      "text": "按实际dt补一段积分能说明什么？",
+      "options": [
+        "恒速模型可复现累计距离；不等于补回漏掉的安全决策",
+        "真实车速任意变化也保证精确",
+        "任何时钟都可随便相减"
+      ]
+    }
+  ],
+  "practice": {
+    "text": "车速12.5m/s，漏30ms那次控制；0—60ms同一时轴。计算40ms那行dt、实际法总距离、固定法总距离和观察员到场数。",
+    "values": [
+      12.5,
+      3,
+      0,
+      1000,
+      950,
+      1,
+      1,
+      0
+    ],
+    "fields": [
+      {
+        "id": "gap_ms",
+        "label": "P1 · 40ms那行dt（ms）",
+        "kind": "number"
+      },
+      {
+        "id": "measured",
+        "label": "P2 · 实际法距离（m）",
+        "kind": "number"
+      },
+      {
+        "id": "fixed",
+        "label": "P3 · 固定法距离（m）",
+        "kind": "number"
+      },
+      {
+        "id": "observer_count",
+        "label": "P4 · 观察员到场数（含0ms）",
+        "kind": "number"
+      }
+    ],
+    "steps": [
+      "40-20得到毫秒差；再除1000换秒。",
+      "恒速12.5m/s×0.060s；固定法只有5次，每次0.010s。",
+      "观察员时刻0/20/40/60；0ms也算一次到场。"
+    ]
+  },
+  "pass_rule": "本浏览器内判定题目、指定实验和模拟回归。此结果只表示在线练习通过；真实C与正式通关请在本地完成。",
+  "appendices": [
+    {
+      "title": "附录A · 补回原计划D08：信号时间戳、有效性与来源",
+      "paragraphs": [
+        "这部分原应在D08学。已发布的D08其实是内存补习；此前通关不能证明你已完成信号时效。这里把缺失内容明确补回，可单独安排45—60分钟，主课3小时仍只做原D09。附录默认折叠；运行记录会保留，未运行时始终显示待补。",
+        "把VehicleSignal想成带标签的一张便条：value_mps是写的车速，stamp_ms是写便条的时刻，valid是发送方是否认为可用，source说它来自谁。收到便条不代表它还是新消息。now1000、stamp950，年龄=1000-950=50ms；stamp900得到100ms仍允许；stamp899得到101ms超时。100ms是本例约定，不是所有传感器统一值。",
+        "stamp1001比now1000还晚，本例拒绝未来时间戳，status-3。真实系统还要按时钟同步与容差约定处理；这里两个时间都来自同一模型。valid0或来源0同样拒绝，不能因为数值看起来合理就使用。",
+        "struct的.通过具体对象取成员，例如s.valid；指针的->通过地址取成员，例如signal->valid，等价于(*signal).valid。const说明检查函数不通过这个指针改输入。long是至少32位的有符号整数；数字后L使字面量按long类型，例如1000000L。%ld对应long；不是%1d，也不是读取两位数字。",
+        "执行顺序：demo_signal建便条并读5项 → &s交给Signal_Check → 查地址、valid/source、数值/时间范围 → 未来先拒绝 → 合法时间才相减 → >100拒绝 → 返回demo显示。未来/字段非法时不展示一个假造的age。",
+        "自检：年龄恰好100是允许还是拒绝？未来时间能算成负年龄并通过吗？收到成功是否必然新鲜？先独立回答，再运行A02/A04/A03查证。运行齐全表示留下了实作证据，不等同于独立掌握。"
+      ],
+      "files": [
+        "signal.h",
+        "signal.c",
+        "demo_signal.c",
+        "test_signal.c"
+      ],
+      "experiment_names": [
+        "A01 · 年龄50ms",
+        "A02 · 年龄恰好100ms",
+        "A03 · 年龄101ms",
+        "A04 · 未来时间戳",
+        "A05 · 发送方无效",
+        "A06 · 来源未知"
+      ]
+    },
+    {
+      "title": "附录B · 原路线对账与额外基础",
+      "paragraphs": [
+        "原D09“10ms控制、20ms感知、漏周期、固定/实际dt积分、保存周期表”全部在本课M01—M07。原D08“VehicleSignal的stamp/valid/source、年龄50/100/101、未来拒绝”在附录A；未见对应运行证据前保持待补。D10—D84主题保持原路线，后续新增知识也放当天附录，不再改掉原主题。",
+        "主课7项和附录6项各有自己的清单；附录实验不算D09通关要求，也不拿D09通过冒充原D08已掌握。下一次反馈可以说明附录是否做了，制作下一课时再核对。",
+        "复习memset/void*：前者从给定起点写连续字节；后者是通用对象地址类型。它们不是理解“项目为什么存在”的替代品。本课先从现实问题和三项输入出发，需要时再读旧D08附录解释。",
+        "整条路线仍需真实本地调试证据：初期计划的gcc/gdb版本、断点、变量等，不能由在线通过替代。这里只记录提供了哪些材料，不把尚未提供的生产/HIL/实车证据标成已完成。"
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "name": "CMakeLists.txt",
+      "group": "main",
+      "language": "cmake",
+      "text": "# 构建工作清单：主课默认只有timing库、timeline_demo和timeline_tests。\ncmake_minimum_required(VERSION 3.16)\nproject(asw_timeline LANGUAGES C)\nset(CMAKE_C_STANDARD 17)\nset(CMAKE_C_STANDARD_REQUIRED ON)\nadd_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Werror)\nadd_library(timing STATIC timing.c)\ntarget_link_libraries(timing PUBLIC m)\ntarget_include_directories(timing PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\nadd_executable(timeline_demo demo.c)\ntarget_link_libraries(timeline_demo PRIVATE timing)\ninclude(CTest)\nif(BUILD_TESTING)\n    add_executable(timeline_tests test_timing.c)\n    target_link_libraries(timeline_tests PRIVATE timing)\n    add_test(NAME timeline_contract COMMAND timeline_tests)\nendif()\n# 新内容放附录：默认OFF，不影响主课。需要补原D08时再显式ON。\noption(BUILD_APPENDIX \"Build original D08 signal appendix\" OFF)\nif(BUILD_APPENDIX)\n    add_library(signal_check STATIC signal.c)\n    target_include_directories(signal_check PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\n    target_link_libraries(signal_check PUBLIC m)\n    add_executable(signal_demo demo_signal.c)\n    target_link_libraries(signal_demo PRIVATE signal_check)\n    if(BUILD_TESTING)\n        add_executable(signal_tests test_signal.c)\n        target_link_libraries(signal_tests PRIVATE signal_check)\n        add_test(NAME signal_contract COMMAND signal_tests)\n    endif()\nendif()\n"
+    },
+    {
+      "name": "demo.c",
+      "group": "main",
+      "language": "c",
+      "text": "/* demo.c是接待员：读三项输入、请计算者做事、把账本展示给人。 */\n#include \"timing.h\"\n#include <stdio.h>\n\nint main(void) {\n    float speed_mps; /* 车速是m/s，不是之前CAN课的km/h；10m/s=36km/h。 */\n    int skip_tick, late_ms;\n    /* %f读float，%d读int；&给出变量存放位置，scanf才能写进去。 */\n    if (scanf(\"%f %d %d\", &speed_mps, &skip_tick, &late_ms) != 3) return 1;\n    struct Timeline result = {0}; /* main的结果账本，目前全0。 */\n    int status = Timeline_Run(speed_mps, skip_tick, late_ms, &result);\n    printf(\"status=%d\\nvalid=%d\\n\", status, status == 0);\n    if (status != 0) return 0; /* 参数被拒绝，不能把旧账本当成新结果展示。 */\n    printf(\"control_ms=\");\n    for (int i=0; i<result.control_count; ++i) printf(\"%d%s\",result.control_ms[i],i+1==result.control_count?\"\\n\":\",\");\n    printf(\"dt_ms=\");\n    for (int i=0; i<result.control_count; ++i) printf(\"%d%s\",result.dt_ms[i],i+1==result.control_count?\"\\n\":\",\");\n    printf(\"perception_ms=\");\n    for (int i=0; i<result.perception_count; ++i) printf(\"%d%s\",result.perception_ms[i],i+1==result.perception_count?\"\\n\":\",\");\n    /* ?:是选择字符串：最后一项换行，其余逗号；与计算dt无关。 */\n    printf(\"control_count=%d\\nupdate_count=%d\\nperception_count=%d\\n\",result.control_count,result.control_count-1,result.perception_count);\n    printf(\"fixed_distance_m=%.6f\\nmeasured_distance_m=%.6f\\n\",result.fixed_distance_m,result.measured_distance_m);\n    return 0;\n}\n"
+    },
+    {
+      "name": "demo_signal.c",
+      "group": "appendix",
+      "language": "c",
+      "text": "/* 附录的独立入口；主课demo只读三项，不必先理解这里五项。 */\n#include \"signal.h\"\n#include <stdio.h>\nint main(void) {\n    struct VehicleSignal s = {0};\n    long now_ms;\n    if (scanf(\"%f %ld %ld %d %d\",&s.value_mps,&now_ms,&s.stamp_ms,&s.valid,&s.source)!=5) return 1;\n    int status=Signal_Check(&s,now_ms);\n    printf(\"status=%d\\nvalid=%d\\n\",status,status==0);\n    if (status==0 || status==-4) printf(\"age_ms=%ld\\n\",now_ms-s.stamp_ms);\n    return 0;\n}\n"
+    },
+    {
+      "name": "README.md",
+      "group": "main",
+      "language": "text",
+      "text": "# D09 主课：同一张时间表上的两份工作\n目的：用纸面时间轴复现10ms控制、20ms感知，以及漏周期时固定dt与实际dt积分的差异。\n主课5文件：timing.h说明卡；timing.c计算；demo.c接待/展示；test_timing.c独立核对；CMakeLists.txt构建清单。\n\nUbuntu/WSL进入本目录，逐条执行：\ncmake -S . -B build-main -DCMAKE_BUILD_TYPE=Release\ncmake --build build-main\nctest --test-dir build-main --output-on-failure\n./build-main/timeline_demo\n先输入10 -1 0并回车：正常，两种距离均0.6m。\n再次启动，输入10 3 0：漏30ms控制，控制到场0,10,20,40,50,60；dt为0,10,10,20,10,10，固定0.5m、实际0.6m。\n输入10 -1 5：30ms那次推迟到35ms；相邻dt为15ms/5ms，两种最终距离都0.6m，但中途不一样。\n这是纸面时间模型，不是OS实时调度或实车控制。输入车速0—50m/s；漏次为-1或1—5；迟到0—9ms。\n无系统CMake可用learning_app/tools/linux-cmake/cmake/data/bin/cmake与ctest的完整WSL路径。\n\n## 附录：补回原计划D08（单独安排，不替换D09）\n信号年龄、stamp、valid、source原应在D08学习；已发布D08实际是内存补习，不能据此认定原主题已会。\ncmake -S . -B build-appendix -DCMAKE_BUILD_TYPE=Release -DBUILD_APPENDIX=ON\ncmake --build build-appendix\nctest --test-dir build-appendix --output-on-failure\n./build-appendix/signal_demo\n输入10 1000 950 1 1，代表车速、当前时刻、数据时刻、有效标记、来源。\n依次把数据时刻改为900/899/1001，观察年龄100允许、101超时、未来拒绝。\n来源1雷达、2车辆、0未知。该规则是演示契约，实际协议要按项目定义。\n主课默认不编译这些附录文件。网页附录实验不计入D09必做清单；它们仍保存运行记录，供后续核对补齐情况。\n"
+    },
+    {
+      "name": "signal.c",
+      "group": "appendix",
+      "language": "c",
+      "text": "/* 附录：数据年龄=当前时刻-数据标记时刻，不是主课两次运行之间的dt。 */\n#include \"signal.h\"\n#include <stddef.h>\n#include <math.h>\nint Signal_Check(const struct VehicleSignal *signal, long now_ms) {\n    if (signal == NULL) return -1;\n    /* ->用于通过指针查看对象成员，等价于(*signal).valid这类写法。 */\n    if (signal->valid != 1 || (signal->source != 1 && signal->source != 2)) return -2;\n    if (!isfinite(signal->value_mps) || signal->value_mps<0 || signal->value_mps>50) return -2;\n    /* 本演示先限制范围，再相减，避免一般超大long相减溢出。 */\n    if (now_ms<0 || now_ms>1000000L || signal->stamp_ms<0 || signal->stamp_ms>1000000L) return -2;\n    if (signal->stamp_ms > now_ms) return -3;\n    long age_ms = now_ms - signal->stamp_ms;\n    if (age_ms > 100L) return -4; /* 恰好100ms允许；101ms拒绝。 */\n    return 0;\n}\n"
+    },
+    {
+      "name": "signal.h",
+      "group": "appendix",
+      "language": "c",
+      "text": "/* 附录：补回原计划D08，不属于D09主课的必做实作。 */\n#ifndef ASW_SIGNAL_H\n#define ASW_SIGNAL_H\nstruct VehicleSignal {\n    float value_mps; /* 数值，例如10m/s。 */\n    long stamp_ms;   /* 这份数据被标记的时刻；long是有符号整数，至少32位。 */\n    int valid;       /* 1表示发送方认为有效；0表示无效。 */\n    int source;      /* 本例1=雷达、2=车辆；0=未知，拒绝。 */\n};\n/* 0新鲜；-1空地址；-2字段非法；-3未来时间戳；-4年龄超过100ms。 */\nint Signal_Check(const struct VehicleSignal *signal, long now_ms);\n#endif\n"
+    },
+    {
+      "name": "test_signal.c",
+      "group": "appendix",
+      "language": "c",
+      "text": "/* 附录自己的测试入口，主课不开启附录时不构建。 */\n#include \"signal.h\"\n#include <stddef.h>\nint main(void) {\n    struct VehicleSignal s = {10.0f,950L,1,1};\n    if (Signal_Check(&s,1000L)!=0) return 1;\n    s.stamp_ms=900L; if (Signal_Check(&s,1000L)!=0) return 2;\n    s.stamp_ms=899L; if (Signal_Check(&s,1000L)!=-4) return 3;\n    s.stamp_ms=1001L; if (Signal_Check(&s,1000L)!=-3) return 4;\n    s.stamp_ms=950L;s.valid=0; if (Signal_Check(&s,1000L)!=-2) return 5;\n    s.valid=1;s.source=0; if (Signal_Check(&s,1000L)!=-2) return 6;\n    if (Signal_Check(NULL,1000L)!=-1) return 7;\n    return 0;\n}\n"
+    },
+    {
+      "name": "test_timing.c",
+      "group": "main",
+      "language": "c",
+      "text": "/* 独立测试员：不用键盘，给固定输入，按自己算的预期检查。 */\n#include \"timing.h\"\n#include <math.h> /* fabsf把float差值取绝对值，允许小量浮点舍入误差。 */\n#include <stdio.h>\n#include <stddef.h>\n\nint main(void) {\n    struct Timeline r = {0};\n    int status = Timeline_Run(10.0f,-1,0,&r);\n    if (status != 0 || r.control_count != 7 || r.perception_count != 4 || fabsf(r.measured_distance_m-0.6f)>0.0001f) return 1;\n    status = Timeline_Run(10.0f,3,0,&r);\n    if (status != 0 || r.control_ms[3] != 40 || r.dt_ms[3] != 20 || fabsf(r.fixed_distance_m-0.5f)>0.0001f || fabsf(r.measured_distance_m-0.6f)>0.0001f) return 2;\n    status = Timeline_Run(10.0f,-1,5,&r);\n    if (status != 0 || r.control_ms[3] != 35 || r.dt_ms[3] != 15 || r.dt_ms[4] != 5) return 3;\n    status = Timeline_Run(10.0f,3,0,&r);\n    if (status != 0 || r.perception_ms[0] != 0 || r.perception_ms[1] != 20 || r.perception_ms[2] != 40 || r.perception_ms[3] != 60) return 4;\n    /* 失败不能破坏之前的账本；比较具体成员，不比较含可能填充字节的整个struct。 */\n    status = Timeline_Run(-1.0f,-1,0,&r);\n    if (status != -2 || r.control_count != 6 || r.control_ms[3] != 40) return 5;\n    status = Timeline_Run(10.0f,-1,0,NULL);\n    if (status != -1) return 6;\n    status = Timeline_Run(10.0f,0,0,&r);\n    if (status != -2) return 7;\n    printf(\"checks_passed=7\\n\");\n    return 0;\n}\n"
+    },
+    {
+      "name": "timing.c",
+      "group": "main",
+      "language": "c",
+      "text": "/* timing.c是做计算的人；没有main，不决定从键盘还是网页拿输入。 */\n#include \"timing.h\"\n#include <stddef.h> /* NULL：没有可写对象的地址。 */\n#include <math.h>   /* isfinite：普通有限数为真，NaN/正负无限为假。 */\n\nint Timeline_Run(float speed_mps, int skip_tick, int late_ms, struct Timeline *out) {\n    /* [1 检查再开始] ||表示或者；!表示把真/假反过来。 */\n    if (out == NULL) return -1;\n    if (!isfinite(speed_mps) || speed_mps < 0 || speed_mps > 50) return -2;\n    if (skip_tick != -1 && (skip_tick < 1 || skip_tick > 5)) return -2;\n    if (late_ms < 0 || late_ms > 9) return -2;\n\n    /* [2 自己先写草稿] {0}使成员从0开始；只有全部做完才交回out。 */\n    struct Timeline draft = {0};\n    int last_control_ms = 0;\n    /* [3 纸面时刻表] tick取0/1/2/3/4/5/6，计划时刻=0/10/.../60ms。 */\n    for (int tick = 0; tick <= 6; ++tick) {\n        int scheduled_ms = tick * 10;\n        /* 观察员每20ms一次。%是求余：偶数tick除2余0。\n         * 先记录观察员，所以漏掉控制更新不会让观察员也消失。 */\n        if (tick % 2 == 0) {\n            draft.perception_ms[draft.perception_count] = scheduled_ms;\n            ++draft.perception_count;\n        }\n        /* continue是跳过这一轮剩余内容，进入下一轮；不是结束整个函数。 */\n        if (tick == skip_tick) continue;\n        int now_ms = scheduled_ms;\n        if (tick == 3) now_ms = now_ms + late_ms;\n        /* [4 到场就记一行] .访问本地draft里的成员。 */\n        int index = draft.control_count;\n        draft.control_ms[index] = now_ms;\n        if (index > 0) { /* 第一次0ms只定起点；没有上一段可累加。 */\n            int elapsed_ms = now_ms - last_control_ms;\n            draft.dt_ms[index] = elapsed_ms;\n            /* 毫秒变秒要除1000.0f，不能整数相除把10/1000截成0。 */\n            float dt_s = (float)elapsed_ms / 1000.0f;\n            /* +=表示“旧值加右边，再存回”。m/s乘s得到m。 */\n            draft.fixed_distance_m += speed_mps * 0.010f;\n            draft.measured_distance_m += speed_mps * dt_s;\n        }\n        /* 必须在算完差值后，才把本次时刻作为下一次的“上次”。 */\n        last_control_ms = now_ms;\n        ++draft.control_count;\n    }\n    /* [5 正式交回] *out代表调用者提供的整个对象；同类结构体可整体赋值。 */\n    *out = draft;\n    return 0;\n}\n"
+    },
+    {
+      "name": "timing.h",
+      "group": "main",
+      "language": "c",
+      "text": "/* timing.h像工作说明卡：约定输入和记账本的格式；这里不做计算。 */\n#ifndef ASW_TIMING_H\n#define ASW_TIMING_H\n\n/* struct把相关数据装进同一本账，不是多个同时运行的程序。\n * control_ms记控制任务到场时间；dt_ms记距上次到场隔了多久，单位ms。\n * 第0项是0ms初始化，不做位移累加；最多7次到场，数组容量就是7。\n * perception_ms记另一位“观察员”在0/20/40/60ms到场。 */\nstruct Timeline {\n    int control_ms[7];\n    int dt_ms[7];\n    int perception_ms[4];\n    int control_count;\n    int perception_count;\n    float fixed_distance_m;    /* 每次都假装只过10ms的对照算法。 */\n    float measured_distance_m; /* 根据两次到场时间差累加。 */\n};\n\n/* speed_mps单位m/s，允许0—50；skip_tick=-1表示不漏，1—5表示漏第几次。\n * late_ms=0—9，只把原定30ms那次控制更新推迟这么多毫秒。\n * return0成功；-1空输出地址；-2参数非法。失败不改调用者的账本。 */\nint Timeline_Run(float speed_mps, int skip_tick, int late_ms, struct Timeline *out);\n#endif\n"
+    }
+  ],
+  "code": "/* 兼容整合副本，实际运行和网页阅读均用独立文件。 */\n/* timing.h像工作说明卡：约定输入和记账本的格式；这里不做计算。 */\n#ifndef ASW_TIMING_H\n#define ASW_TIMING_H\n\n/* struct把相关数据装进同一本账，不是多个同时运行的程序。\n * control_ms记控制任务到场时间；dt_ms记距上次到场隔了多久，单位ms。\n * 第0项是0ms初始化，不做位移累加；最多7次到场，数组容量就是7。\n * perception_ms记另一位“观察员”在0/20/40/60ms到场。 */\nstruct Timeline {\n    int control_ms[7];\n    int dt_ms[7];\n    int perception_ms[4];\n    int control_count;\n    int perception_count;\n    float fixed_distance_m;    /* 每次都假装只过10ms的对照算法。 */\n    float measured_distance_m; /* 根据两次到场时间差累加。 */\n};\n\n/* speed_mps单位m/s，允许0—50；skip_tick=-1表示不漏，1—5表示漏第几次。\n * late_ms=0—9，只把原定30ms那次控制更新推迟这么多毫秒。\n * return0成功；-1空输出地址；-2参数非法。失败不改调用者的账本。 */\nint Timeline_Run(float speed_mps, int skip_tick, int late_ms, struct Timeline *out);\n#endif\n\n/* demo.c是接待员：读三项输入、请计算者做事、把账本展示给人。 */\n#include <stdio.h>\n\nint main(void) {\n    float speed_mps; /* 车速是m/s，不是之前CAN课的km/h；10m/s=36km/h。 */\n    int skip_tick, late_ms;\n    /* %f读float，%d读int；&给出变量存放位置，scanf才能写进去。 */\n    if (scanf(\"%f %d %d\", &speed_mps, &skip_tick, &late_ms) != 3) return 1;\n    struct Timeline result = {0}; /* main的结果账本，目前全0。 */\n    int status = Timeline_Run(speed_mps, skip_tick, late_ms, &result);\n    printf(\"status=%d\\nvalid=%d\\n\", status, status == 0);\n    if (status != 0) return 0; /* 参数被拒绝，不能把旧账本当成新结果展示。 */\n    printf(\"control_ms=\");\n    for (int i=0; i<result.control_count; ++i) printf(\"%d%s\",result.control_ms[i],i+1==result.control_count?\"\\n\":\",\");\n    printf(\"dt_ms=\");\n    for (int i=0; i<result.control_count; ++i) printf(\"%d%s\",result.dt_ms[i],i+1==result.control_count?\"\\n\":\",\");\n    printf(\"perception_ms=\");\n    for (int i=0; i<result.perception_count; ++i) printf(\"%d%s\",result.perception_ms[i],i+1==result.perception_count?\"\\n\":\",\");\n    /* ?:是选择字符串：最后一项换行，其余逗号；与计算dt无关。 */\n    printf(\"control_count=%d\\nupdate_count=%d\\nperception_count=%d\\n\",result.control_count,result.control_count-1,result.perception_count);\n    printf(\"fixed_distance_m=%.6f\\nmeasured_distance_m=%.6f\\n\",result.fixed_distance_m,result.measured_distance_m);\n    return 0;\n}\n\n/* timing.c是做计算的人；没有main，不决定从键盘还是网页拿输入。 */\n#include <stddef.h> /* NULL：没有可写对象的地址。 */\n#include <math.h>   /* isfinite：普通有限数为真，NaN/正负无限为假。 */\n\nint Timeline_Run(float speed_mps, int skip_tick, int late_ms, struct Timeline *out) {\n    /* [1 检查再开始] ||表示或者；!表示把真/假反过来。 */\n    if (out == NULL) return -1;\n    if (!isfinite(speed_mps) || speed_mps < 0 || speed_mps > 50) return -2;\n    if (skip_tick != -1 && (skip_tick < 1 || skip_tick > 5)) return -2;\n    if (late_ms < 0 || late_ms > 9) return -2;\n\n    /* [2 自己先写草稿] {0}使成员从0开始；只有全部做完才交回out。 */\n    struct Timeline draft = {0};\n    int last_control_ms = 0;\n    /* [3 纸面时刻表] tick取0/1/2/3/4/5/6，计划时刻=0/10/.../60ms。 */\n    for (int tick = 0; tick <= 6; ++tick) {\n        int scheduled_ms = tick * 10;\n        /* 观察员每20ms一次。%是求余：偶数tick除2余0。\n         * 先记录观察员，所以漏掉控制更新不会让观察员也消失。 */\n        if (tick % 2 == 0) {\n            draft.perception_ms[draft.perception_count] = scheduled_ms;\n            ++draft.perception_count;\n        }\n        /* continue是跳过这一轮剩余内容，进入下一轮；不是结束整个函数。 */\n        if (tick == skip_tick) continue;\n        int now_ms = scheduled_ms;\n        if (tick == 3) now_ms = now_ms + late_ms;\n        /* [4 到场就记一行] .访问本地draft里的成员。 */\n        int index = draft.control_count;\n        draft.control_ms[index] = now_ms;\n        if (index > 0) { /* 第一次0ms只定起点；没有上一段可累加。 */\n            int elapsed_ms = now_ms - last_control_ms;\n            draft.dt_ms[index] = elapsed_ms;\n            /* 毫秒变秒要除1000.0f，不能整数相除把10/1000截成0。 */\n            float dt_s = (float)elapsed_ms / 1000.0f;\n            /* +=表示“旧值加右边，再存回”。m/s乘s得到m。 */\n            draft.fixed_distance_m += speed_mps * 0.010f;\n            draft.measured_distance_m += speed_mps * dt_s;\n        }\n        /* 必须在算完差值后，才把本次时刻作为下一次的“上次”。 */\n        last_control_ms = now_ms;\n        ++draft.control_count;\n    }\n    /* [5 正式交回] *out代表调用者提供的整个对象；同类结构体可整体赋值。 */\n    *out = draft;\n    return 0;\n}\n"
+}
