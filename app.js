@@ -272,7 +272,7 @@ $('runButton').onclick=async()=>{
         result.scenario===2?'雷达无效时切换READY并清除告警，恢复有效后才重新ACTIVE。':
         '依次OFF→READY→ACTIVE→ACTIVE→OFF；context在main的for外创建，因此每次Acc_Step都能读取上一帧状态。';
       summaryText='场景'+result.scenario+'，states='+result.states.join(',')+'，alerts='+result.alerts.join(',')+'；本次只是JS模拟';
-    if(lesson.runner==='timing_day09'){
+    }else if(lesson.runner==='timing_day09'){
       grid.append(item(result.chapter?'附录状态':'主课状态',result.status,result.valid?'good':'bad'));if(result.chapter){if(result.age_ms!==undefined)grid.append(item('数据年龄（ms）',result.age_ms));explanation=result.status===0?'按本例约定数据新鲜。':result.status===-4?'超过100ms，拒绝过期数据。':result.status===-3?'时间戳来自未来，先拒绝，不展示假造年龄。':'有效标记、来源或数值/时间范围非法。';}else if(result.valid){grid.append(item('控制到场数（含0ms）',result.control_count),item('实际更新次数',result.update_count),item('固定dt累计（m）',result.fixed_distance_m),item('实际dt累计（m）',result.measured_distance_m));explanation='先看下方周期表：每次用本次-上次算dt，0ms只初始化。本例速度恒定，漏一次的20ms一段能补上距离，不代表补回安全决策。';}else explanation='输入被拒绝，不展示旧时间表。';renderTimingTable(values,result);summaryText='部分'+result.chapter+'，status='+result.status;
     }else if(lesson.runner==='memory_day08'){
       grid.append(item('填写status',result.status,result.valid?'good':'bad'),item('转换后的字节（十进制）',result.fill_byte),item('实际不同格数',result.changed_count),item('选区外保持',result.outside_unchanged),item('测试目标',result.test_built?'已构建并运行':'未构建/未运行'),item('CTest登记数',result.test_count),item('独立检查数',result.checks_passed));renderBytePreview(values,result);
