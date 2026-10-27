@@ -192,7 +192,7 @@ function renderDay11Guide(){
   let compass=$('day11Compass');
   if(!compass){compass=document.createElement('section');compass.id='day11Compass';compass.className='day11-compass';}
   compass.replaceChildren();compass.hidden=!is11;
-  if(!is11){$('code').after($('walkthrough'));$('reading').hidden=false;return;}
+  if(!is11){$('code').after($('walkthrough'));const details=$('day11ReadingDetails');if(details){details.before($('reading'));details.remove();}$('reading').hidden=false;return;}
   $('projectIntro').after(compass);$('architecture').after($('walkthrough'));
   const h=document.createElement('h3');h.textContent='找不到变量？点击即可定位真正的定义';
   const p=document.createElement('p');p.textContent='先看“这个名字在哪里定义、是什么类型、在本轮怎样变化”，再读计算过程。下列按钮只切换课程原版源码，不更改你的个人注释和批注。';
@@ -213,6 +213,54 @@ function renderDay11Guide(){
   more.hidden=false;more.open=false;$('reading').hidden=false;
   $('code').classList.remove('expanded');$('expandCode').textContent='展开全部源码';
   $('expandCode').setAttribute('aria-expanded','false');
+}
+
+function renderDay11Trace(result){
+  const section=document.createElement('section');section.id='day11QueueTrace';
+  const h=document.createElement('h4');h.textContent='按真实执行顺序观察队列：每次只看一步';
+  const intro=document.createElement('p');intro.textContent='颜色表示逻辑上仍有效的数据槽。灰色格里的旧值可能仍在内存中，但Pop后已不属于有效队列。';
+  section.append(h,intro);
+  const bar=document.createElement('div');bar.className='d11-trace-controls';
+  const back=document.createElement('button');back.textContent='← 上一步';
+  const position=document.createElement('span');position.className='muted';
+  const forward=document.createElement('button');forward.textContent='下一步 →';
+  const toSource=document.createElement('button');toSource.textContent='查看当前函数的原始C代码';toSource.className='small';
+  bar.append(back,position,forward,toSource);section.append(bar);
+  const state=document.createElement('div');state.className='d11-trace-state';section.append(state);
+  const slots=document.createElement('div');slots.className='d11-slots';section.append(slots);
+  const explanation=document.createElement('p');explanation.className='d11-trace-explanation';section.append(explanation);
+  const detail=document.createElement('details'),summary=document.createElement('summary');
+  summary.textContent='查看所有动作的head/tail/count对照表';
+  const rows=result.rows.map(r=>[r.step,r.operation,r.status,
+    [r.before.head,r.before.tail,r.before.count].join(' / '),
+    [r.after.head,r.after.tail,r.after.count].join(' / '),
+    r.used_slot===null?'—':r.used_slot,r.received?.speed_cycle??'—']);
+  detail.append(summary,makeTable(['step','操作','status','操作前H/T/C','操作后H/T/C','使用槽','Pop周期'],rows));
+  section.append(detail);
+  let index=0;
+  const draw=()=>{
+    const r=result.rows[index];
+    position.textContent='第'+(index+1)+'/'+result.rows.length+'步：'+r.operation;
+    back.disabled=index===0;forward.disabled=index===result.rows.length-1;
+    state.replaceChildren(item('操作',r.operation==='push'?'Push入队':'Pop出队'),
+      item('status',r.status,r.status===0?'good':'bad'),
+      item('执行前 H/T/C',[r.before.head,r.before.tail,r.before.count].join(' / ')),
+      item('执行后 H/T/C',[r.after.head,r.after.tail,r.after.count].join(' / ')));
+    slots.replaceChildren();
+    for(const cell of r.slots){
+      const el=document.createElement('div');el.className='d11-slot'+(cell.occupied?' occupied':' stale');
+      const cap=document.createElement('small');cap.textContent='slots['+cell.index+']';
+      const val=document.createElement('strong');val.textContent=cell.cycle===null?'空（未写过）':'周期'+cell.cycle;
+      const hint=document.createElement('small');hint.textContent=cell.occupied?'有效未读':'不在当前队列';
+      el.append(cap,val,hint);slots.append(el);
+    }
+    explanation.textContent=r.reason+(r.received?'；成功Pop的完整帧：车速'+r.received.speed_kmh+
+      'km/h，距离'+r.received.distance_m+'m，周期'+r.received.speed_cycle:'')+
+      '。演示的step='+r.step+'不是队列head或tail。';
+  };
+  back.onclick=()=>{index--;draw();};forward.onclick=()=>{index++;draw();};
+  toSource.onclick=()=>{tab('learn');showStep(result.rows[index].operation==='push'?5:7);$('walkthrough').scrollIntoView({block:'start'});};
+  draw();$('output').append(section);
 }
 function renderBitLab(){
   const target=$('bitLab');target.replaceChildren();target.hidden=day!==4;if(day!==4)return;
@@ -306,7 +354,18 @@ $('runButton').onclick=async()=>{
   try{const values=lesson.run_fields.map(f=>$(f.id).value.trim());const result=await api('/api/run',{day,values});
     $('output').replaceChildren();const grid=document.createElement('div');grid.className='output-grid';
     let explanation,summaryText;
-    if(lesson.runner==='acc_state_day10'){
+    if(lesson.runner==='sensor_queue_day11'){
+      grid.append(item('容量（格）',result.capacity),item('动作数量',result.actions_count),
+        item('最终head',result.head),item('最终tail',result.tail),item('剩余count',result.count),
+        item('成功Pop周期',result.received_cycles.join(',')||'无'));
+      explanation=result.scenario===0?'入、入、出：先存周期100和101，再取周期100；剩余1帧。':
+        result.scenario===1?'tail从3前进一步会回0；满时count=4，Push不能覆盖未读旧数据。':
+        result.scenario===2?'速度周期8、距离周期7被拒绝；完整周期7和8仍可正常进出队。':
+        result.scenario===3?'空队列Pop返回-3，不修改索引和数量，之后仍可正常入队。':
+        '负速度返回-2，不改变队列；下一份合法帧正常处理。';
+      summaryText='D11场景'+result.scenario+'：head/tail/count='+[result.head,result.tail,result.count].join('/')+
+        '，statuses='+result.statuses.join(',')+'；浏览器JS模拟';
+    }else if(lesson.runner==='acc_state_day10'){
       const stateNames=['OFF','READY','ACTIVE','FAULT'],rows=result.frames;
       grid.append(item('教学场景',result.scenario),item('本次输入帧数',result.frame_count),
         item('最后一帧state',stateNames[rows.at(-1).state]),item('最后一帧status',result.status,result.valid?'good':'bad'),
@@ -361,6 +420,7 @@ $('runButton').onclick=async()=>{
       summaryText=`${mode}，status=${result.status}，valid=${result.valid}${result.valid?`，期望=${result.desired}m，误差=${result.error}m`:''}`;
     }
     $('output').append(grid);const p=document.createElement('p');p.textContent=explanation;$('output').append(p);
+    if(lesson.runner==='sensor_queue_day11')renderDay11Trace(result);
     if(lesson.runner==='acc_state_day10'){
       const help=document.createElement('p');help.textContent='状态值对照：0 OFF关闭、1 READY等待雷达、2 ACTIVE正常监视、3 FAULT故障锁存。逐帧数据来自浏览器模拟，非真实C执行。';
       $('output').append(help,makeTable(
