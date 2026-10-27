@@ -5670,6 +5670,10 @@
         {
           "title": "8 · 本地C实作与在线模拟的界限",
           "text": "在线场景按钮只运行浏览器JavaScript实现的同样规则，不会在网页上真实运行C/CMake/CTest。若要验证C，下载完整项目ZIP，在WSL进入包含demo.c/acc_state.c的目录，按README用gcc构建并运行，再单独编译test_acc_state.c；可保存自己的终端输出作为实作记录。\n不要将单次模拟结论外推到真实ACC控制、制动安全性、真实传感器超时或硬实时调度。本节只验证C接口、状态保持与教学滞环规则。"
+        },
+        {
+          "title": "D10复盘 · 已反馈理解：为什么数据会跨帧保留、为什么38m有两种提示",
+          "text": "这份补充来自D10的学习问答和纠错（详见docs/day10/LEARNING_REVIEW_AND_CORRECTIONS.md），属于公开教学摘要，不上传个人笔记原件。\n1. context在demo.c的for外创建，目的是同一个对象跨多次Acc_Step调用持续存在；不是“固定成员值”，成员每一帧都可能被更新。\n2. main里的AccContext context是结构体对象，Acc_Step形参AccContext *context是指针参数；它们不是一个变量，即使在同一.c文件内也不是。&context取对象地址，函数用->读写。\n3. AccContext next=*context复制整份旧上下文到函数局部新对象；*context=next在校验成功后将更新后的结构体整体写回main。\n4. 滞环不是直接比较上一帧距离。AccContext保存的是上一帧spacing_alert，本帧距离来自input->distance_m；ACTIVE且旧提示0时distance<=35才开启，旧提示1时distance>=41才关闭。38m时两种历史都可能成立。非ACTIVE才强制清0。\n5. FAULT已锁存时，故障信号本轮必须清除，并同时fault_reset=1、driver_enable=0才回OFF；不是直接回ACTIVE。\n6. acc_state.h提供类型和函数声明，acc_state.c给出实现；gcc可以直接同时编译两份.c并链接，CMake静态库是另外一种组织构建的方式，不是调用函数必需的中间步骤。\n这段内容是在学员反馈理解后做的教学总结，不能把它标成新的独立测验或本地真实C通关。"
         }
       ],
       "code_sections": [
