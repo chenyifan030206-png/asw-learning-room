@@ -5991,6 +5991,775 @@
         }
       ],
       "code": "#include \"acc_state.h\"\n#include <stdio.h>\n#include <stddef.h>\n\n/* 五组固定输入；每个大括号是一次Acc_Step调用所用的一帧。 */\nstatic const AccInput NORMAL[] = {\n    {.distance_m = 50.0f},\n    {.driver_enable = 1, .distance_m = 50.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 50.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.radar_valid = 1, .distance_m = 34.0f}\n};\nstatic const AccInput JITTER[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 36.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 36.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 40.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 39.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 35.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 37.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 42.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 38.0f}\n};\nstatic const AccInput RADAR_DROP[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f}\n};\nstatic const AccInput FAULT_RESET[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .fault_present = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f},\n    {.radar_valid = 1, .fault_reset = 1, .distance_m = 34.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f}\n};\nstatic const AccInput INVALID[] = {\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = -1.0f},\n    {.driver_enable = 1, .radar_valid = 1, .distance_m = 34.0f}\n};\n\nint main(void)\n{\n    int scenario = 0;\n    if (scanf(\"%d\", &scenario) != 1) {\n        printf(\"input_error=1\\n\");\n        return 1;\n    }\n\n    /* 根据场景选一个输入数组；count是该数组的实际元素个数。 */\n    const AccInput *frames = NULL;\n    size_t count = 0U;\n    switch (scenario) {\n        case 0: frames = NORMAL; count = sizeof(NORMAL) / sizeof(NORMAL[0]); break;\n        case 1: frames = JITTER; count = sizeof(JITTER) / sizeof(JITTER[0]); break;\n        case 2: frames = RADAR_DROP; count = sizeof(RADAR_DROP) / sizeof(RADAR_DROP[0]); break;\n        case 3: frames = FAULT_RESET; count = sizeof(FAULT_RESET) / sizeof(FAULT_RESET[0]); break;\n        case 4: frames = INVALID; count = sizeof(INVALID) / sizeof(INVALID[0]); break;\n        default: printf(\"input_error=2\\n\"); return 1;\n    }\n\n    /* 这两个对象只在main创建一次，for循环内重复使用。 */\n    AccContext context = {.state = ACC_OFF, .spacing_alert = 0};\n    AccCalibration calibration = {.alert_enter_m = 35.0f, .alert_exit_m = 41.0f};\n\n    printf(\"scenario=%d count=%zu\\n\", scenario, count);\n    printf(\"legend: OFF=0 READY=1 ACTIVE=2 FAULT=3\\n\");\n    for (size_t i = 0U; i < count; ++i) {\n        AccOutput output = {0};\n        int status = Acc_Step(&context, &frames[i], &calibration, &output);\n        printf(\"frame=%zu status=%d valid=%d state=%d alert=%d distance=%.1f\\n\",\n               i, status, output.valid, (int)output.state,\n               output.spacing_alert, (double)frames[i].distance_m);\n    }\n\n    return 0;\n}\n"
+    },
+    "11": {
+      "day": 11,
+      "revision": "2026-10-27-buffer-snapshot-v1",
+      "title": "环形缓冲与一致快照：为什么不能混用新车速和旧距离？",
+      "source": "demo.c",
+      "runner": "sensor_queue_day11",
+      "project_name": "day11_sensor_queue",
+      "time": "建议先分两段学习：第一段只学场景0和状态表；第二段才学回绕、混帧、空满和volatile。CMake为选学。",
+      "summary": "从D10的context/next指针写回延伸到FrameQueue和整帧数据快照。先用三步Push/Push/Pop建立运行模型，再逐格学习4容量环形队列与速度新距离旧的检测。网页JS模拟，不代替本地C。",
+      "goals": [
+        "第一屏便能说出项目问题、输入动作、输出和不可混帧的原因；能定位每个结构体、函数与参数的定义位置。",
+        "能分清main的queue与函数形参FrameQueue *queue，理解queue->slots[tail]=*frame与*out=draft均是整结构体值复制。",
+        "通过实际逐步表预测head/tail/count的变化，分清演示动作序号i和队列槽下标。",
+        "理解count从0到4、%4的回绕、满时拒绝、空时拒绝及失败状态不改变队列。",
+        "能解释速度周期8/距离周期7为什么被拒绝；知道这种课程级校验不证明真实并发同步。",
+        "能够说清volatile的职责与限制，独立用GCC执行main和test两种程序；浏览器在线成绩与本地C分开。"
+      ],
+      "flow_text": "main选BASIC等动作数组→在for外创建FrameQueue queue→每轮创建received→按动作调用Queue_Push(&queue,&action->frame)或Queue_Pop(&queue,&received)→函数先校验→复制整帧→更新head/tail/count→返回status→main打印本轮状态→下一轮继续使用同一个queue",
+      "remediation_title": "开课补桥：你为什么不用找queue.head的单独定义？",
+      "project_intro": {
+        "title": "今天只解决一个问题：新车速与旧距离能算同一帧吗？",
+        "paragraphs": [
+          "设周期7：速度72km/h、前车距离45m；周期8：速度更新为73km/h，但距离仍是周期7的45m。浮点数本身都合法，却不是同一周期的一组数据。我们要拒绝这样的混合输入，并将完整合法的一帧按顺序存入4格队列。",
+          "第一次只观察Push周期100→Push周期101→Pop这一组3步；先搞清queue从哪创建、两个函数怎样接收&queue、head/tail/count怎么改变。理解后才切换到回绕、满队列、混合帧、空队列。",
+          "这里是**单线程预设动作模拟**，既不读取真实CAN，也不测量线程并发安全。uint32_t周期标识的比较是教学中的数据校验契约，不代表读取硬件寄存器或共享内存就自动安全。"
+        ]
+      },
+      "architecture": {
+        "headers": [
+          "名字",
+          "源代码中的首次定义",
+          "类型/数据作用",
+          "谁调用/何时修改"
+        ],
+        "rows": [
+          [
+            "SensorFrame.speed_kmh / distance_m / speed_cycle / distance_cycle",
+            "sensor_queue.h 的typedef struct成员",
+            "一帧4个字段；周期号用于检查两个物理量来自同一轮",
+            "main数组构造、Queue_Push读取、队列槽保存"
+          ],
+          [
+            "FrameQueue.slots[4] / head / tail / count",
+            "sensor_queue.h 的FrameQueue typedef struct",
+            "四格环形队列；head下一读、tail下一写、count已占用数量",
+            "demo.c创建queue；Push/Pop改变成员"
+          ],
+          [
+            "QUEUE_CAPACITY",
+            "sensor_queue.h #define QUEUE_CAPACITY 4u",
+            "宏常量4，与count不同",
+            "Push满检查，%4回绕"
+          ],
+          [
+            "BASIC / WRAP_FULL / MIXED / EMPTY / BAD_VALUE",
+            "demo.c的main以前",
+            "const DemoAction数组（预设动作），不是函数",
+            "main根据scenario选择其一"
+          ],
+          [
+            "DemoAction 与 ActionKind",
+            "demo.c 的typedef struct / enum",
+            "动作种类PUSH/POP及附带帧",
+            "main按kind选择调用函数"
+          ],
+          [
+            "main()",
+            "demo.c int main(void)",
+            "程序入口，无函数形参",
+            "scanf读取scenario，逐动作调用"
+          ],
+          [
+            "actions / action_count",
+            "demo.c main",
+            "指向选中数组的指针与该数组动作数",
+            "switch赋值、for使用"
+          ],
+          [
+            "queue（对象）",
+            "demo.c main 中FrameQueue queue={0}",
+            "跨动作保留slots/head/tail/count的真实结构体对象",
+            "for外一次创建；&queue交给Push/Pop"
+          ],
+          [
+            "action / received（对象）",
+            "demo.c main 的for里面",
+            "本轮动作指针与本轮Pop输出结构体对象",
+            "每轮重新创建；只有成功Pop可用received"
+          ],
+          [
+            "Queue_Push(queue,frame)",
+            "sensor_queue.h声明；sensor_queue.c定义",
+            "两个指针形参；frame只读；返回0/-1/-2/-3",
+            "main遇PUSH调用；整体复制frame到slots[tail]"
+          ],
+          [
+            "Queue_Pop(queue,out)",
+            "sensor_queue.h声明；sensor_queue.c定义",
+            "两个指针形参；out可写；返回0/-1/-3",
+            "main遇POP调用；*out=draft写回received"
+          ],
+          [
+            "draft",
+            "sensor_queue.c 的Queue_Pop内",
+            "SensorFrame局部结构体副本",
+            "读取slots[head]，在*out=draft时给调用者"
+          ]
+        ]
+      },
+      "symbols": [
+        {
+          "name": "SensorFrame",
+          "file": "sensor_queue.h",
+          "match": "typedef struct {",
+          "what": "一份完整传感帧的类型；包含速度、距离、两个周期号",
+          "lifetime": "创建为数组元素、队列槽和received"
+        },
+        {
+          "name": "FrameQueue",
+          "file": "sensor_queue.h",
+          "match": "SensorFrame slots[QUEUE_CAPACITY];",
+          "what": "队列的类型，内部含slots、head、tail、count",
+          "lifetime": "main中只创建一次，Push/Pop跨轮修改"
+        },
+        {
+          "name": "QUEUE_CAPACITY",
+          "file": "sensor_queue.h",
+          "match": "#define QUEUE_CAPACITY 4u",
+          "what": "4个格的宏常量，不是当前有效帧数量",
+          "lifetime": "编译前展开"
+        },
+        {
+          "name": "DemoAction",
+          "file": "demo.c",
+          "match": "typedef struct {",
+          "what": "一条输入动作（Push/Pop+可选帧）",
+          "lifetime": "BASIC等数组的元素类型"
+        },
+        {
+          "name": "main",
+          "file": "demo.c",
+          "match": "int main(void)",
+          "what": "程序运行入口",
+          "lifetime": "选择场景和执行逐条动作"
+        },
+        {
+          "name": "actions",
+          "file": "demo.c",
+          "match": "const DemoAction *actions = NULL;",
+          "what": "保存当前实验数组首元素地址的指针",
+          "lifetime": "main局部变量"
+        },
+        {
+          "name": "action",
+          "file": "demo.c",
+          "match": "const DemoAction *action = &actions[i];",
+          "what": "指向第i条动作的指针",
+          "lifetime": "for内每轮新建"
+        },
+        {
+          "name": "queue",
+          "file": "demo.c",
+          "match": "FrameQueue queue = {0};",
+          "what": "真正的队列结构体对象，存储head/tail/count/slots",
+          "lifetime": "for外只创建一次"
+        },
+        {
+          "name": "received",
+          "file": "demo.c",
+          "match": "SensorFrame received = {0};",
+          "what": "本轮Pop的输出对象",
+          "lifetime": "for内每轮初始化"
+        },
+        {
+          "name": "Queue_Push",
+          "file": "sensor_queue.c",
+          "match": "int Queue_Push(",
+          "what": "队列入队函数的定义；声明在sensor_queue.h",
+          "lifetime": "main从动作分支调用"
+        },
+        {
+          "name": "Queue_Pop",
+          "file": "sensor_queue.c",
+          "match": "int Queue_Pop(",
+          "what": "队列出队函数的定义；声明在sensor_queue.h",
+          "lifetime": "main从动作分支调用"
+        },
+        {
+          "name": "frame",
+          "file": "sensor_queue.c",
+          "match": "FrameQueue *queue, const SensorFrame *frame)",
+          "what": "Push中指向调用者输入帧的只读指针参数",
+          "lifetime": "本次函数调用"
+        },
+        {
+          "name": "out",
+          "file": "sensor_queue.c",
+          "match": "FrameQueue *queue, SensorFrame *out)",
+          "what": "Pop中指向main的received的输出指针",
+          "lifetime": "本次函数调用"
+        },
+        {
+          "name": "draft",
+          "file": "sensor_queue.c",
+          "match": "SensorFrame draft = queue->slots[queue->head];",
+          "what": "Pop局部结构体副本，用* out=draft写回",
+          "lifetime": "本次函数调用结束后不再存在"
+        }
+      ],
+      "run_fields": [
+        {
+          "id": "scenario",
+          "label": "场景：先学0，两入一出",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "0 · 第一遍：Push、Push、Pop"
+            ],
+            [
+              "1",
+              "1 · 回绕与队列满"
+            ],
+            [
+              "2",
+              "2 · 速度新、距离旧混合帧"
+            ],
+            [
+              "3",
+              "3 · 队列空时拒绝"
+            ],
+            [
+              "4",
+              "4 · 负车速非法"
+            ]
+          ]
+        }
+      ],
+      "reading": [
+        {
+          "title": "00 · 为什么会出现速度新、距离旧？",
+          "text": "先不要看代码。设周期7测得车速72km/h、距离45m；周期8车速更新为73km/h，但距离仍是周期7的45m。若把这两个值拼成“周期8的同一帧”，计算出的数据看似合法，实际上新旧不同步。Day11教学约定：每个值携带其采样周期号；当speed_cycle与distance_cycle不相等时拒绝入队。这样保护的是这一套预设的单线程输入数据结构，并不证明真正多线程的读写安全。",
+          "table": {
+            "headers": [
+              "步骤",
+              "速度 / 速度周期",
+              "距离 / 距离周期",
+              "本例是否接收"
+            ],
+            "rows": [
+              [
+                "上次完整帧",
+                "72 / 7",
+                "45 / 7",
+                "接收"
+              ],
+              [
+                "混合帧",
+                "73 / 8",
+                "45 / 7",
+                "拒绝，不写队列"
+              ],
+              [
+                "新完整帧",
+                "73 / 8",
+                "44 / 8",
+                "接收"
+              ]
+            ]
+          }
+        },
+        {
+          "title": "01 · 单位、存储与环形数组画法",
+          "text": "FrameQueue在sensor_queue.h定义四格SensorFrame slots[4]，是四个结构体对象连续存储的数组。head是下一次读哪格，tail是下一次写哪格，count是当前有效数量。初始化FrameQueue queue={0}后三个数全为0。每成功Push写slots[tail]，tail=(tail+1)%4，count++；每成功Pop读slots[head]，head=(head+1)%4，count--。注意：空时head和tail都可能相同；满时也可能相同，所以只看head==tail无法区分，必须读count。",
+          "table": {
+            "headers": [
+              "名称",
+              "初始值",
+              "属于谁",
+              "用途"
+            ],
+            "rows": [
+              [
+                "slots[0..3]",
+                "全部零初始化",
+                "main的queue成员",
+                "四份完整SensorFrame"
+              ],
+              [
+                "head",
+                "0",
+                "queue.head",
+                "下一次读取的位置"
+              ],
+              [
+                "tail",
+                "0",
+                "queue.tail",
+                "下一次写入的位置"
+              ],
+              [
+                "count",
+                "0",
+                "queue.count",
+                "当前已占用格数（0～4）"
+              ],
+              [
+                "QUEUE_CAPACITY",
+                "4",
+                "sensor_queue.h宏",
+                "四格总容量，不是变量"
+              ]
+            ]
+          }
+        },
+        {
+          "title": "02 · 为什么三个文件都要看、但只执行main？",
+          "text": "demo.c拥有唯一演示入口main，它先读取场景号，选定BASIC/WRAP_FULL/MIXED/EMPTY/BAD_VALUE数组。sensor_queue.h包含SensorFrame和FrameQueue两种结构体类型的定义及Queue_Push/Queue_Pop函数原型；它不执行队列算法。sensor_queue.c定义这两个函数，只有main执行调用时才进入。test_sensor_queue.c有另一个独立可执行程序的main，不会与demo.c的main一起运行。先用gcc demo.c sensor_queue.c -o sensor_demo -lm编译链接；CMake选学，放在本课末尾。"
+        },
+        {
+          "title": "03 · 每一个对象来自哪、哪一个会保存到下一轮",
+          "text": "demo.c的main里FrameQueue queue={0}在for循环外声明，只创建一次。const DemoAction *actions保存当前场景数组首元素的地址，action_count记录选中的数组长度。循环中的const DemoAction *action=&actions[i]指向本轮的一条动作；SensorFrame received={0}每次循环重新创建，只有Pop成功后才有可用新数据。Push/Pop函数形参分别为FrameQueue *queue、const SensorFrame *frame或SensorFrame *out；参数名与main中的对象名是否相同不重要，**类型和地址传递才重要**。"
+        },
+        {
+          "title": "04 · Push为什么用结构体整体赋值？",
+          "text": "在Queue_Push中先检查queue/frame指针非NULL，再对speed_kmh/distance_m做有限性与范围检查，然后要求frame->speed_cycle等于frame->distance_cycle。满(count==4)则返回-3。只有全部检查通过，才执行queue->slots[queue->tail]=*frame；这把整份SensorFrame结构体的值复制到当前槽，而不是存一个指向调用者栈变量的悬空指针。之后tail=(tail+1)%4，count加1。遇到拒绝条件，不改变三个索引和槽内容。"
+        },
+        {
+          "title": "05 · Pop为什么先复制draft再写*out？",
+          "text": "Queue_Pop先检查queue/out，再检查count==0。合法时在函数内创建SensorFrame draft=queue->slots[queue->head]，这是真实结构体值的副本。接着*out=draft把值写给demo.c本轮的received对象；之后才移动head、减少count。函数返回整数status；main只有在status==0时才读取received，否则received不是有效的新出队结果。这与你D09的* out=draft、D10的*context=next是同一套指针写回语法。"
+        },
+        {
+          "title": "06 · 真实运行顺序：场景0只做三个动作",
+          "text": "输入scenario=0：main选择BASIC、action_count=3，创建queue全0。第0轮i=0，action->kind==ACTION_PUSH，传入第0帧(72,45,周期100/100)；函数写slots[0]，返回成功，head0/tail1/count1。第1轮Push(73,44,周期101/101)写slots[1]，head0/tail2/count2。第2轮Pop读slots[0]；函数用*out=draft写入main的received，head1/tail2/count1；打印72、45、100。不要误认为i就是head或tail：i是演示动作的下标，head/tail是队列槽下标。"
+        },
+        {
+          "title": "07 · 场景1为什么回绕后还能保持先入先出？",
+          "text": "输入scenario=1：先Push周期1到槽0，再Push周期2到槽1；Pop一次取走周期1，使head=1。然后Push周期3到槽2、周期4到槽3，这时tail从3前进到0；再Push周期5到槽0，tail=1、count=4。这时head和tail都是1但队列是满的，而不是空。继续Push周期6返回-3，不能覆盖原来未读的周期2。之后连续Pop依次得到周期2、3、4、5；整个队列重新为空。必须用逐步执行表显示每一步的head/tail/count和槽变化。",
+          "table": {
+            "headers": [
+              "动作",
+              "返回status",
+              "head",
+              "tail",
+              "count",
+              "备注"
+            ],
+            "rows": [
+              [
+                "开始",
+                "—",
+                "0",
+                "0",
+                "0",
+                "空"
+              ],
+              [
+                "Push #1",
+                "0",
+                "0",
+                "1",
+                "1",
+                "写槽0"
+              ],
+              [
+                "Push #2",
+                "0",
+                "0",
+                "2",
+                "2",
+                "写槽1"
+              ],
+              [
+                "Pop #1",
+                "0",
+                "1",
+                "2",
+                "1",
+                "取走1"
+              ],
+              [
+                "Push #3",
+                "0",
+                "1",
+                "3",
+                "2",
+                "写槽2"
+              ],
+              [
+                "Push #4",
+                "0",
+                "1",
+                "0",
+                "3",
+                "回绕到0"
+              ],
+              [
+                "Push #5",
+                "0",
+                "1",
+                "1",
+                "4",
+                "满：head==tail"
+              ],
+              [
+                "Push #6",
+                "-3",
+                "1",
+                "1",
+                "4",
+                "拒绝；旧帧不变"
+              ],
+              [
+                "Pop #2～#5",
+                "均0",
+                "1",
+                "1",
+                "0",
+                "依次读2、3、4、5"
+              ]
+            ]
+          }
+        },
+        {
+          "title": "08 · 场景2：为什么混合帧不应该入队？",
+          "text": "场景2先Push周期7/7的完整帧，成功；再尝试Push速度周期8、距离周期7的混合帧，Queue_Push校验两个标识不等，返回-2，queue.count保持1。随后Pop得到先前的完整周期7帧；再Push周期8/8的新完整帧并Pop，得到73km/h、44m。注意本例的cycle只是人为附带的整数，能发现这种故意设置的不一致。若真实并发系统在读取标识和数据时发生竞争，光比较两个整数依然不能保证安全。"
+        },
+        {
+          "title": "09 · 什么时候数组是完整快照？",
+          "text": "本课中的一帧是SensorFrame结构体，包含速度、距离与各自采样周期。Push以结构体整体赋值把合法的一帧**复制**到队列槽；之后外部的frame变量修改，不会修改队列已经保存的值。Pop又整体复制一份给received。这是单线程且输入对象没有并发被修改的前提下的值快照；真实共享内存多任务读取仍需要同步设计。队列拒绝混合帧是数据一致性策略，不是硬件总线上的时间同步实现。"
+        },
+        {
+          "title": "10 · volatile究竟解决什么，又不能解决什么？",
+          "text": "volatile在C语言里主要要求编译器保留针对volatile对象的可观察访问，不等于读写一组结构体成员时不可被中断，也不等于多线程原子操作/互斥锁/跨核内存顺序保证。把SensorFrame两个字段简单声明为volatile，仍可能读到“速度已更新，距离尚未更新”的混合快照。真正的并发生产者与消费者需要根据操作系统/MCU/平台采用原子类型、临界区、互斥锁或经过严格设计的无锁协议，并验证内存序、ISR安全性和数据所有权。本页不实际创建线程，因此不声称证明并发安全。"
+        },
+        {
+          "title": "11 · 多文件构建与真实C证据",
+          "text": "第一遍请在WSL目录里用gcc -std=c17 -Wall -Wextra -Wpedantic -Werror demo.c sensor_queue.c -o sensor_demo -lm；另外把test_sensor_queue.c与sensor_queue.c编成sensor_tests。CMakeLists里的add_library(sensor_queue STATIC sensor_queue.c)先建业务库；add_executable(sensor_demo demo.c)建主程序目标；target_link_libraries(sensor_demo PRIVATE sensor_queue)链接实现；test文件的另一个main进入sensor_tests目标。完整CMake命令在README。浏览器Run是JS模拟，真实gcc/ctest证据必须在本地获得。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "S01 · main入口与scanf",
+          "file": "demo.c",
+          "start": "int main(void)",
+          "end": "    /* 这两个量描述本次选中的数组",
+          "pattern": "int main(void)是程序入口；scanf(\"%d\",&scenario)通过变量地址接收一个整数，返回成功读入的数量。",
+          "text": "只读一个场景号0～4。BASIC/WRAP_FULL/MIXED/EMPTY/BAD_VALUE在本文件main前定义，都是完整DemoAction数组；本课不会从键盘读每一帧的float。",
+          "trace": "用户输入0→scenario=0；如果读到非数字→printf(input_error=1)然后main return1。"
+        },
+        {
+          "title": "S02 · main选择动作数组",
+          "file": "demo.c",
+          "start": "    const DemoAction *actions = NULL;",
+          "end": "    /* 只有一个队列，放在for外",
+          "pattern": "const DemoAction *actions是保存数组首元素地址的指针；size_t action_count记录本组动作元素数；switch里的break仅结束选择分支。",
+          "text": "scenario=0时actions=BASIC，数组名在这里转换为首元素指针；sizeof(BASIC)/sizeof(BASIC[0])为3。这里没有再创建一个新的三元素数组。",
+          "trace": "actions指向BASIC[0]；action_count=3（与队列容量4不是同一个数）。"
+        },
+        {
+          "title": "S03 · main创建queue并循环",
+          "file": "demo.c",
+          "start": "    /* 只有一个队列，放在for外",
+          "end": "    return 0;\n}",
+          "pattern": "FrameQueue queue={0}是真实的队列结构体对象，for外只创建一次；&actions[i]是本轮动作地址；SensorFrame received={0}是本轮输出对象。",
+          "text": "i是动作序号，不是队列槽下标！队列会不断更新head、tail、count；每一轮Push或Pop都接收&queue以修改同一个对象。Pop失败不能打印received里的新帧。",
+          "trace": "输入0：第一轮i0是Push帧100，第二轮i1是Push帧101，第三轮i2是Pop帧100；队列最终head1/tail2/count1。"
+        },
+        {
+          "title": "S04 · h文件定义两个结构体与函数原型",
+          "file": "sensor_queue.h",
+          "start": "#define QUEUE_CAPACITY 4u",
+          "end": "#endif",
+          "pattern": "#define定义宏常量4；typedef struct定义类型；float表示值，uint32_t表示固定宽度32位无符号整数；size_t表示数组元素数量。",
+          "text": "SensorFrame有speed_kmh、distance_m和两个cycle标识。FrameQueue有slots[4]、head、tail、count。成员名在头文件的类型中声明，因此main只要写FrameQueue queue={0}就拥有全部成员。",
+          "trace": "queue.head、queue.tail、queue.count初始为0；queue.slots[0]是一个SensorFrame结构体成员对象，Queue_Push参数queue却是指针。"
+        },
+        {
+          "title": "S05 · 进入Queue_Push并执行守门检查",
+          "file": "sensor_queue.c",
+          "start": "int Queue_Push(",
+          "end": "    /* 整体复制一帧",
+          "pattern": "if(queue==NULL||frame==NULL)检查指针；isfinite验证浮点；->经结构体指针访问成员；!=检验两个周期标识是否不同。",
+          "text": "顺序：先空指针，后数值范围，再速度/距离周期号必须相等，最后检查count是否为4；任何失败都return错误码，并且没有写slots、tail、count。",
+          "trace": "scenario2第二次Push：speed_cycle=8，distance_cycle=7→返回-2；原队列count仍1。"
+        },
+        {
+          "title": "S06 · Push拷贝数据与tail回绕",
+          "file": "sensor_queue.c",
+          "start": "    /* 整体复制一帧",
+          "end": "int Queue_Pop(",
+          "pattern": "queue->slots[queue->tail]=*frame把**整份结构体值**复制进数组；(tail+1)%4让下标按0→1→2→3→0循环；++count增加已占用格数。",
+          "text": "这行不是让queue.slots保存frame指针，也不是用memcpy不确定字节数；C允许相同结构体类型直接做整体赋值。count没有超过4，因为提前检查了满队列。",
+          "trace": "场景0第0次Push: head0/tail0/count0→写slots[0]为周期100→head0/tail1/count1；第1次写slots[1]。"
+        },
+        {
+          "title": "S07 · 进入Queue_Pop，空队列怎么办",
+          "file": "sensor_queue.c",
+          "start": "int Queue_Pop(",
+          "end": "    /* 先取完整帧",
+          "pattern": "FrameQueue *queue和SensorFrame *out是指针参数；out是调用者提供的结果地址；count==0就没有可读的有效槽。",
+          "text": "空指针返回-1，空队列返回-3；这时不会修改head/tail/count，也不会提供新的received值。读取输出必须以status==0为先决条件。",
+          "trace": "场景3第一次就是空Pop，返回-3；queue仍head0/tail0/count0。"
+        },
+        {
+          "title": "S08 · Pop用draft与*out写回",
+          "file": "sensor_queue.c",
+          "start": "    /* 先取完整帧",
+          "end": "    return 0;\n}",
+          "pattern": "SensorFrame draft=queue->slots[head]创建局部结构体副本；*out=draft把完整值复制回main里的received；--count减少队列元素。",
+          "text": "这就是D09的* out=draft和D10的*context=next的再应用。先复制并写回完整帧，之后head=(head+1)%4移动；队列只持有还没Pop的有效槽。",
+          "trace": "场景0第2轮：原head0/tail2/count2；读取slots[0]周期100→received得到72/45/100→head1/tail2/count1。"
+        },
+        {
+          "title": "S09 · CMake只是构建步骤",
+          "file": "CMakeLists.txt",
+          "start": "cmake_minimum_required(VERSION 3.16)",
+          "end": "endif()",
+          "pattern": "cmake命令名(参数...)，例如add_library(目标名 STATIC 源文件)；与C函数调用语法不同。",
+          "text": "add_library把sensor_queue.c编成静态库，add_executable分别创建demo与测试两个独立程序，target_link_libraries让它们共享实现。没有CMake也可以用gcc两份.c直接编译。",
+          "trace": "CMake运行于构建时；程序运行时从demo.c的main开始，不执行CMakeLists.txt。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "M01 · 两入一出",
+          "values": [
+            0
+          ],
+          "hint": "预测：Push周期100、Push周期101、Pop后拿到哪帧？head/tail/count是多少？",
+          "steps": [
+            "先看main只创建一次queue，初始head0/tail0/count0。",
+            "逐步预测Push→Push→Pop三个动作后数量和位置。",
+            "运行浏览器模拟，核对最后Pop输出72/45周期100。"
+          ],
+          "optional": false
+        },
+        {
+          "name": "M02 · 四格回绕与满",
+          "values": [
+            1
+          ],
+          "hint": "预测：tail从3怎么返回0？count满4后Push #6为什么被拒绝？",
+          "steps": [
+            "先从示例表预测每次head/tail/count。",
+            "运行场景1并选择满时的那一行。",
+            "解释head==tail时count=4为什么是满、不是空。"
+          ],
+          "optional": false
+        },
+        {
+          "name": "M03 · 速度新距离旧",
+          "values": [
+            2
+          ],
+          "hint": "预测：周期8/7的混合帧会不会写进队列？",
+          "steps": [
+            "先指出frame->speed_cycle与frame->distance_cycle来自同一输入结构体的两个成员。",
+            "预测拒绝时队列count不变。",
+            "运行后核对Pop仍然取到完整周期7，再取周期8。"
+          ],
+          "optional": false
+        },
+        {
+          "name": "M04 · 空队列不读取",
+          "values": [
+            3
+          ],
+          "hint": "预测：空时Pop错误码与head/tail/count是否改变？",
+          "steps": [
+            "预测第一步Pop返回-3。",
+            "运行并检查之后Push/Pop恢复正常。",
+            "说明失败时received不提供新的有效数据。"
+          ],
+          "optional": false
+        },
+        {
+          "name": "M05 · 输入值非法",
+          "values": [
+            4
+          ],
+          "hint": "预测：负车速是否入队？下一个合法帧是否仍能处理？",
+          "steps": [
+            "检查-1km/h先触发数值校验，返回-2。",
+            "后续合法周期5帧会正常入队、出队。",
+            "解释先校验后写入如何阻止半个新帧。"
+          ],
+          "optional": false
+        }
+      ],
+      "lab_steps": [
+        "第一次只跑场景0：先手算三步之后head/tail/count以及Pop拿到的周期号。",
+        "通过变量来源表点开queue、received、draft、Queue_Push/Pop的定义，再按main→h→c→main顺序选择代码讲解。",
+        "第二遍跑场景1→2→3→4，逐行记录输入、status、head/tail/count变化与是否出队。",
+        "完成10道概念题和3个数值迁移题；再从完整项目ZIP下载C代码，在自己的WSL终端编译运行真实GCC与独立测试。"
+      ],
+      "test_steps": [
+        "测试首要目标：你能定位FrameQueue类型、queue对象、Queue_Push形参指针、Queue_Pop局部draft。",
+        "先手算场景0最后head=1、tail=2、count=1；场景1满时head=tail=1但count=4。",
+        "逐场景跑满/空/回绕/混帧拒绝；错误状态不会静默覆盖有效旧帧。",
+        "只有浏览器模拟通过按在线练习保存；真实C请在WSL单独用gcc编译demo和test，并保留终端输出。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "为什么FrameQueue queue={0}放在demo.c的for外？",
+          "options": [
+            "为了让head/tail/count跨动作保持更新",
+            "因为for外的变量成员永远不能变",
+            "因为结构体只能声明在main外"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "FrameQueue queue 与函数FrameQueue *queue是什么关系？",
+          "options": [
+            "是同一个作用域的同一个变量",
+            "前者是对象，后者是接收该对象地址的指针形参",
+            "都是全局变量"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "head/tail/count各代表什么？",
+          "options": [
+            "head下一次写，tail下一次读，count总容量",
+            "head下一次读，tail下一次写，count当前已占格数",
+            "三个都只用于打印"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "对4格队列执行tail=(tail+1)%4，如果tail原来为3，下一次变多少？",
+          "options": [
+            "4",
+            "1",
+            "0"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "为什么Push要写queue->slots[queue->tail]=*frame？",
+          "options": [
+            "复制完整SensorFrame结构体值到下一格",
+            "只把指针地址保存到数组",
+            "清空数组"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "速度周期=8、距离周期=7，Push应怎样？",
+          "options": [
+            "成功，因为两个浮点数都合法",
+            "拒绝，status=-2且count不变",
+            "默默用更大的周期值"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "队列count==4时还要Push会怎样？",
+          "options": [
+            "覆盖最旧帧",
+            "count变5",
+            "返回-3并保留原数据"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "为什么head==tail不能单独断定队列为空？",
+          "options": [
+            "因为初始化和满队列都可能相等",
+            "因为head是float",
+            "因为两个下标永远不会相等"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "Queue_Pop失败时，main能否把received当成新的有效帧？",
+          "options": [
+            "能，因为received初始化为0",
+            "不能；只有status==0才可用新输出",
+            "一定抛出C异常"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "volatile能不能替代跨线程的一致快照同步？",
+          "options": [
+            "可以，只要两个float都volatile",
+            "不可以；要使用合适的同步方案",
+            "只要compare两个周期标识就能保证真实多线程安全"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "独立推导，不直接抄预设答案：队列容量4，初始head=0、tail=0、count=0。先Push A、Push B、Pop A，再Push C、Push D、Push E。求此时head、tail、count；再判断如果Push F且不Pop，返回什么状态。",
+        "values": [
+          1
+        ],
+        "fields": [
+          {
+            "id": "head",
+            "label": "P1 · head目前下标",
+            "kind": "number"
+          },
+          {
+            "id": "tail",
+            "label": "P2 · tail下一写下标",
+            "kind": "number"
+          },
+          {
+            "id": "count",
+            "label": "P3 · 队列当前占用数",
+            "kind": "number"
+          },
+          {
+            "id": "full_status",
+            "label": "P4 · 再Push F返回状态码",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "Push A→tail1 count1；Push B→tail2 count2；Pop A→head1 count1。",
+          "Push C→tail3，Push D→tail0，Push E→tail1；此时count=4。",
+          "队列已满，Push F返回-3，不能覆盖未读B。"
+        ]
+      },
+      "pass_rule": "必做5组JS模拟，10道基础题和4道迁移数值题。页面只能记为“在线练习通过”；本地真实C需要学员在WSL真实构建、测试，不由网页声称完成。",
+      "assets": [
+        {
+          "name": "demo.c",
+          "group": "main",
+          "language": "c",
+          "text": "#include \"sensor_queue.h\"\n#include <stdio.h>\n\n/* 动作：0放入一帧，1取出一帧。只有输入队列时才使用frame。 */\ntypedef enum { ACTION_PUSH = 0, ACTION_POP = 1 } ActionKind;\ntypedef struct {\n    ActionKind kind;\n    SensorFrame frame;\n} DemoAction;\n\n/* 场景0：入、入、出；最适合第一次追踪。 */\nstatic const DemoAction BASIC[] = {\n    {ACTION_PUSH, {72.0f, 45.0f, 100U, 100U}},\n    {ACTION_PUSH, {73.0f, 44.0f, 101U, 101U}},\n    {ACTION_POP, {0}}\n};\n/* 场景1：写到下标3，再回到0；满时拒绝第6次放入。 */\nstatic const DemoAction WRAP_FULL[] = {\n    {ACTION_PUSH, {70.0f, 50.0f, 1U, 1U}},\n    {ACTION_PUSH, {71.0f, 49.0f, 2U, 2U}},\n    {ACTION_POP, {0}},\n    {ACTION_PUSH, {72.0f, 48.0f, 3U, 3U}},\n    {ACTION_PUSH, {73.0f, 47.0f, 4U, 4U}},\n    {ACTION_PUSH, {74.0f, 46.0f, 5U, 5U}},\n    {ACTION_PUSH, {75.0f, 45.0f, 6U, 6U}},\n    {ACTION_POP, {0}},\n    {ACTION_POP, {0}},\n    {ACTION_POP, {0}},\n    {ACTION_POP, {0}}\n};\n/* 场景2：本帧速度来自周期8、距离来自周期7，拒绝混帧。 */\nstatic const DemoAction MIXED[] = {\n    {ACTION_PUSH, {72.0f, 45.0f, 7U, 7U}},\n    {ACTION_PUSH, {73.0f, 45.0f, 8U, 7U}},\n    {ACTION_POP, {0}},\n    {ACTION_PUSH, {73.0f, 44.0f, 8U, 8U}},\n    {ACTION_POP, {0}}\n};\n/* 场景3：空时拒绝Pop，之后重新放入又可读取。 */\nstatic const DemoAction EMPTY[] = {\n    {ACTION_POP, {0}},\n    {ACTION_PUSH, {60.0f, 55.0f, 4U, 4U}},\n    {ACTION_POP, {0}},\n    {ACTION_POP, {0}}\n};\n/* 场景4：非法速度拒绝；其后的正常帧不受影响。 */\nstatic const DemoAction BAD_VALUE[] = {\n    {ACTION_PUSH, {-1.0f, 55.0f, 4U, 4U}},\n    {ACTION_PUSH, {61.0f, 54.0f, 5U, 5U}},\n    {ACTION_POP, {0}}\n};\n\nint main(void)\n{\n    int scenario = 0;\n    if (scanf(\"%d\", &scenario) != 1) {\n        printf(\"input_error=1\\n\");\n        return 1;\n    }\n\n    /* 这两个量描述本次选中的数组，不是重新复制全部帧。 */\n    const DemoAction *actions = NULL;\n    size_t action_count = 0U;\n    switch (scenario) {\n        case 0: actions = BASIC; action_count = sizeof(BASIC) / sizeof(BASIC[0]); break;\n        case 1: actions = WRAP_FULL; action_count = sizeof(WRAP_FULL) / sizeof(WRAP_FULL[0]); break;\n        case 2: actions = MIXED; action_count = sizeof(MIXED) / sizeof(MIXED[0]); break;\n        case 3: actions = EMPTY; action_count = sizeof(EMPTY) / sizeof(EMPTY[0]); break;\n        case 4: actions = BAD_VALUE; action_count = sizeof(BAD_VALUE) / sizeof(BAD_VALUE[0]); break;\n        default: printf(\"input_error=2\\n\"); return 1;\n    }\n\n    /* 只有一个队列，放在for外；每次操作后位置、数量都保留。 */\n    FrameQueue queue = {0};\n    printf(\"scenario=%d actions=%zu capacity=%u\\n\",\n           scenario, action_count, (unsigned)QUEUE_CAPACITY);\n\n    for (size_t i = 0U; i < action_count; ++i) {\n        const DemoAction *action = &actions[i];\n        int status = 0;\n        SensorFrame received = {0}; /* 本轮输出对象 */\n        if (action->kind == ACTION_PUSH) {\n            status = Queue_Push(&queue, &action->frame);\n            printf(\"step=%zu op=push cycle=%u/%u status=%d head=%zu tail=%zu count=%zu\\n\",\n                   i, (unsigned)action->frame.speed_cycle,\n                   (unsigned)action->frame.distance_cycle, status,\n                   queue.head, queue.tail, queue.count);\n        } else {\n            status = Queue_Pop(&queue, &received);\n            printf(\"step=%zu op=pop status=%d head=%zu tail=%zu count=%zu\",\n                   i, status, queue.head, queue.tail, queue.count);\n            if (status == 0) {\n                printf(\" cycle=%u speed=%.1f distance=%.1f\",\n                       (unsigned)received.speed_cycle,\n                       (double)received.speed_kmh, (double)received.distance_m);\n            }\n            printf(\"\\n\");\n        }\n    }\n    return 0;\n}\n"
+        },
+        {
+          "name": "sensor_queue.h",
+          "group": "main",
+          "language": "c",
+          "text": "#ifndef ASW_SENSOR_QUEUE_H\n#define ASW_SENSOR_QUEUE_H\n#include <stddef.h>\n#include <stdint.h>\n#define QUEUE_CAPACITY 4u\n\n/* 同一逻辑帧：两个物理量与它们各自所属的采样周期标识。 */\ntypedef struct {\n    float speed_kmh;\n    float distance_m;\n    uint32_t speed_cycle;\n    uint32_t distance_cycle;\n} SensorFrame;\n\n/* 保存4份完整帧；head读取位置，tail下次写入位置，count当前占用数。 */\ntypedef struct {\n    SensorFrame slots[QUEUE_CAPACITY];\n    size_t head;\n    size_t tail;\n    size_t count;\n} FrameQueue;\n\n/* 返回：0成功，-1指针错误，-2输入值或采样周期不一致，-3满/空。 */\nint Queue_Push(FrameQueue *queue, const SensorFrame *frame);\nint Queue_Pop(FrameQueue *queue, SensorFrame *out);\n\n#endif\n"
+        },
+        {
+          "name": "sensor_queue.c",
+          "group": "main",
+          "language": "c",
+          "text": "#include \"sensor_queue.h\"\n#include <math.h>\n#include <stddef.h>\n\n/* 只负责处理一个完整输入帧，不直接读取CAN，不启动线程。 */\nint Queue_Push(FrameQueue *queue, const SensorFrame *frame)\n{\n    if (queue == NULL || frame == NULL) return -1;\n\n    /* 先拒绝无效数据，不修改队列。 */\n    if (!isfinite(frame->speed_kmh) || !isfinite(frame->distance_m) ||\n        frame->speed_kmh < 0.0f || frame->speed_kmh > 250.0f ||\n        frame->distance_m < 0.0f || frame->distance_m > 500.0f)\n        return -2;\n\n    /* 本教学示例要求速度和距离来自同一个采样周期。 */\n    if (frame->speed_cycle != frame->distance_cycle) return -2;\n\n    if (queue->count == QUEUE_CAPACITY) return -3;\n\n    /* 整体复制一帧：slots中的元素从此独立于调用者的frame对象。 */\n    queue->slots[queue->tail] = *frame;\n    queue->tail = (queue->tail + 1U) % QUEUE_CAPACITY;\n    ++queue->count;\n    return 0;\n}\n\nint Queue_Pop(FrameQueue *queue, SensorFrame *out)\n{\n    if (queue == NULL || out == NULL) return -1;\n    if (queue->count == 0U) return -3;\n\n    /* 先取完整帧再改变head；输出是调用者提供的另一个结构体。 */\n    SensorFrame draft = queue->slots[queue->head];\n    *out = draft;\n    queue->head = (queue->head + 1U) % QUEUE_CAPACITY;\n    --queue->count;\n    return 0;\n}\n"
+        },
+        {
+          "name": "test_sensor_queue.c",
+          "group": "main",
+          "language": "c",
+          "text": "#include \"sensor_queue.h\"\n#include <stdio.h>\n\n/* 使用具体返回码而不是只靠assert；测试和demo各有自己的main。 */\nint main(void)\n{\n    FrameQueue q = {0};\n    SensorFrame out = {0};\n    SensorFrame a = {72.0f, 45.0f, 1U, 1U};\n    SensorFrame b = {73.0f, 44.0f, 2U, 2U};\n    SensorFrame c = {74.0f, 43.0f, 3U, 3U};\n    SensorFrame d = {75.0f, 42.0f, 4U, 4U};\n    SensorFrame e = {76.0f, 41.0f, 5U, 5U};\n    SensorFrame f = {77.0f, 40.0f, 6U, 6U};\n    SensorFrame mixed = {80.0f, 40.0f, 9U, 8U};\n\n    if (Queue_Pop(&q, &out) != -3 || q.count != 0U) return 1;\n    if (Queue_Push(&q, &a) != 0 || Queue_Push(&q, &b) != 0) return 2;\n    if (Queue_Pop(&q, &out) != 0 || out.speed_cycle != 1U) return 3;\n    if (Queue_Push(&q, &c) != 0 || Queue_Push(&q, &d) != 0 ||\n        Queue_Push(&q, &e) != 0) return 4;\n    if (q.head != 1U || q.tail != 1U || q.count != 4U) return 5;\n    if (Queue_Push(&q, &f) != -3 || q.count != 4U) return 6;\n\n    for (uint32_t id = 2U; id <= 5U; ++id) {\n        if (Queue_Pop(&q, &out) != 0 || out.speed_cycle != id) return 7;\n    }\n    if (q.count != 0U || Queue_Pop(&q, &out) != -3) return 8;\n    if (Queue_Push(&q, &mixed) != -2 || q.count != 0U) return 9;\n    if (Queue_Push(&q, NULL) != -1 || Queue_Pop(NULL, &out) != -1) return 10;\n    a.speed_kmh = -1.0f;\n    if (Queue_Push(&q, &a) != -2 || q.count != 0U) return 11;\n\n    printf(\"PASS: empty, FIFO, wrap, full, mixed-cycle, bounds, NULL\\n\");\n    return 0;\n}\n"
+        },
+        {
+          "name": "CMakeLists.txt",
+          "group": "main",
+          "language": "cmake",
+          "text": "cmake_minimum_required(VERSION 3.16)\nproject(asw_sensor_queue LANGUAGES C)\nset(CMAKE_C_STANDARD 17)\nset(CMAKE_C_STANDARD_REQUIRED ON)\n\nadd_library(sensor_queue STATIC sensor_queue.c)\ntarget_include_directories(sensor_queue PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\ntarget_link_libraries(sensor_queue PUBLIC m)\n\nadd_executable(sensor_demo demo.c)\ntarget_link_libraries(sensor_demo PRIVATE sensor_queue)\n\ninclude(CTest)\nif(BUILD_TESTING)\n    add_executable(sensor_tests test_sensor_queue.c)\n    target_link_libraries(sensor_tests PRIVATE sensor_queue)\n    add_test(NAME queue_checks COMMAND sensor_tests)\nendif()\n"
+        },
+        {
+          "name": "README.md",
+          "group": "main",
+          "language": "markdown",
+          "text": "# Day11：固定容量环形队列与一致快照\n\n**这是单线程、预设数据的教学程序，不读取真实CAN/传感器，不存在实际并发写入，不证明硬件采样的原子性。**\n\n## 三个最先要回答的问题\n\n1. `FrameQueue queue = {0}` 在 `demo.c` 的 `main()` 中只创建一次；数据成员 `head/tail/count/slots` 在 `sensor_queue.h` 的 `FrameQueue` 中定义。\n2. `Queue_Push(&queue, &action->frame)` 将整个输入帧的值复制进数组 `queue.slots[tail]`，`tail`前进并在4处回0。\n3. `Queue_Pop(&queue, &received)` 从 `queue.slots[head]` 取完整帧，先 `*out=draft` 把值写回 `main()` 的 `received`，然后 `head`前进并减少 `count`。\n\n## WSL实际编译（与网页JS模拟分开）\n\n```bash\ngcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g demo.c sensor_queue.c -o sensor_demo -lm\nprintf '0\\n' | ./sensor_demo\nprintf '1\\n' | ./sensor_demo\nprintf '2\\n' | ./sensor_demo\nprintf '3\\n' | ./sensor_demo\nprintf '4\\n' | ./sensor_demo\ngcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g test_sensor_queue.c sensor_queue.c -o sensor_tests -lm\n./sensor_tests\n```\n\n## CMake扩展（非主课前置）\n\n```bash\ncmake -S . -B build -DCMAKE_BUILD_TYPE=Debug\ncmake --build build\nctest --test-dir build --output-on-failure\n./build/sensor_demo\n```\n\n## 状态/错误码\n\n- `Queue_Push` / `Queue_Pop` 均为0成功、-1空指针、-3满或空；`Queue_Push`还用-2拒绝越界数值或两个采样周期标识不一致。\n- 拒绝Push不会占用格子；拒绝Pop不会改变队列。Pop失败时 `received` 不保证包含新值，只有 `status==0` 才能读取。\n- `speed_cycle == distance_cycle` 是**本教学示例的检查规则**，不足以保证真实中断/线程共享数据的无竞争同步；需要锁、原子操作、合理内存序或其它平台认可的一致快照策略。`volatile` 不能替代同步。\n- 队列满时本程序**拒绝新帧**，不覆盖最旧帧。这是选定策略，不是所有环形缓冲都必须如此。\n"
+        }
+      ],
+      "code": "#include \"sensor_queue.h\"\n#include <stdio.h>\n\n/* 动作：0放入一帧，1取出一帧。只有输入队列时才使用frame。 */\ntypedef enum { ACTION_PUSH = 0, ACTION_POP = 1 } ActionKind;\ntypedef struct {\n    ActionKind kind;\n    SensorFrame frame;\n} DemoAction;\n\n/* 场景0：入、入、出；最适合第一次追踪。 */\nstatic const DemoAction BASIC[] = {\n    {ACTION_PUSH, {72.0f, 45.0f, 100U, 100U}},\n    {ACTION_PUSH, {73.0f, 44.0f, 101U, 101U}},\n    {ACTION_POP, {0}}\n};\n/* 场景1：写到下标3，再回到0；满时拒绝第6次放入。 */\nstatic const DemoAction WRAP_FULL[] = {\n    {ACTION_PUSH, {70.0f, 50.0f, 1U, 1U}},\n    {ACTION_PUSH, {71.0f, 49.0f, 2U, 2U}},\n    {ACTION_POP, {0}},\n    {ACTION_PUSH, {72.0f, 48.0f, 3U, 3U}},\n    {ACTION_PUSH, {73.0f, 47.0f, 4U, 4U}},\n    {ACTION_PUSH, {74.0f, 46.0f, 5U, 5U}},\n    {ACTION_PUSH, {75.0f, 45.0f, 6U, 6U}},\n    {ACTION_POP, {0}},\n    {ACTION_POP, {0}},\n    {ACTION_POP, {0}},\n    {ACTION_POP, {0}}\n};\n/* 场景2：本帧速度来自周期8、距离来自周期7，拒绝混帧。 */\nstatic const DemoAction MIXED[] = {\n    {ACTION_PUSH, {72.0f, 45.0f, 7U, 7U}},\n    {ACTION_PUSH, {73.0f, 45.0f, 8U, 7U}},\n    {ACTION_POP, {0}},\n    {ACTION_PUSH, {73.0f, 44.0f, 8U, 8U}},\n    {ACTION_POP, {0}}\n};\n/* 场景3：空时拒绝Pop，之后重新放入又可读取。 */\nstatic const DemoAction EMPTY[] = {\n    {ACTION_POP, {0}},\n    {ACTION_PUSH, {60.0f, 55.0f, 4U, 4U}},\n    {ACTION_POP, {0}},\n    {ACTION_POP, {0}}\n};\n/* 场景4：非法速度拒绝；其后的正常帧不受影响。 */\nstatic const DemoAction BAD_VALUE[] = {\n    {ACTION_PUSH, {-1.0f, 55.0f, 4U, 4U}},\n    {ACTION_PUSH, {61.0f, 54.0f, 5U, 5U}},\n    {ACTION_POP, {0}}\n};\n\nint main(void)\n{\n    int scenario = 0;\n    if (scanf(\"%d\", &scenario) != 1) {\n        printf(\"input_error=1\\n\");\n        return 1;\n    }\n\n    /* 这两个量描述本次选中的数组，不是重新复制全部帧。 */\n    const DemoAction *actions = NULL;\n    size_t action_count = 0U;\n    switch (scenario) {\n        case 0: actions = BASIC; action_count = sizeof(BASIC) / sizeof(BASIC[0]); break;\n        case 1: actions = WRAP_FULL; action_count = sizeof(WRAP_FULL) / sizeof(WRAP_FULL[0]); break;\n        case 2: actions = MIXED; action_count = sizeof(MIXED) / sizeof(MIXED[0]); break;\n        case 3: actions = EMPTY; action_count = sizeof(EMPTY) / sizeof(EMPTY[0]); break;\n        case 4: actions = BAD_VALUE; action_count = sizeof(BAD_VALUE) / sizeof(BAD_VALUE[0]); break;\n        default: printf(\"input_error=2\\n\"); return 1;\n    }\n\n    /* 只有一个队列，放在for外；每次操作后位置、数量都保留。 */\n    FrameQueue queue = {0};\n    printf(\"scenario=%d actions=%zu capacity=%u\\n\",\n           scenario, action_count, (unsigned)QUEUE_CAPACITY);\n\n    for (size_t i = 0U; i < action_count; ++i) {\n        const DemoAction *action = &actions[i];\n        int status = 0;\n        SensorFrame received = {0}; /* 本轮输出对象 */\n        if (action->kind == ACTION_PUSH) {\n            status = Queue_Push(&queue, &action->frame);\n            printf(\"step=%zu op=push cycle=%u/%u status=%d head=%zu tail=%zu count=%zu\\n\",\n                   i, (unsigned)action->frame.speed_cycle,\n                   (unsigned)action->frame.distance_cycle, status,\n                   queue.head, queue.tail, queue.count);\n        } else {\n            status = Queue_Pop(&queue, &received);\n            printf(\"step=%zu op=pop status=%d head=%zu tail=%zu count=%zu\",\n                   i, status, queue.head, queue.tail, queue.count);\n            if (status == 0) {\n                printf(\" cycle=%u speed=%.1f distance=%.1f\",\n                       (unsigned)received.speed_cycle,\n                       (double)received.speed_kmh, (double)received.distance_m);\n            }\n            printf(\"\\n\");\n        }\n    }\n    return 0;\n}\n"
     }
   },
   "rules": {
@@ -7379,6 +8148,103 @@
           "M05 · 非法距离拒绝"
         ]
       ]
+    },
+    "11": {
+      "correct": {
+        "q1": 0,
+        "q2": 1,
+        "q3": 1,
+        "q4": 2,
+        "q5": 0,
+        "q6": 1,
+        "q7": 2,
+        "q8": 0,
+        "q9": 1,
+        "q10": 1
+      },
+      "explanations": {
+        "q1": "queue只创建一次，但字段在每次成功Push/Pop时更新。",
+        "q2": "&queue把main对象的地址传给函数中的指针参数。",
+        "q3": "队列不靠head==tail区分满空，要看count。",
+        "q4": "(3+1)%4=0；%取余让下标回绕。",
+        "q5": "结构体整体赋值复制四个成员，而不是保存指针。",
+        "q6": "本课规定一帧两个周期标识必须相同，否则拒绝混合帧。",
+        "q7": "本课采用满时拒绝新帧的策略。",
+        "q8": "初始head=tail=0且count0；满队列也可head=tail但count4。",
+        "q9": "失败的Pop不写新帧，初始化0不表示取出了一个真实帧。",
+        "q10": "volatile本身不提供一组成员的原子快照或线程互斥。"
+      },
+      "numeric": {
+        "head": [
+          1,
+          "Pop A使head=1。"
+        ],
+        "tail": [
+          1,
+          "Push E写槽0后tail回到1。"
+        ],
+        "count": [
+          4,
+          "B/C/D/E共四帧未读取，队列满。"
+        ],
+        "full_status": [
+          -3,
+          "满队列拒绝额外Push，状态和数据保持。"
+        ]
+      },
+      "labels": {
+        "q1": "第1题",
+        "q2": "第2题",
+        "q3": "第3题",
+        "q4": "第4题",
+        "q5": "第5题",
+        "q6": "第6题",
+        "q7": "第7题",
+        "q8": "第8题",
+        "q9": "第9题",
+        "q10": "第10题",
+        "head": "P1 · 读指针下标",
+        "tail": "P2 · 写指针下标",
+        "count": "P3 · 已占用格数",
+        "full_status": "P4 · 满缓存错误码"
+      },
+      "needed": [
+        [
+          [
+            0
+          ],
+          "lab0",
+          "M01 · 两入一出"
+        ],
+        [
+          [
+            1
+          ],
+          "lab1",
+          "M02 · 四格回绕与满"
+        ],
+        [
+          [
+            2
+          ],
+          "lab2",
+          "M03 · 速度新距离旧"
+        ],
+        [
+          [
+            3
+          ],
+          "lab3",
+          "M04 · 空队列不读取"
+        ],
+        [
+          [
+            4
+          ],
+          "lab4",
+          "M05 · 输入值非法"
+        ]
+      ]
     }
   },
   "curriculum": [
@@ -8223,5 +9089,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "day10-20261026-v1"
+  "release": "day11-20261027-v1"
 }
