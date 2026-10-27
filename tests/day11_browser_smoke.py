@@ -40,6 +40,18 @@ async def exercise(browser, width, height, label):
     await page.screenshot(path=str(SCREENSHOTS / (label + "_trace.png")), full_page=True)
     await page.locator("#tab-learn").click()
     await page.screenshot(path=str(SCREENSHOTS / (label + "_lesson.png")), full_page=True)
+    # Autosave is browser-local; do not use actual GitHub private tokens in CI.
+    await page.locator("#notes").fill("Day11自动保存冒烟测试")
+    await page.wait_for_function("""
+      () => JSON.parse(localStorage.getItem('asw-pages-v1:/')).notes
+        .some(n => n.day===11 && n.notes.includes('Day11自动保存冒烟测试'))
+    """)
+    # Switching to old D10 must restore its regular reading section, not leave it inside hidden Day11 details.
+    await page.locator("#roadmap summary").click()
+    await page.locator("#days button").filter(has_text="D10").click()
+    await page.wait_for_function("document.getElementById('title')?.textContent.includes('状态机')")
+    assert await page.locator("#reading").is_visible()
+    assert await page.locator("#day11Compass").is_hidden()
     overflow = await page.evaluate("document.documentElement.scrollWidth > innerWidth + 2")
     assert not overflow, label + " horizontal overflow"
     assert not errors, errors
