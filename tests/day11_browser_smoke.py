@@ -26,7 +26,7 @@ async def exercise(browser, width, height, label):
     assert await page.locator("#day11Compass").is_visible()
     assert await page.locator("#walkthrough").is_visible()
     assert await page.locator("#cloudPanel").is_hidden()
-    await page.locator("#day11Compass button").filter(has_text="queue").first.click()
+    await page.get_by_role("button", name="queue", exact=True).click()
     info = await page.locator("#day11SymbolInfo").inner_text()
     assert "demo.c" in info, info
     await page.locator("#tab-run").click()
