@@ -21,3 +21,36 @@
 .annotation-popover{font-size:14px;line-height:1.45;padding:12px}.annotation-popover button{padding:6px 10px;font-size:14px}.annotation-popover label{margin:8px 0 4px}.annotation-popover p{margin:8px 0}.annotation-popover textarea{height:72px;min-height:72px}.annotation-popover .row{gap:8px;justify-content:space-between}
 
 .project-intro{background:#f1f8f2;border:1px solid #bbd8c3;border-radius:12px;padding:18px;margin:14px 0 24px}.project-intro p{line-height:1.9}#appendices>details{background:#f7f8fb;padding:16px;border:1px solid #d4ddea;border-radius:10px;margin:16px 0}#appendices summary,#appendixFileTabs summary{font-weight:600;cursor:pointer}#appendices button{margin:5px}#appendixFileTabs{border:1px dashed #b4c2d9;padding:8px}#timelineLab{margin:18px 0;padding:14px;background:#f2f6fd;border-radius:10px}#timelineLab table{font-size:13px}#runFields label[hidden]{display:none!important}
+
+/* Day11专用阅读体验：先同屏追踪执行，再查看完整源码；不改变旧课结构 */
+#day11Compass{border:1px solid var(--border);border-radius:12px;padding:16px;background:#f8fbff;margin:18px 0}
+#day11Compass h3{margin:0 0 8px}
+.d11-symbols{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0}
+.d11-symbols button{font-family:Consolas,'Microsoft YaHei',monospace;background:#fff}
+#day11SymbolInfo{border-left:3px solid var(--accent);padding:6px 12px;background:var(--soft);line-height:1.65}
+#workspace.day11-mode #walkthrough{margin:20px 0 26px;border:1px solid var(--border);border-radius:12px;padding:14px;background:#fbfcff;scroll-margin-top:20px}
+#workspace.day11-mode #walkthrough>h3{margin-top:0}
+#workspace.day11-mode .walk-grid{grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr);align-items:start;gap:14px}
+#workspace.day11-mode #stepCode{max-height:540px;overflow:auto;font-size:13px}
+#workspace.day11-mode #stepExplanation{padding:12px 16px;line-height:1.7}
+#workspace.day11-mode #stepExplanation h4{font-size:15px;margin:10px 0 5px}
+#workspace.day11-mode #stepExplanation p{margin:6px 0 12px;font-size:14px}
+#workspace.day11-mode #code.expanded{max-height:620px;overflow:auto}
+#day11ReadingDetails{border:1px solid var(--border);background:#fff;border-radius:10px;padding:14px;margin:22px 0}
+#day11ReadingDetails>summary{font-weight:700;color:var(--accent)}
+#day11ReadingDetails #reading{margin-top:16px}
+#day11QueueTrace{margin-top:20px;padding:16px;border:1px solid var(--border);background:#f9fbff;border-radius:12px}
+#day11QueueTrace h4{margin:0 0 8px}
+.d11-trace-controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:14px 0}
+.d11-trace-state{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:8px 0}
+.d11-trace-state>div{min-width:0;padding:9px;border:1px solid var(--border);border-radius:8px;background:#fff}
+.d11-trace-state .value{font-size:18px}
+.d11-slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+.d11-slot{display:flex;flex-direction:column;gap:6px;padding:12px 9px;min-width:0;border-radius:8px;border:1px solid var(--border);background:#fff}
+.d11-slot small{font-size:12px;overflow-wrap:anywhere}
+.d11-slot strong{font-size:16px}
+.d11-slot.occupied{border-color:#2a736b;background:#e6f4ee}
+.d11-slot.stale{color:var(--muted);background:#eef1f5}
+.d11-trace-explanation{padding:12px;background:#eaf1ff;border-left:3px solid var(--accent);border-radius:5px}
+@media(max-width:1000px){#workspace.day11-mode .walk-grid{grid-template-columns:minmax(0,1fr)}#workspace.day11-mode #stepCode{max-height:380px}}
+@media(max-width:600px){#workspace.day11-mode #walkthrough{padding:10px}#day11QueueTrace{padding:10px}.d11-slots{grid-template-columns:repeat(2,minmax(0,1fr))}.d11-trace-state{grid-template-columns:minmax(0,1fr)}.d11-trace-controls button{min-height:40px}#workspace.day11-mode .step-buttons button{font-size:13px}}

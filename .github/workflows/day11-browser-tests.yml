@@ -1,0 +1,44 @@
+name: Day11 browser UI and annotation-safe layout smoke
+
+on:
+  pull_request:
+    paths:
+      - 'app.js'
+      - 'style.css'
+      - 'index.html'
+      - 'courses.json'
+      - 'pages-runtime.js'
+      - 'tests/day11_browser_smoke.py'
+      - '.github/workflows/day11-browser-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'app.js'
+      - 'style.css'
+      - 'index.html'
+      - 'courses.json'
+      - 'pages-runtime.js'
+      - 'tests/day11_browser_smoke.py'
+
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser automation
+        run: |
+          python3 -m pip install --user playwright
+          python3 -m playwright install chromium --with-deps
+      - name: Start static Pages server and exercise desktop/mobile
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/day11-pages.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          python3 tests/day11_browser_smoke.py
+      - name: Upload screenshots for visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: day11-desktop-mobile
+          path: day11-ui-evidence/
+          if-no-files-found: warn
