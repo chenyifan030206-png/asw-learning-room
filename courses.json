@@ -5998,7 +5998,7 @@
     },
     "11": {
       "day": 11,
-      "revision": "2026-10-27-buffer-snapshot-v1",
+      "revision": "2026-10-27-buffer-snapshot-v2",
       "title": "环形缓冲与一致快照：为什么不能混用新车速和旧距离？",
       "source": "demo.c",
       "runner": "sensor_queue_day11",
@@ -6014,10 +6014,11 @@
         "能够说清volatile的职责与限制，独立用GCC执行main和test两种程序；浏览器在线成绩与本地C分开。"
       ],
       "flow_text": "main选BASIC等动作数组→在for外创建FrameQueue queue→每轮创建received→按动作调用Queue_Push(&queue,&action->frame)或Queue_Pop(&queue,&received)→函数先校验→复制整帧→更新head/tail/count→返回status→main打印本轮状态→下一轮继续使用同一个queue",
-      "remediation_title": "开课补桥：你为什么不用找queue.head的单独定义？",
+      "remediation_title": "先补D10的四个关键误区，再进入Push/Pop",
       "project_intro": {
         "title": "今天只解决一个问题：新车速与旧距离能算同一帧吗？",
         "paragraphs": [
+          "【学完D10后的复习承诺】D10你已在详细解析后理解context跨帧更新和*context=next。本节不假定你能自动迁移到queue、draft、received；会先追踪对象来源和写回链，再学新算法。注意：讲懂后的自我反馈不等于已经完成本地真实C测试。",
           "设周期7：速度72km/h、前车距离45m；周期8：速度更新为73km/h，但距离仍是周期7的45m。浮点数本身都合法，却不是同一周期的一组数据。我们要拒绝这样的混合输入，并将完整合法的一帧按顺序存入4格队列。",
           "第一次只观察Push周期100→Push周期101→Pop这一组3步；先搞清queue从哪创建、两个函数怎样接收&queue、head/tail/count怎么改变。理解后才切换到回绕、满队列、混合帧、空队列。",
           "这里是**单线程预设动作模拟**，既不读取真实CAN，也不测量线程并发安全。uint32_t周期标识的比较是教学中的数据校验契约，不代表读取硬件寄存器或共享内存就自动安全。"
@@ -6237,6 +6238,14 @@
       ],
       "reading": [
         {
+          "title": "开课前：四个误区在Day11分别怎样解决？",
+          "text": "【1 结构体放在for外不是“固定内容”】demo.c中的FrameQueue queue={0}在for外创建一次，成员head/tail/count会在每轮Push/Pop成功时改变；同一个对象持续保存结果。\n【2 不同函数里的queue不是同一个变量】main的FrameQueue queue是完整对象；Queue_Push(FrameQueue *queue,...)里的queue是指针形参。调用&queue后，它们通过对象地址关联；并非仅仅因为在不同.c文件。\n【3 结构体成员并不需要另写“queue.count的声明”】在sensor_queue.h的FrameQueue类型里写size_t count;，main创建FrameQueue queue={0}时就拥有queue.count；函数中queue->count是通过指针访问同一对象成员。\n【4 区分保存的数据和本次输入】队列保存的是完整SensorFrame成员(speed_kmh,distance_m,speed_cycle,distance_cycle)。它**没有保存真实线程锁或原子时间戳**。两个cycle不相等只能证明此教学输入不一致，不保证真实并发读取安全。\n【5 结构体整体赋值】Push执行queue->slots[queue->tail]=*frame，将一份输入帧的值复制进队列；Pop执行SensorFrame draft=queue->slots[queue->head]，随后*out=draft，将这份值写回main的received。这与D09的*out=draft、D10的*context=next相同。\n【6 .h/.c和构建】.h提供类型/函数原型；.c提供实现。gcc demo.c sensor_queue.c -o sensor_demo可直接同时编译链接；CMake不是完成前三个动作的前提。\n本次课程第一遍只看场景0的Push周期100→Push周期101→Pop周期100，不要求同时理解满队列、回绕和volatile。"
+        },
+        {
+          "title": "课程结构图：谁定义、谁创建、谁修改、何时返回",
+          "text": "第一步（预处理与构建，而非运行）：sensor_queue.h定义SensorFrame、FrameQueue以及Queue_Push/Queue_Pop函数声明；demo.c和sensor_queue.c都包含该头文件。链接后才有完整程序。\n第二步（main）：demo.c的main读取scenario=0，在文件顶部的BASIC数组中找到3条动作；创建FrameQueue queue={0}，成员都从0开始。\n第三步（调用Push）：main取得&actions[0]的动作地址，向Queue_Push传&queue和&action->frame；函数接收FrameQueue *queue和const SensorFrame *frame，先检查输入、复制整帧到slots[tail]、更新tail/count，return 0。\n第四步（第二次Push）：队列对象没有重新创建，tail已是1，所以写slots[1]，count变2。\n第五步（调用Pop）：main创建本次SensorFrame received={0}，传&queue及&received；Queue_Pop内部从slots[head]复制到draft，再用*out=draft写回received，更新head/count，return 0。\n第六步（回到main）：只有status==0时打印received。本例打印周期100的72km/h和45m；queue还保留周期101的一帧，最终head=1,tail=2,count=1。\n每一步建议把窗口固定成三个区：当前函数与传参、调用前后变量表、被读写的队列槽；不要把阅读定位留给学员自行搜索。"
+        },
+        {
           "title": "00 · 为什么会出现速度新、距离旧？",
           "text": "先不要看代码。设周期7测得车速72km/h、距离45m；周期8车速更新为73km/h，但距离仍是周期7的45m。若把这两个值拼成“周期8的同一帧”，计算出的数据看似合法，实际上新旧不同步。Day11教学约定：每个值携带其采样周期号；当speed_cycle与distance_cycle不相等时拒绝入队。这样保护的是这一套预设的单线程输入数据结构，并不证明真正多线程的读写安全。",
           "table": {
@@ -6267,6 +6276,10 @@
               ]
             ]
           }
+        },
+        {
+          "title": "三个动作逐句精讲：即使不看源码也能手算",
+          "text": "【起点】FrameQueue queue={0}；4个slots成员都零初始化，但没有有效帧。head=0表示下一次从槽0读取，tail=0表示下一次从槽0写入，count=0表示目前0个有效槽。\n【动作0：Push A】main的action指向BASIC[0]，内部frame是(72.0,45.0,100,100)。调用Queue_Push(&queue,&action->frame)。函数中frame是只读指针，frame->speed_cycle=100、frame->distance_cycle=100；值均合法，count<4。queue->slots[0]=*frame：把四个成员整体复制进去。queue->tail=(0+1)%4=1，++queue->count使count=1。head不动仍为0。return 0。\n【动作1：Push B】for进入i=1，main没有重新创建queue；本轮输入(73.0,44.0,101,101)。tail原先是1，所以写slots[1]。tail从1变2，count从1变2，head仍0。return 0。\n【动作2：Pop】for进入i=2，本轮SensorFrame received={0}是新的输出对象，但旧queue仍保留A、B。Queue_Pop(&queue,&received)中count=2不是空。SensorFrame draft=queue->slots[queue->head]，head=0，所以draft是A；*out=draft把A复制到main中的received。之后head从0变1，count从2减1变1；tail保持2。return 0。main打印received.speed_cycle=100、speed_kmh=72、distance_m=45。\n【结束】三轮for完成，只有一帧B仍然有效：slots[1]；head=1、tail=2、count=1。Pop后的slots[0]内存可能仍保留A的旧字节值，但逻辑上它已经不属于队列有效数据，不能再当作未读取的一帧。\n【反思题】为什么i=2却从slots[0]读取？因为i是动作序号，head是下一次出队下标，二者毫无要求必须相等。"
         },
         {
           "title": "01 · 单位、存储与环形数组画法",
@@ -6462,7 +6475,7 @@
           "start": "    /* 只有一个队列，放在for外",
           "end": "    return 0;\n}",
           "pattern": "FrameQueue queue={0}是真实的队列结构体对象，for外只创建一次；&actions[i]是本轮动作地址；SensorFrame received={0}是本轮输出对象。",
-          "text": "i是动作序号，不是队列槽下标！队列会不断更新head、tail、count；每一轮Push或Pop都接收&queue以修改同一个对象。Pop失败不能打印received里的新帧。",
+          "text": "i是动作序号，不是队列槽下标！队列会不断更新head、tail、count；每一轮Push或Pop都接收&queue以修改同一个对象。Pop失败不能打印received里的新帧。 关键防错：FrameQueue queue={0}只创建一次，但它的head/tail/count成员并没有被冻结；它们在每次成功Push/Pop后变化。SensorFrame received={0}则每次for迭代新建。",
           "trace": "输入0：第一轮i0是Push帧100，第二轮i1是Push帧101，第三轮i2是Pop帧100；队列最终head1/tail2/count1。"
         },
         {
@@ -6489,7 +6502,7 @@
           "start": "    /* 整体复制一帧",
           "end": "int Queue_Pop(",
           "pattern": "queue->slots[queue->tail]=*frame把**整份结构体值**复制进数组；(tail+1)%4让下标按0→1→2→3→0循环；++count增加已占用格数。",
-          "text": "这行不是让queue.slots保存frame指针，也不是用memcpy不确定字节数；C允许相同结构体类型直接做整体赋值。count没有超过4，因为提前检查了满队列。",
+          "text": "这行不是让queue.slots保存frame指针，也不是用memcpy不确定字节数；C允许相同结构体类型直接做整体赋值。count没有超过4，因为提前检查了满队列。 本轮必须明确给出写入前tail、写入槽下标、写入后的tail/count。失败时不改变旧队列。",
           "trace": "场景0第0次Push: head0/tail0/count0→写slots[0]为周期100→head0/tail1/count1；第1次写slots[1]。"
         },
         {
@@ -6507,7 +6520,7 @@
           "start": "    /* 先取完整帧",
           "end": "    return 0;\n}",
           "pattern": "SensorFrame draft=queue->slots[head]创建局部结构体副本；*out=draft把完整值复制回main里的received；--count减少队列元素。",
-          "text": "这就是D09的* out=draft和D10的*context=next的再应用。先复制并写回完整帧，之后head=(head+1)%4移动；队列只持有还没Pop的有效槽。",
+          "text": "这就是D09的* out=draft和D10的*context=next的再应用。先复制并写回完整帧，之后head=(head+1)%4移动；队列只持有还没Pop的有效槽。 这里要追踪内存对象身份：main中的received是完整结构体，Pop中的out是指针形参，draft是另一份局部结构体值。三者不是同一个变量；*out=draft才让main能读到新帧。",
           "trace": "场景0第2轮：原head0/tail2/count2；读取slots[0]周期100→received得到72/45/100→head1/tail2/count1。"
         },
         {
@@ -9093,5 +9106,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "day11-20261027-v1"
+  "release": "day11-20261027-teaching-v2"
 }
