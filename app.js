@@ -194,8 +194,8 @@ function renderDay11Guide(){
   compass.replaceChildren();compass.hidden=!is11;
   if(!is11){$('code').after($('walkthrough'));const details=$('day11ReadingDetails');if(details){details.before($('reading'));details.remove();}$('reading').hidden=false;return;}
   $('projectIntro').after(compass);$('architecture').after($('walkthrough'));
-  const h=document.createElement('h3');h.textContent='找不到变量？点击即可定位真正的定义';
-  const p=document.createElement('p');p.textContent='先看“这个名字在哪里定义、是什么类型、在本轮怎样变化”，再读计算过程。下列按钮只切换课程原版源码，不更改你的个人注释和批注。';
+  const h=document.createElement('h3');h.textContent='先看三步运行，再定位变量定义';
+  const p=document.createElement('p');p.textContent='本课顺序：①看场景0三步Push/Push/Pop → ②找到queue、frame、received、draft → ③按main到函数再返回的顺序跟代码 → ④之后才学满/空/回绕/volatile。点下面的名字直达原始声明；不修改个人源码与批注。';
   const buttons=document.createElement('div');buttons.className='d11-symbols';
   for(const symbol of lesson.symbols||[]){
     const button=document.createElement('button');button.type='button';button.className='small';
@@ -204,13 +204,22 @@ function renderDay11Guide(){
   }
   const info=document.createElement('p');info.id='day11SymbolInfo';info.className='muted';
   info.textContent='推荐依次查看：FrameQueue → queue → Queue_Push → Queue_Pop → draft → received。';
-  compass.append(h,p,buttons,info);
+  const quick=document.createElement('div');quick.className='d11-quick-path';
+  const heading=document.createElement('h4');heading.textContent='先手算场景0：主程序每次只做一个动作';
+  quick.append(heading,makeTable(
+    ['当前动作','调用前 head/tail/count','函数写入或读出','调用后 head/tail/count'],
+    [['① Push 周期100','0 / 0 / 0','slots[0] ← (72,45,100)','0 / 1 / 1'],
+     ['② Push 周期101','0 / 1 / 1','slots[1] ← (73,44,101)','0 / 2 / 2'],
+     ['③ Pop 周期100','0 / 2 / 2','slots[0] → received','1 / 2 / 1']]));
+  const explain=document.createElement('p');explain.textContent='这里的head是下一读位置，tail是下一写位置，count是已占用格数；main里的动作下标i不等于head/tail。queue在循环外只创建一次，成员会持续更新。';
+  quick.append(explain);
+  compass.append(h,p,quick,buttons,info);
   let more=$('day11ReadingDetails');
   if(!more){more=document.createElement('details');more.id='day11ReadingDetails';
-    const summary=document.createElement('summary');summary.textContent='深入解释 · 12节拓展内容与逐步演算表（点击展开）';
+    const summary=document.createElement('summary');summary.textContent='完整讲解与逐句执行链（默认展开；内容较长，可点此收起）';
     more.append(summary);$('reading').before(more);more.append($('reading'));
   }
-  more.hidden=false;more.open=false;$('reading').hidden=false;
+  more.hidden=false;more.open=true;$('reading').hidden=false;
   $('code').classList.remove('expanded');$('expandCode').textContent='展开全部源码';
   $('expandCode').setAttribute('aria-expanded','false');
 }
