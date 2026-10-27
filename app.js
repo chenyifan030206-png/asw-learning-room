@@ -72,7 +72,7 @@ function coloredCode(target,source,firstLine=1){
   const token=/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:0[xX][\da-fA-F]+|\b(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)[uUlLfF]*|\b[a-zA-Z_]\w*\b|[\s\S]/g;
   for(const match of source.matchAll(token)){const t=match[0];let cls='';
     if(t.startsWith('/*')||t.startsWith('//'))cls='syntax-comment';else if(t[0]==='"'||t[0]==="'")cls='syntax-string';else if(/^\d/.test(t))cls='syntax-number';
-    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|Codec_Encode|Codec_Decode|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process|Acc_Step|Timeline_Run)$/.test(t))cls='syntax-function';
+    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|Codec_Encode|Codec_Decode|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process|Acc_Step|Timeline_Run|Queue_Push|Queue_Pop)$/.test(t))cls='syntax-function';
     t.split('\n').forEach((part,i)=>{if(i)newLine();if(part){const span=document.createElement('span');span.className=cls;span.textContent=part;content.append(span);}});
   }
 }
@@ -168,6 +168,52 @@ $('editCodeNotes').onclick=()=>{showCodeView('edit');$('codeNotes').focus();};
 $('previewCodeNotes').onclick=()=>showCodeView('personal');
 $('downloadLegacyNotes').onclick=()=>download(legacyCode,`D${String(day).padStart(2,'0')}-旧版整合注释.c`,'text/plain;charset=utf-8');
 $('downloadCodeNotes').onclick=async()=>{try{await saveNotes();download($('codeNotes').value,`D${String(day).padStart(2,'0')}-我的-${activeFile}`,'text/plain;charset=utf-8');}catch(e){message(e.message);}};
+
+function day11FindSymbol(symbol){
+  const src=sourceFile(symbol.file).text,lines=src.split('\n');
+  const idx=lines.findIndex(line=>line.includes(symbol.match));
+  if(idx<0){message('没有找到 '+symbol.name+' 的原始定义。');return;}
+  tab('learn');chooseFile(symbol.file);
+  const code=$('code'),line=code.querySelector('[data-line="'+(idx+1)+'"]');
+  code.querySelectorAll('.selected-line').forEach(x=>x.classList.remove('selected-line'));
+  if(line){line.classList.add('selected-line');$('codeFile').scrollIntoView({block:'start'});line.scrollIntoView({block:'center'});}
+  $('day11SymbolInfo').textContent=symbol.name+' → '+symbol.file+' 第'+(idx+1)+'行。'+symbol.what+'。'+symbol.lifetime;
+}
+function renderDay11Guide(){
+  const is11=day===11,area=$('workspace');
+  area.classList.toggle('day11-mode',is11);
+  const cloud=$('cloudPanel');let toggle=$('day11CloudToggle');
+  if(!toggle){
+    toggle=document.createElement('button');toggle.id='day11CloudToggle';toggle.className='small';
+    cloud.before(toggle);
+    toggle.onclick=()=>{cloud.hidden=!cloud.hidden;toggle.textContent=cloud.hidden?'展开云端记录设置':'收起云端记录设置';};
+  }
+  toggle.hidden=!is11;cloud.hidden=is11;toggle.textContent='展开云端记录设置';
+  let compass=$('day11Compass');
+  if(!compass){compass=document.createElement('section');compass.id='day11Compass';compass.className='day11-compass';}
+  compass.replaceChildren();compass.hidden=!is11;
+  if(!is11){$('code').after($('walkthrough'));$('reading').hidden=false;return;}
+  $('projectIntro').after(compass);$('architecture').after($('walkthrough'));
+  const h=document.createElement('h3');h.textContent='找不到变量？点击即可定位真正的定义';
+  const p=document.createElement('p');p.textContent='先看“这个名字在哪里定义、是什么类型、在本轮怎样变化”，再读计算过程。下列按钮只切换课程原版源码，不更改你的个人注释和批注。';
+  const buttons=document.createElement('div');buttons.className='d11-symbols';
+  for(const symbol of lesson.symbols||[]){
+    const button=document.createElement('button');button.type='button';button.className='small';
+    button.textContent=symbol.name;button.title=symbol.what;
+    button.onclick=()=>day11FindSymbol(symbol);buttons.append(button);
+  }
+  const info=document.createElement('p');info.id='day11SymbolInfo';info.className='muted';
+  info.textContent='推荐依次查看：FrameQueue → queue → Queue_Push → Queue_Pop → draft → received。';
+  compass.append(h,p,buttons,info);
+  let more=$('day11ReadingDetails');
+  if(!more){more=document.createElement('details');more.id='day11ReadingDetails';
+    const summary=document.createElement('summary');summary.textContent='深入解释 · 12节拓展内容与逐步演算表（点击展开）';
+    more.append(summary);$('reading').before(more);more.append($('reading'));
+  }
+  more.hidden=false;more.open=false;$('reading').hidden=false;
+  $('code').classList.remove('expanded');$('expandCode').textContent='展开全部源码';
+  $('expandCode').setAttribute('aria-expanded','false');
+}
 function renderBitLab(){
   const target=$('bitLab');target.replaceChildren();target.hidden=day!==4;if(day!==4)return;
   const title=document.createElement('h3');title.textContent='点一下bit，就能看见移位、合并与提取';target.append(title);
@@ -220,7 +266,7 @@ async function selectDay(d){
   $('waiting').hidden=true;$('workspace').hidden=false;$('dayTag').textContent=`D${String(day).padStart(2,'0')} · 第${c.week}周 · ${c.stage}`;
   $('title').textContent=lesson.title;$('summary').textContent=lesson.summary;$('time').textContent=lesson.time;
   $('goals').replaceChildren();for(const goal of lesson.goals){const li=document.createElement('li');li.textContent=goal;$('goals').append(li);}
-  renderCode();renderBitLab();$('reading').replaceChildren();
+  renderCode();renderDay11Guide();renderBitLab();$('reading').replaceChildren();
   for(const [ri,r] of (lesson.code_sections?lesson.reading.slice(1):lesson.reading).entries()){const section=document.createElement('section'),h=document.createElement('h3');section.dataset.annotationScope='reading:'+ri;h.textContent=r.title;section.append(h);for(const text of r.text.split('\n')){const p=document.createElement('p');p.textContent=text;section.append(p);}if(r.table)section.append(makeTable(r.table.headers,r.table.rows));for(const source of r.sources||[]){const p=document.createElement('p'),a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';p.append(a);section.append(p);}$('reading').append(section);}
   if(!lesson.project_name)for(const asset of lesson.assets||[]){const section=document.createElement('section'),h=document.createElement('h3'),pre=document.createElement('pre'),button=document.createElement('button');h.textContent='完整文件 · '+asset.name;pre.textContent=asset.text;pre.style.maxHeight='none';button.textContent='下载 '+asset.name;button.onclick=()=>download(asset.text,asset.name,'text/plain;charset=utf-8');section.append(h,pre,button);$('reading').append(section);}
   if(lesson.project_name){const button=document.createElement('button');button.textContent='下载完整项目ZIP';button.id='downloadProject';button.className='primary';button.onclick=()=>download(projectZip(lesson.assets,lesson.project_name),lesson.project_name+'.zip','application/zip');$('architecture').append(button);}
