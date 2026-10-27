@@ -54,3 +54,16 @@
 .d11-trace-explanation{padding:12px;background:#eaf1ff;border-left:3px solid var(--accent);border-radius:5px}
 @media(max-width:1000px){#workspace.day11-mode .walk-grid{grid-template-columns:minmax(0,1fr)}#workspace.day11-mode #stepCode{max-height:380px}}
 @media(max-width:600px){#workspace.day11-mode #walkthrough{padding:10px}#day11QueueTrace{padding:10px}.d11-slots{grid-template-columns:repeat(2,minmax(0,1fr))}.d11-trace-state{grid-template-columns:minmax(0,1fr)}.d11-trace-controls button{min-height:40px}#workspace.day11-mode .step-buttons button{font-size:13px}}
+
+/* Day11 v2: readable execution-first learning layout, without changing notes/storage. */
+#workspace.day11-mode #day11Compass{background:var(--card,#fff);border:1px solid var(--border);padding:clamp(14px,2vw,24px)}
+#workspace.day11-mode .d11-quick-path{margin:14px 0 18px;padding:14px;border-radius:10px;background:var(--soft);border:1px solid var(--border)}
+#workspace.day11-mode .d11-quick-path h4{margin:0 0 10px;font-size:16px}
+#workspace.day11-mode .d11-quick-path p{font-size:14px;line-height:1.8}
+#workspace.day11-mode .d11-quick-path table{min-width:590px}
+#workspace.day11-mode #day11ReadingDetails{border-left:4px solid var(--accent);margin:14px 0 22px}
+#workspace.day11-mode #day11ReadingDetails>summary{cursor:pointer;line-height:1.7}
+#workspace.day11-mode #stepExplanation{font-size:15px;line-height:1.85}
+#workspace.day11-mode #stepCode{font-size:13px;line-height:1.7}
+#workspace.day11-mode .d11-symbols button{min-height:42px;white-space:normal;overflow-wrap:anywhere}
+@media(max-width:600px){#workspace.day11-mode .d11-quick-path{padding:10px}#workspace.day11-mode .d11-symbols button{font-size:12px}#workspace.day11-mode #stepExplanation{padding:10px}}
