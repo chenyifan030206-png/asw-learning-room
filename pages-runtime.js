@@ -96,6 +96,50 @@ function pagesSimulate(day,values){
     result={chapter,build_status:0,program_ran:1,test_count:1+chapter,compiler_log:'浏览器模拟：主课默认只构建时间轴；附录另行启用。没有实际执行C、实时调度或ROS节点。'};
     if(chapter){const status=signalValid!==1||![1,2].includes(source)||!Number.isFinite(speed)||speed<0||speed>50||now<0||now>1000000||stamp<0||stamp>1000000?-2:stamp>now?-3:now-stamp>100?-4:0;Object.assign(result,{status,valid:Number(status===0)});if(status===0||status===-4)result.age_ms=now-stamp;}
     else{const status=!Number.isFinite(speed)||speed<0||speed>50||(skip!==-1&&(skip<1||skip>5))||late<0||late>9?-2:0;Object.assign(result,{status,valid:Number(status===0)});if(status===0){const control_ms=[],dt_ms=[],perception_ms=[0,20,40,60];let fixed=0,measured=0,last=0;for(let tick=0;tick<=6;tick++){if(tick===skip)continue;const now=tick*10+(tick===3?late:0),dt=control_ms.length?now-last:0;control_ms.push(now);dt_ms.push(dt);if(control_ms.length>1){fixed=f(fixed+f(speed*f(0.010)));measured=f(measured+f(speed*f(f(dt)/f(1000))));}last=now;}Object.assign(result,{control_ms,dt_ms,perception_ms,control_count:control_ms.length,update_count:control_ms.length-1,perception_count:4,fixed_distance_m:Number(fixed.toFixed(6)),measured_distance_m:Number(measured.toFixed(6))});}}
+  }else if(day===11){
+    // D11为完全单线程的JS教学演算，不模拟真实共享内存/线程同步。
+    const v=pagesNumbers(values,1),scenario=v[0];
+    if(!Number.isInteger(scenario)||scenario<0||scenario>4)throw Error('D11场景必须是整数0、1、2、3或4。');
+    const push=(speed,distance,sc,dc)=>({kind:0,frame:{speed_kmh:speed,distance_m:distance,speed_cycle:sc,distance_cycle:dc}}),pop=()=>({kind:1});
+    const groups=[
+      [push(72,45,100,100),push(73,44,101,101),pop()],
+      [push(70,50,1,1),push(71,49,2,2),pop(),push(72,48,3,3),
+        push(73,47,4,4),push(74,46,5,5),push(75,45,6,6),pop(),pop(),pop(),pop()],
+      [push(72,45,7,7),push(73,45,8,7),pop(),push(73,44,8,8),pop()],
+      [pop(),push(60,55,4,4),pop(),pop()],
+      [push(-1,55,4,4),push(61,54,5,5),pop()]
+    ],actions=groups[scenario];
+    let head=0,tail=0,count=0;const slots=Array(4).fill(null),rows=[],received=[];
+    for(const [i,action] of actions.entries()){
+      const before={head,tail,count},frame=action.frame;let status=0,saved=null,slot=null,reason='';
+      if(action.kind===0){
+        if(!Number.isFinite(frame.speed_kmh)||!Number.isFinite(frame.distance_m)||
+            frame.speed_kmh<0||frame.speed_kmh>250||frame.distance_m<0||frame.distance_m>500)
+          {status=-2;reason='数值非法，拒绝入队';}
+        else if(frame.speed_cycle!==frame.distance_cycle)
+          {status=-2;reason='速度/距离周期不一致，拒绝混合帧';}
+        else if(count===4){status=-3;reason='队列已满，不覆盖旧帧';}
+        else {
+          slot=tail;slots[tail]={...frame};tail=(tail+1)%4;count++;
+          reason='复制完整结构体到槽'+slot+'，tail回绕到'+tail;
+        }
+      }else {
+        if(count===0){status=-3;reason='队列为空，不能读取';}
+        else {
+          slot=head;saved={...slots[head]};head=(head+1)%4;count--;received.push(saved.speed_cycle);
+          reason='从槽'+slot+'复制完整帧到received，head更新为'+head;
+        }
+      }
+      const occupied=Array(4).fill(false);
+      for(let j=0;j<count;j++)occupied[(head+j)%4]=true;
+      rows.push({step:i,operation:action.kind===0?'push':'pop',
+        input_frame:frame||null,before,after:{head,tail,count},status,
+        used_slot:slot,received:saved,reason,occupied_slots:occupied,
+        slots:slots.map((x,k)=>({index:k,cycle:x?.speed_cycle??null,occupied:occupied[k]}))});
+    }
+    result={scenario,capacity:4,actions_count:actions.length,head,tail,count,rows,received_cycles:received,
+      statuses:rows.map(r=>r.status),final_occupied:rows.at(-1).slots.filter(x=>x.occupied).map(x=>x.cycle),
+      compiler_log:'这里是浏览器JS单线程模拟；未运行GCC、CTest，亦未建立真正的并发生产者/消费者。'};
   }else if(day===10){
     // D10只有场景号1个输入；浏览器严格标注为JS模拟，真实C由用户在WSL运行。
     const v=pagesNumbers(values,1),scenario=v[0];
@@ -167,6 +211,13 @@ function pagesRegression(day){
   cases[7]=[['标准',[72.5,1,1,8,0],{raw:725,decoded_speed:72.5}],['端序',[72.5,1,1,8,1],{received_raw:54530,decode_status:-2}],['模式',[72.5,1,1,8,2],{received_control:7,decode_status:-2}],['启用',[72.5,1,1,8,3],{assertions_enabled:1,assert_failed:1,side_effect_count:1}],['关闭',[72.5,1,1,8,4],{assertions_enabled:0,side_effect_count:0,continued:1}],['保护',[72.5,1,1,8,5],{include_count:2,header_enum_count:1}],['迁移',[54.3,2,1,8,0],{raw:543,frame:[31,2,6,0,0,0,0,0]}]];
   cases[8]=[['middle',[2,3,165,8,1],{after:[16,17,165,165,165,21,22,23],changed_count:3,test_count:1,checks_passed:7}],['reject',[7,2,0,8,1],{status:-2,changed_count:0}],['empty',[8,0,0,8,1],{status:0,changed_count:0}],['negative',[-1,1,0,8,1],{status:-2}],['byte',[5,2,-1,8,1],{fill_byte:255}],['large',[2,2,4660,8,1],{fill_byte:52}],['off',[2,3,165,8,0],{test_built:0,test_count:0,checks_passed:0}],['transfer',[3,2,0,8,1],{after:[16,17,18,0,0,21,22,23]}]];
   cases[9]=[['normal',[10,-1,0,1000,950,1,1,0],{control_ms:[0,10,20,30,40,50,60],measured_distance_m:0.6}],['miss',[10,3,0,1000,950,1,1,0],{dt_ms:[0,10,10,20,10,10],fixed_distance_m:0.5,measured_distance_m:0.6}],['late',[10,-1,5,1000,950,1,1,0],{dt_ms:[0,10,10,15,5,10,10]}],['reject',[-1,-1,0,1000,950,1,1,0],{status:-2}],['age50',[10,-1,0,1000,950,1,1,1],{age_ms:50,status:0}],['age100',[10,-1,0,1000,900,1,1,1],{age_ms:100,status:0}],['age101',[10,-1,0,1000,899,1,1,1],{status:-4}],['future',[10,-1,0,1000,1001,1,1,1],{status:-3}]];
+  cases[11]=[
+    ['基本先入先出',[0],{head:1,tail:2,count:1,received_cycles:[100],statuses:[0,0,0]}],
+    ['回绕满队列',[1],{head:1,tail:1,count:0,received_cycles:[1,2,3,4,5],statuses:[0,0,0,0,0,0,-3,0,0,0,0]}],
+    ['混合周期拒绝',[2],{count:0,received_cycles:[7,8],statuses:[0,-2,0,0,0]}],
+    ['空队列拒绝',[3],{count:0,statuses:[-3,0,0,-3]}],
+    ['非法车速拒绝',[4],{count:0,statuses:[-2,0,0],received_cycles:[5]}]
+  ];
   cases[10]=[
     ['基本状态',[0],{states:[0,1,2,2,0],alerts:[0,0,0,1,0],statuses:[0,0,0,0,0]}],
     ['十帧滞环',[1],{states:[2,2,2,2,2,2,2,2,2,2],alerts:[0,1,1,1,1,1,1,1,0,0],alert_changes:2}],
