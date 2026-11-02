@@ -72,7 +72,7 @@ function coloredCode(target,source,firstLine=1){
   const token=/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:0[xX][\da-fA-F]+|\b(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)[uUlLfF]*|\b[a-zA-Z_]\w*\b|[\s\S]/g;
   for(const match of source.matchAll(token)){const t=match[0];let cls='';
     if(t.startsWith('/*')||t.startsWith('//'))cls='syntax-comment';else if(t[0]==='"'||t[0]==="'")cls='syntax-string';else if(/^\d/.test(t))cls='syntax-number';
-    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|Codec_Encode|Codec_Decode|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process|Acc_Step|Timeline_Run|Queue_Push|Queue_Pop)$/.test(t))cls='syntax-function';
+    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|Codec_Encode|Codec_Decode|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process|Acc_Step|Timeline_Run|Queue_Push|Queue_Pop|App_RunOnce|VehicleIf_Read|VehicleIf_Write)$/.test(t))cls='syntax-function';
     t.split('\n').forEach((part,i)=>{if(i)newLine();if(part){const span=document.createElement('span');span.className=cls;span.textContent=part;content.append(span);}});
   }
 }
@@ -363,7 +363,11 @@ $('runButton').onclick=async()=>{
   try{const values=lesson.run_fields.map(f=>$(f.id).value.trim());const result=await api('/api/run',{day,values});
     $('output').replaceChildren();const grid=document.createElement('div');grid.className='output-grid';
     let explanation,summaryText;
-    if(lesson.runner==='sensor_queue_day11'){
+    if(lesson.runner==='vehicle_interface_day12'){
+      grid.append(item('实验场景',result.scenario),item('执行次数',result.steps),item('已成功发布',result.publish_count),item('状态码',result.statuses.join(',')),item('发布标志',result.published.join(',')));
+      explanation='status、published、valid含义不同。写失败没有新输出；无效输出即使写成功也不能当作有效距离判断。仅JavaScript模拟，不是C程序运行。';
+      summaryText='D12 statuses='+result.statuses.join(',')+' published='+result.published.join(',');
+    }else if(lesson.runner==='sensor_queue_day11'){
       grid.append(item('容量（格）',result.capacity),item('动作数量',result.actions_count),
         item('最终head',result.head),item('最终tail',result.tail),item('剩余count',result.count),
         item('成功Pop周期',result.received_cycles.join(',')||'无'));
@@ -429,6 +433,13 @@ $('runButton').onclick=async()=>{
       summaryText=`${mode}，status=${result.status}，valid=${result.valid}${result.valid?`，期望=${result.desired}m，误差=${result.error}m`:''}`;
     }
     $('output').append(grid);const p=document.createElement('p');p.textContent=explanation;$('output').append(p);
+    if(lesson.runner==='vehicle_interface_day12'){
+      const p=document.createElement('p');p.textContent='published=0表示本轮没有新结果；published=1且valid=0表示确实发布了一份无效结果。';
+      $('output').append(p,makeTable(['轮次','Read码','应用状态','本轮发布','valid','warning','周期','距离m','解释'],
+        result.rows.map(x=>[x.step,x.read_status,x.app_status,x.published,
+          x.valid===null?'—':x.valid,x.warning===null?'—':x.warning,
+          x.cycle===null?'—':x.cycle,x.distance_m===null?'—':x.distance_m,x.explanation])));
+    }
     if(lesson.runner==='sensor_queue_day11')renderDay11Trace(result);
     if(lesson.runner==='acc_state_day10'){
       const help=document.createElement('p');help.textContent='状态值对照：0 OFF关闭、1 READY等待雷达、2 ACTIVE正常监视、3 FAULT故障锁存。逐帧数据来自浏览器模拟，非真实C执行。';
