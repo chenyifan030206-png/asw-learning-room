@@ -179,6 +179,46 @@ function day11FindSymbol(symbol){
   if(line){line.classList.add('selected-line');$('codeFile').scrollIntoView({block:'start'});line.scrollIntoView({block:'center'});}
   $('day11SymbolInfo').textContent=symbol.name+' → '+symbol.file+' 第'+(idx+1)+'行。'+symbol.what+'。'+symbol.lifetime;
 }
+function renderDay12Guide(){
+  const is12=day===12,area=$('workspace');
+  area.classList.toggle('day12-mode',is12);
+  let panel=$('day12Primer');
+  if(!panel){panel=document.createElement('section');panel.id='day12Primer';}
+  panel.replaceChildren();panel.hidden=!is12;
+  if(!is12)return;
+  $('projectIntro').after(panel);
+  $('architecture').after($('walkthrough')); // 跟在定义总表后，不被长完整源码隔开
+  const h=document.createElement('h3');h.textContent='先看3次真实调用的结果，再沿源码追踪';
+  const p=document.createElement('p');p.textContent='先跑场景0：45m→34m→42m。每次main调用App_RunOnce，应用经过VehicleIf_Read/Write，再返回main；点击下方变量按钮能定位定义行。';
+  panel.append(h,p,makeTable(['轮次','模拟输入','Read写到sample','App产生result','Write后main看到'],
+    [['0','72km/h，45m','sample=(72,45,1,100)','warning=0, valid=1','status=0, published=1'],
+     ['1','73km/h，34m','sample=(73,34,1,101)','warning=1, valid=1','status=0, published=1'],
+     ['2','74km/h，42m','sample=(74,42,1,102)','warning=0, valid=1','status=0, published=1']]));
+  const tip=document.createElement('h4');tip.textContent='符号就地解释：先看对象类型，再决定怎么写';
+  panel.append(tip,makeTable(['源码写法','声明类型','这一步究竟做什么'],
+    [['sample.distance_m','VehicleSample sample（对象）','对象用.取成员'],
+     ['step->frame','const MockStep *step（指针）','指针用->取成员；等于(*step).frame'],
+     ['VehicleIf_Read(&sample)','sample是对象','&取得地址并交给函数'],
+     ['VehicleSample *out','函数形参声明','*在此表示声明指针'],
+     ['*out = step->frame','out是指针','*在此表示指针解引用，写回整个sample']]));
+  const label=document.createElement('h4');label.textContent='点名称：直接查它在哪个文件、哪一行定义';
+  const nav=document.createElement('div');nav.className='d12-symbols';
+  const info=document.createElement('p');info.className='muted';info.textContent='推荐依次点：sample → VehicleIf_Read → out → step → result → VehicleIf_Write。';
+  for(const symbol of lesson.symbols||[]){
+    const b=document.createElement('button');b.className='small';b.type='button';b.textContent=symbol.name;
+    b.title=symbol.what;b.onclick=()=>{
+      const source=sourceFile(symbol.file).text,lines=source.split('\n');
+      const at=lines.findIndex(line=>line.includes(symbol.match));
+      if(at<0){message('未找到 '+symbol.name+' 的源码定义');return;}
+      tab('learn');chooseFile(symbol.file);
+      const code=$('code');code.querySelectorAll('.selected-line').forEach(x=>x.classList.remove('selected-line'));
+      const current=code.querySelector('[data-line="'+(at+1)+'"]');
+      if(current){current.classList.add('selected-line');$('codeFile').scrollIntoView({block:'start'});current.scrollIntoView({block:'center'});}
+      info.textContent=symbol.name+' → '+symbol.file+' 第'+(at+1)+'行：'+symbol.what+'。'+symbol.lifetime;
+    };nav.append(b);
+  }
+  panel.append(label,nav,info);
+}
 function renderDay11Guide(){
   const is11=day===11,area=$('workspace');
   area.classList.toggle('day11-mode',is11);
@@ -323,7 +363,7 @@ async function selectDay(d){
   $('waiting').hidden=true;$('workspace').hidden=false;$('dayTag').textContent=`D${String(day).padStart(2,'0')} · 第${c.week}周 · ${c.stage}`;
   $('title').textContent=lesson.title;$('summary').textContent=lesson.summary;$('time').textContent=lesson.time;
   $('goals').replaceChildren();for(const goal of lesson.goals){const li=document.createElement('li');li.textContent=goal;$('goals').append(li);}
-  renderCode();renderDay11Guide();renderBitLab();$('reading').replaceChildren();
+  renderCode();renderDay11Guide();renderDay12Guide();renderBitLab();$('reading').replaceChildren();
   for(const [ri,r] of (lesson.code_sections?lesson.reading.slice(1):lesson.reading).entries()){const section=document.createElement('section'),h=document.createElement('h3');section.dataset.annotationScope='reading:'+ri;h.textContent=r.title;section.append(h);for(const text of r.text.split('\n')){const p=document.createElement('p');p.textContent=text;section.append(p);}if(r.table)section.append(makeTable(r.table.headers,r.table.rows));for(const source of r.sources||[]){const p=document.createElement('p'),a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';p.append(a);section.append(p);}$('reading').append(section);}
   if(!lesson.project_name)for(const asset of lesson.assets||[]){const section=document.createElement('section'),h=document.createElement('h3'),pre=document.createElement('pre'),button=document.createElement('button');h.textContent='完整文件 · '+asset.name;pre.textContent=asset.text;pre.style.maxHeight='none';button.textContent='下载 '+asset.name;button.onclick=()=>download(asset.text,asset.name,'text/plain;charset=utf-8');section.append(h,pre,button);$('reading').append(section);}
   if(lesson.project_name){const button=document.createElement('button');button.textContent='下载完整项目ZIP';button.id='downloadProject';button.className='primary';button.onclick=()=>download(projectZip(lesson.assets,lesson.project_name),lesson.project_name+'.zip','application/zip');$('architecture').append(button);}
