@@ -67,3 +67,14 @@
 #workspace.day11-mode #stepCode{font-size:13px;line-height:1.7}
 #workspace.day11-mode .d11-symbols button{min-height:42px;white-space:normal;overflow-wrap:anywhere}
 @media(max-width:600px){#workspace.day11-mode .d11-quick-path{padding:10px}#workspace.day11-mode .d11-symbols button{font-size:12px}#workspace.day11-mode #stepExplanation{padding:10px}}
+
+/* D12: emphasize current execution and symbol type before long code. */
+#workspace.day12-mode #day12Primer{border:1px solid var(--border);border-radius:12px;padding:clamp(14px,2vw,22px);margin:14px 0 20px;background:var(--card,#fff)}
+#workspace.day12-mode #day12Primer h3{margin-top:0}
+#workspace.day12-mode #day12Primer p{font-size:15px;line-height:1.85}
+#workspace.day12-mode #day12Primer h4{margin:22px 0 10px}
+#workspace.day12-mode .d12-symbols{display:flex;flex-wrap:wrap;gap:8px}
+#workspace.day12-mode .d12-symbols button{min-height:42px;overflow-wrap:anywhere;white-space:normal}
+#workspace.day12-mode #stepExplanation{font-size:15px;line-height:1.85}
+#workspace.day12-mode #stepCode{font-size:13px;line-height:1.75}
+@media(max-width:600px){#workspace.day12-mode #day12Primer{padding:12px}#workspace.day12-mode .d12-symbols button{min-width:85px}}
