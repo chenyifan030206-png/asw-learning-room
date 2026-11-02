@@ -6777,6 +6777,616 @@
         }
       ],
       "code": "#include \"sensor_queue.h\"\n#include <stdio.h>\n\n/* 动作：0放入一帧，1取出一帧。只有输入队列时才使用frame。 */\ntypedef enum { ACTION_PUSH = 0, ACTION_POP = 1 } ActionKind;\ntypedef struct {\n    ActionKind kind;\n    SensorFrame frame;\n} DemoAction;\n\n/* 场景0：入、入、出；最适合第一次追踪。 */\nstatic const DemoAction BASIC[] = {\n    {ACTION_PUSH, {72.0f, 45.0f, 100U, 100U}},\n    {ACTION_PUSH, {73.0f, 44.0f, 101U, 101U}},\n    {.kind = ACTION_POP}\n};\n/* 场景1：写到下标3，再回到0；满时拒绝第6次放入。 */\nstatic const DemoAction WRAP_FULL[] = {\n    {ACTION_PUSH, {70.0f, 50.0f, 1U, 1U}},\n    {ACTION_PUSH, {71.0f, 49.0f, 2U, 2U}},\n    {.kind = ACTION_POP},\n    {ACTION_PUSH, {72.0f, 48.0f, 3U, 3U}},\n    {ACTION_PUSH, {73.0f, 47.0f, 4U, 4U}},\n    {ACTION_PUSH, {74.0f, 46.0f, 5U, 5U}},\n    {ACTION_PUSH, {75.0f, 45.0f, 6U, 6U}},\n    {.kind = ACTION_POP},\n    {.kind = ACTION_POP},\n    {.kind = ACTION_POP},\n    {.kind = ACTION_POP}\n};\n/* 场景2：本帧速度来自周期8、距离来自周期7，拒绝混帧。 */\nstatic const DemoAction MIXED[] = {\n    {ACTION_PUSH, {72.0f, 45.0f, 7U, 7U}},\n    {ACTION_PUSH, {73.0f, 45.0f, 8U, 7U}},\n    {.kind = ACTION_POP},\n    {ACTION_PUSH, {73.0f, 44.0f, 8U, 8U}},\n    {.kind = ACTION_POP}\n};\n/* 场景3：空时拒绝Pop，之后重新放入又可读取。 */\nstatic const DemoAction EMPTY[] = {\n    {.kind = ACTION_POP},\n    {ACTION_PUSH, {60.0f, 55.0f, 4U, 4U}},\n    {.kind = ACTION_POP},\n    {.kind = ACTION_POP}\n};\n/* 场景4：非法速度拒绝；其后的正常帧不受影响。 */\nstatic const DemoAction BAD_VALUE[] = {\n    {ACTION_PUSH, {-1.0f, 55.0f, 4U, 4U}},\n    {ACTION_PUSH, {61.0f, 54.0f, 5U, 5U}},\n    {.kind = ACTION_POP}\n};\n\nint main(void)\n{\n    int scenario = 0;\n    if (scanf(\"%d\", &scenario) != 1) {\n        printf(\"input_error=1\\n\");\n        return 1;\n    }\n\n    /* 这两个量描述本次选中的数组，不是重新复制全部帧。 */\n    const DemoAction *actions = NULL;\n    size_t action_count = 0U;\n    switch (scenario) {\n        case 0: actions = BASIC; action_count = sizeof(BASIC) / sizeof(BASIC[0]); break;\n        case 1: actions = WRAP_FULL; action_count = sizeof(WRAP_FULL) / sizeof(WRAP_FULL[0]); break;\n        case 2: actions = MIXED; action_count = sizeof(MIXED) / sizeof(MIXED[0]); break;\n        case 3: actions = EMPTY; action_count = sizeof(EMPTY) / sizeof(EMPTY[0]); break;\n        case 4: actions = BAD_VALUE; action_count = sizeof(BAD_VALUE) / sizeof(BAD_VALUE[0]); break;\n        default: printf(\"input_error=2\\n\"); return 1;\n    }\n\n    /* 只有一个队列，放在for外；每次操作后位置、数量都保留。 */\n    FrameQueue queue = {0};\n    printf(\"scenario=%d actions=%zu capacity=%u\\n\",\n           scenario, action_count, (unsigned)QUEUE_CAPACITY);\n\n    for (size_t i = 0U; i < action_count; ++i) {\n        const DemoAction *action = &actions[i];\n        int status = 0;\n        SensorFrame received = {0}; /* 本轮输出对象 */\n        if (action->kind == ACTION_PUSH) {\n            status = Queue_Push(&queue, &action->frame);\n            printf(\"step=%zu op=push cycle=%u/%u status=%d head=%zu tail=%zu count=%zu\\n\",\n                   i, (unsigned)action->frame.speed_cycle,\n                   (unsigned)action->frame.distance_cycle, status,\n                   queue.head, queue.tail, queue.count);\n        } else {\n            status = Queue_Pop(&queue, &received);\n            printf(\"step=%zu op=pop status=%d head=%zu tail=%zu count=%zu\",\n                   i, status, queue.head, queue.tail, queue.count);\n            if (status == 0) {\n                printf(\" cycle=%u speed=%.1f distance=%.1f\",\n                       (unsigned)received.speed_cycle,\n                       (double)received.speed_kmh, (double)received.distance_m);\n            }\n            printf(\"\\n\");\n        }\n    }\n    return 0;\n}\n"
+    },
+    "12": {
+      "day": 12,
+      "revision": "2026-11-02-asw-interface-v1",
+      "title": "ASW、车辆接口与mock：用 .、->、* 看懂读写调用链",
+      "source": "demo.c",
+      "runner": "vehicle_interface_day12",
+      "project_name": "day12_vehicle_interface",
+      "time": "两遍学习：先正常3帧和指针语法，再错误处理与本地GCC；CMake可放最后。",
+      "summary": "从D11的%4、volatile、head/tail/count误区出发。主课只讲应用为什么经接口读/写数据，沿main→App_RunOnce→VehicleIf_Read/Write→main逐行追踪对象、指针与返回状态。本课使用mock，不是实际AUTOSAR RTE。",
+      "goals": [
+        "纠正%4不是四进制；能解释结构体成员声明与#define的区别，volatile不等于线程同步。",
+        "能指出VehicleSample、VehicleResult、App_RunOnce、VehicleIf_Read/Write的声明和定义位置。",
+        "能根据类型解释sample.distance_m、step->frame、*out=...、&sample的差别。",
+        "能用三帧45/34/42m推算有效输出，并解释status、published、valid各表示什么。",
+        "能辨别Read失败、雷达无效、Write失败时哪些数据真的发布成功。",
+        "能在WSL单独使用GCC构建demo与独立test，不把网页模拟当本地C测试。"
+      ],
+      "flow_text": "构建：vehicle_if.h声明接口→app.c定义应用→mock.c定义Read/Write→编译链接。执行：demo.c main→Mock_Select→for每轮App_RunOnce→app.c创建sample/result→VehicleIf_Read(&sample)→mock.c通过*out=step->frame写回→返回app，用sample.成员校验和计算→VehicleIf_Write(&result)→mock.c成功才保存并计数→回main检查本轮published→下一帧。",
+      "remediation_title": "必看：D11的%4是取余；.、->、*、&由类型决定",
+      "project_intro": {
+        "title": "场景：为什么应用不应该知道车速数据藏在哪个数组里？",
+        "paragraphs": [
+          "这次不做新控制算法。假设车辆上层应用要取得一帧速度与距离，计算简单距离提示。为了让应用不依赖具体CAN硬件或测试数组，我们制定一个简单接口：VehicleIf_Read负责给应用数据，VehicleIf_Write负责接收应用输出。",
+          "首次只看3个正常距离：45m→不提示、34m→提示、42m→不提示。阈值35m只是教学数据；本课故意不复用D10滞环，也没有真实车辆控制。",
+          "完整函数关系先用main→App_RunOnce→VehicleIf_Read/Write→main走一遍；代码里每次出现.、->、*、&就标明左边对象的类型及数据流向。这个接口是自定义mock，不是AUTOSAR生成的RTE。"
+        ]
+      },
+      "architecture": {
+        "headers": [
+          "名字",
+          "在哪里首次定义",
+          "类型/参数含义",
+          "谁在何处读取或写入"
+        ],
+        "rows": [
+          [
+            "VehicleSample与4个成员",
+            "vehicle_if.h typedef struct",
+            "输入结构体类型，不是某个全局变量",
+            "app.c创建sample；mock.c的Read向它写回"
+          ],
+          [
+            "VehicleResult与3个成员",
+            "vehicle_if.h typedef struct",
+            "输出结构体类型，有warning/valid/cycle",
+            "app.c创建result；Write读取；demo.c读取last"
+          ],
+          [
+            "VehicleIf_Read(VehicleSample *out)",
+            "vehicle_if.h声明、mock.c定义",
+            "out是可写指针，保存app中sample的地址",
+            "app.c调用Read(&sample)；mock.c通过*out复制整帧"
+          ],
+          [
+            "VehicleIf_Write(const VehicleResult *result)",
+            "vehicle_if.h声明、mock.c定义",
+            "result是只读指针，指向app准备发布的结果",
+            "app.c调用Write(&result)，mock.c复制到g_last"
+          ],
+          [
+            "App_RunOnce(void)",
+            "app.h声明、app.c定义",
+            "应用函数，无参数；0/-2/-3/-4是执行状态码",
+            "demo.c的for每轮调用一次"
+          ],
+          [
+            "scenario",
+            "demo.c main局部变量",
+            "int场景号0～4",
+            "scanf读取，Mock_Select选择模拟数组"
+          ],
+          [
+            "sample与result",
+            "app.c App_RunOnce函数中",
+            "两个真实结构体对象，成员使用点号",
+            "Read修改sample；应用修改result并传给Write"
+          ],
+          [
+            "step",
+            "mock.c VehicleIf_Read函数内",
+            "const MockStep *结构体指针，用step->成员",
+            "选择本轮预设输入与读取故障标志"
+          ],
+          [
+            "out",
+            "mock.c VehicleIf_Read形参",
+            "VehicleSample *指针；*out指向app的sample对象",
+            "*out = step->frame写回整帧"
+          ],
+          [
+            "g_next与g_published",
+            "mock.c文件作用域static",
+            "模拟步号与成功发布次数，不是应用变量",
+            "每次Read改变g_next，成功Write增加g_published"
+          ],
+          [
+            "last",
+            "demo.c本轮published条件分支",
+            "VehicleResult局部对象，成员用点号",
+            "只有本次成功发布才通过Mock_Last(&last)读取"
+          ],
+          [
+            "status、published、valid",
+            "demo.c局部变量与VehicleResult成员",
+            "应用函数结果、写出是否成功、输出是否有效三件不同的事",
+            "main按三者分别展示，不能互相替代"
+          ]
+        ]
+      },
+      "symbols": [
+        {
+          "name": "VehicleSample",
+          "file": "vehicle_if.h",
+          "match": "float speed_kmh;",
+          "what": "输入结构体类型的成员声明；还没创建sample对象",
+          "lifetime": "编译时类型"
+        },
+        {
+          "name": "VehicleResult",
+          "file": "vehicle_if.h",
+          "match": "int warning;",
+          "what": "输出类型，valid=0时warning不能用来判断安全",
+          "lifetime": "编译时类型"
+        },
+        {
+          "name": "App_RunOnce",
+          "file": "app.c",
+          "match": "int App_RunOnce(void)",
+          "what": "应用函数定义；由main每轮调用",
+          "lifetime": "每轮调用一次"
+        },
+        {
+          "name": "sample",
+          "file": "app.c",
+          "match": "VehicleSample sample = {0};",
+          "what": "真实结构体对象，使用sample.distance_m",
+          "lifetime": "每轮App_RunOnce内部"
+        },
+        {
+          "name": "result",
+          "file": "app.c",
+          "match": "VehicleResult result = {0};",
+          "what": "本轮输出对象，写出前填valid和warning",
+          "lifetime": "每轮App_RunOnce内部"
+        },
+        {
+          "name": "out",
+          "file": "mock.c",
+          "match": "int VehicleIf_Read(VehicleSample *out)",
+          "what": "Read的指针形参，*out是app中的sample",
+          "lifetime": "本轮Read函数调用"
+        },
+        {
+          "name": "step",
+          "file": "mock.c",
+          "match": "const MockStep *step =",
+          "what": "指向预设步骤的只读指针，用step->访问",
+          "lifetime": "本轮Read函数调用"
+        },
+        {
+          "name": "VehicleIf_Read",
+          "file": "mock.c",
+          "match": "int VehicleIf_Read(",
+          "what": "接口函数定义，原型在vehicle_if.h",
+          "lifetime": "从app.c调用"
+        },
+        {
+          "name": "VehicleIf_Write",
+          "file": "mock.c",
+          "match": "int VehicleIf_Write(",
+          "what": "写出函数定义，只有成功才更改g_last",
+          "lifetime": "从app.c调用"
+        },
+        {
+          "name": "last",
+          "file": "demo.c",
+          "match": "VehicleResult last = {0};",
+          "what": "演示本轮成功发布后取回的对象",
+          "lifetime": "本轮main的for内部"
+        }
+      ],
+      "run_fields": [
+        {
+          "id": "scenario",
+          "label": "本轮实验场景",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "0 · 正常45/34/42m"
+            ],
+            [
+              "1",
+              "1 · 第二帧读取失败"
+            ],
+            [
+              "2",
+              "2 · 雷达标志无效"
+            ],
+            [
+              "3",
+              "3 · 第二帧写失败"
+            ],
+            [
+              "4",
+              "4 · 第二帧车速非法"
+            ]
+          ]
+        }
+      ],
+      "reading": [
+        {
+          "title": "00 · 回顾D11：%4不是四进制，volatile不是同步",
+          "text": "D11中tail=(tail+1)%4，%是整数取余：tail=3时(3+1)%4=0。它是让下标在0到3循环，并非四进制表示。四进制是数字的表示方法，取余是一种运算。\nhead、tail、count在sensor_queue.h的FrameQueue结构体里分别声明为成员，main创建queue对象时成员同时存在；#define QUEUE_CAPACITY 4u是预处理宏定义，与成员声明不同。\nvolatile是类型限定符，使针对该类型对象的某些访问按规定被视为可观察访问；不代表“定义”，不能当原子操作或多线程快照保证。本课不使用volatile。"
+        },
+        {
+          "title": "01 · 项目角色：ASW、接口和mock是什么",
+          "text": "ASW泛指应用软件。在本教学项目中app.c承担应用层职责，负责读入数据、验证、计算距离提示；vehicle_if.h声明输入输出类型及函数接口，mock.c只在测试环境提供具体的Read/Write实现。demo.c选择模拟场景并调用应用。\nAUTOSAR RTE通常由配置工具生成并连接软件组件端口；本课程自定义VehicleIf_Read/Write只是演示接口解耦，不是实际RTE、CAN驱动或量产实现。"
+        },
+        {
+          "title": "02 · 先画一张数据地图，再读代码",
+          "text": "vehicle_if.h定义VehicleSample输入类型和VehicleResult输出类型。app.c函数内创建VehicleSample sample={0}及VehicleResult result={0}；main不直接传入这两帧。\nRead函数参数VehicleSample *out收到&sample，执行*out=step->frame时将mock数组里当前结构体复制到sample。回到app.c就能用sample.speed_kmh和sample.distance_m；计算后将&result交给Write，mock再用g_last=*result存一份。\n读写函数的声明在.h，实现却在mock.c；编译链接两个.c之后才可以调用，include头文件并不会自动执行mock.c。"
+        },
+        {
+          "title": "03 · 四个符号逐一分辨：.、->、*、&",
+          "text": "点号.：变量本身是结构体对象，如VehicleSample sample={0};，就写sample.distance_m。箭头->：变量本身是指针，如const MockStep *step，读取成员就写step->read_fail；完全等价于(*step).read_fail。\n星号*在声明VehicleSample *out时是“声明指针”，在表达式*out=step->frame中是“解引用，访问整个被指向对象”；在算术表达式3*4才是乘法。\n&sample是“取sample地址”，提供给要求VehicleSample *out的函数形参；本课的&不是按位与。看到这些符号先查变量声明，不要只看名字猜用法。"
+        },
+        {
+          "title": "04 · 场景0：第0帧从main到mock再回main",
+          "text": "输入场景0后，Mock_Select(0)选定三帧。main的i=0，记录before=0，调用App_RunOnce()。应用创建sample/result为全零，调用VehicleIf_Read(&sample)进入mock.c。\nmock中step指向STEPS[0][0]，指针用step->frame访问成员；Read执行*out=step->frame，将72km/h、45m、雷达有效1、周期100整体复制进sample。返回app后sample.distance_m=45（用点号），45<=35为假，result.warning=0，result.valid=1，result.cycle=100。\nApp调用Write(&result)，mock成功执行g_last=*result并将g_published从0变1。App返回status0。main发现after=1>before=0，所以published=1，调用Mock_Last(&last)把有效发布结果复制回来并打印valid1/warning0/cycle100。"
+        },
+        {
+          "title": "05 · 场景0：第1、2帧为什么不需要新的函数",
+          "text": "第二轮i=1，还是同一个App_RunOnce/Read/Write组合，但mock的g_next已增加到1。此时Read得到(73,34,1,101)，应用计算34<=35，因此warning=1且valid=1；写出成功，status0/published1。\n第三轮i=2，Read得到(74,42,1,102)，42<=35为假，因此warning=0；写出成功，status0/published1。\n这里使用单阈值35m只是为了练习“接口层读写数据”，没有沿用D10的滞环状态记忆，也没有输出真实车辆制动指令。"
+        },
+        {
+          "title": "06 · 异常1：Read失败仍可能发布一份无效结果",
+          "text": "场景1第二轮，mock的read_fail=1，Read不执行*out赋值而返回-1。App看到read_status!=0，不会把sample全零误当有效采样；它尝试Write(&result)，因为result初始为全零，所以输出valid=0、warning=0、cycle=0。Write成功后App返回-2。\n因此这一轮status=-2、published=1、valid=0同时成立，分别表示应用读失败、发布无效结果成功、结果不具备有效提示意义。"
+        },
+        {
+          "title": "07 · 异常2：Read成功但输入无效",
+          "text": "场景2第二轮雷达标志radar_valid=0；场景4第二轮车速speed_kmh=-1。两种情况下Read返回0，把结构体写入sample，但App校验失败。App保持result.valid=0和warning=0，尝试Write；成功后status=-3、published=1。\n不能把valid=0的warning=0解释为“前车间距安全”，它只是无效结果占位值。"
+        },
+        {
+          "title": "08 · 异常3：Write失败不等于成功发布了旧值",
+          "text": "场景3第二轮输入有效，App计算warning=1、valid=1，但mock此轮write_fail=1，Write返回-1，不会修改g_last也不会增加g_published。App返回-4，main看到after==before，published=0，于是不会打印本轮新的valid/warning/cycle。\n旧g_last仍保存第一轮，但不能冒充本轮新发布，和D10/D11里区分旧状态与本次有效输出是同一项能力。"
+        },
+        {
+          "title": "09 · 为什么要分别有status、published、valid？",
+          "text": "status来自App_RunOnce的int返回值：0本轮成功，-2读失败，-3数据无效，-4写失败。published由main比较Write前后成功次数决定：1本轮确实发布，0本轮没有发布。valid则是VehicleResult内部成员：1表示该帧的warning有意义，0表示无效。\n例：读失败但无效结果成功写出→status=-2,published=1,valid=0；写接口失败→status=-4,published=0，此轮根本没有新valid值供main打印。三者不可互换。"
+        },
+        {
+          "title": "10 · CMake和本地C是独立的工程扩展",
+          "text": "先在WSL同一目录执行gcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g demo.c app.c mock.c -o vehicle_demo -lm，接着用printf '0\\\\n' | ./vehicle_demo输入场景号，亲自核对三次状态和warning。test_app.c包含另一个main，需独立生成vehicle_tests，不能和demo.c一起放入同一个可执行文件。\nCMake里的add_library(app STATIC app.c)与add_library(mock STATIC mock.c)建立两个静态库目标，add_executable(vehicle_demo demo.c)建立程序，target_link_libraries(... app mock)把实现链接进去。它是构建时操作，不是程序运行时自动寻找源文件。\n网页运行的是JavaScript模拟，不是GCC或AUTOSAR RTE测试。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "S01 · main创建场景号并初始化mock",
+          "file": "demo.c",
+          "start": "int main(void)",
+          "end": "    printf(\"scenario=%d steps=3",
+          "pattern": "scanf用&scenario取得int地址；Mock_Select是函数调用；返回值非0时main提前结束。",
+          "text": "先选择场景0，Mock_Select重置模拟索引与发布计数。程序并没有让main直接读取mock的数据帧。",
+          "trace": "输入0→scenario=0，选择NORMAL实验数组，包含3轮。"
+        },
+        {
+          "title": "S02 · main调用应用并检查发布记录",
+          "file": "demo.c",
+          "start": "    printf(\"scenario=%d steps=3",
+          "end": "    return 0;",
+          "pattern": "for中i是下标，size_t计数；App_RunOnce(void)不接收传感器参数。",
+          "text": "main每轮先取发布次数before，调用App_RunOnce，再检查after；只有after>before才打印新结果。",
+          "trace": "场景0三轮after为1/2/3，published均为1。"
+        },
+        {
+          "title": "S03 · app.h声明应用函数",
+          "file": "app.h",
+          "start": "int App_RunOnce(void);",
+          "end": "#endif",
+          "pattern": "函数原型结尾有分号；void在括号里表示没有参数。",
+          "text": "app.h不包含计算代码；app.c包含函数体。",
+          "trace": "main中的status接收App_RunOnce的int返回值。"
+        },
+        {
+          "title": "S04 · app.c创建sample并调用Read",
+          "file": "app.c",
+          "start": "int App_RunOnce(void)",
+          "end": "    if (read_status != 0)",
+          "pattern": "VehicleSample sample={0}是真实结构体对象；&sample取地址交给指针参数。",
+          "text": "app只include vehicle_if.h，不知道mock数组；Read接口把当前预设数据写回sample。",
+          "trace": "第0轮Read前sample全0；Read后sample=(72,45,1,100)。"
+        },
+        {
+          "title": "S05 · vehicle_if.h里的类型和原型",
+          "file": "vehicle_if.h",
+          "start": "typedef struct {",
+          "end": "#endif",
+          "pattern": "typedef struct定义类型，VehicleIf_Read(VehicleSample *out)只是函数声明。",
+          "text": "sample、result都是由这些类型创建；.访问结构体对象成员，->访问指针所指向对象成员。",
+          "trace": "查找speed_kmh、distance_m、radar_valid、cycle四个成员的声明位置。"
+        },
+        {
+          "title": "S06 · mock.c执行Read并通过*out写回",
+          "file": "mock.c",
+          "start": "int VehicleIf_Read(VehicleSample *out)",
+          "end": "int VehicleIf_Write(",
+          "pattern": "VehicleSample *out声明指针，*out=step->frame是整体写回；step->表示通过指针访问成员。",
+          "text": "mock先读取本轮MockStep，遇read_fail就返回-1而不写输入；成功时把step->frame整个结构体复制到app的sample。",
+          "trace": "第0帧step->frame=(72,45,1,100)，*out写回sample，返回0。"
+        },
+        {
+          "title": "S07 · app.c校验输入并准备结果",
+          "file": "app.c",
+          "start": "    if (read_status != 0)",
+          "end": "    /* 【4 计算】",
+          "pattern": "sample是对象所以sample.member用点号；||是逻辑或，任一无效就走错误分支。",
+          "text": "读失败尝试发布全零的无效结果；数据不合法也发布valid0的结果。只有输入通过校验才允许计算warning。",
+          "trace": "场景1第二轮status=-2；场景2第二轮status=-3，且两者published都可以是1。"
+        },
+        {
+          "title": "S08 · app.c计算warning并调用Write",
+          "file": "app.c",
+          "start": "    /* 【4 计算】",
+          "end": "    return 0;",
+          "pattern": "?:是三目条件表达式；&result取对象地址；Write的参数是const VehicleResult *。",
+          "text": "距离<=35则warning1，否则0；valid=1；Write失败返回-4，成功才返回0。",
+          "trace": "场景0的45/34/42m分别warning0/1/0。"
+        },
+        {
+          "title": "S09 · mock.c执行Write并记录成功",
+          "file": "mock.c",
+          "start": "int VehicleIf_Write(const VehicleResult *result)",
+          "end": "size_t Mock_PublishedCount(void)",
+          "pattern": "result是指针，*result为整个结构体值；g_last=*result复制它，g_published只在成功时自增。",
+          "text": "Write失败时g_last仍是旧值，但published计数不增加。main通过前后差判断是否真的产生本次新输出。",
+          "trace": "场景3第二轮status=-4，published=0，不打印旧valid/warning。"
+        },
+        {
+          "title": "S10 · CMake怎样连接应用和模拟实现",
+          "file": "CMakeLists.txt",
+          "start": "cmake_minimum_required(VERSION 3.16)",
+          "end": "endif()",
+          "pattern": "CMake命令名(参数...)，不是C函数；STATIC指静态库，不是C的static变量。",
+          "text": "应用app.c与模拟mock.c分别作为静态库目标，demo和测试是不同的main程序，各自链接所需实现。",
+          "trace": "直接GCC命令要包括demo.c、app.c、mock.c，只有.h不能完成链接。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "M01 · 正常三帧",
+          "values": [
+            0
+          ],
+          "optional": false,
+          "hint": "45/34/42m→warning0/1/0，三轮均正常发布",
+          "steps": [
+            "先只算三次距离判断。",
+            "查看Read(&sample)→*out=step->frame→Write(&result)的跨文件关系。",
+            "运行模拟，核对status0、published1、valid1。"
+          ]
+        },
+        {
+          "name": "M02 · 读取失败",
+          "values": [
+            1
+          ],
+          "optional": false,
+          "hint": "中间一帧Read失败；无效结果仍可能发布",
+          "steps": [
+            "预测status=-2与valid=0之间的差别。",
+            "运行检查本轮published=1并非意味着有有效提示。"
+          ]
+        },
+        {
+          "name": "M03 · 雷达无效",
+          "values": [
+            2
+          ],
+          "optional": false,
+          "hint": "Read成功但radar_valid=0",
+          "steps": [
+            "指出数据校验的if在哪个.c中。",
+            "确认status=-3、published1、valid0。"
+          ]
+        },
+        {
+          "name": "M04 · 写失败",
+          "values": [
+            3
+          ],
+          "optional": false,
+          "hint": "第二帧Write失败，不能把旧输出当新发布",
+          "steps": [
+            "先预测发布计数前后是否增加。",
+            "确认status=-4、published=0。"
+          ]
+        },
+        {
+          "name": "M05 · 车速非法",
+          "values": [
+            4
+          ],
+          "optional": false,
+          "hint": "车速-1输入无效，不能发布有效warning",
+          "steps": [
+            "核对Read返回0与应用返回-3的差别。",
+            "确认valid=0，下一帧恢复正常。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "先读D11误区纠正及.、->、*、&速查表，尽量用自己的话解释每个符号所接对象的类型。",
+        "先只运行场景0，对每一步写出Read写入sample、App计算result、Write发布结果、main查看published的变化。",
+        "然后分别实验场景1至4，逐轮比较status、published、valid，不能只记最终数字。",
+        "每个源码文件都可下载并增加自己的中文注释，自动保存；不要把用户私人记录复制到公共课程源码。",
+        "在自己的WSL终端使用GCC实际编译demo和test，这与页面JS模拟是两项独立验收。"
+      ],
+      "test_steps": [
+        "必做5个场景，先预测再运行；第0场景至少独立解释完整跨文件调用。",
+        "10道题重点检查%不是进制、指针/结构体用法、声明与定义/链接区别。",
+        "4道迁移题检查warning、Read错误码、Write失败不发布、valid=0。",
+        "本地真实C通过只能由用户的WSL实际运行证明，网页不能假称完成。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "D11的(tail+1)%4代表什么？",
+          "options": [
+            "将整数写成四进制",
+            "对4取余，使下标回绕",
+            "乘4"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "为什么include vehicle_if.h还需要mock.c参与链接？",
+          "options": [
+            "头文件会自动寻找任意.c",
+            "头文件只有接口声明，实现需要编译链接",
+            "程序运行时读.h文件寻找函数体"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "VehicleSample sample={0}; 访问距离成员用什么？",
+          "options": [
+            "sample.distance_m",
+            "sample->distance_m",
+            "*sample.distance_m"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "Read函数的VehicleSample *out怎样将完整输入写入调用者？",
+          "options": [
+            "out=step->frame",
+            "*out=step->frame",
+            "out.frame=step->frame"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "const MockStep *step访问read_fail成员应写什么？",
+          "options": [
+            "step.read_fail",
+            "step->read_fail",
+            "&step.read_fail"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "VehicleIf_Read(&sample)中&的意义是什么？",
+          "options": [
+            "取对象地址",
+            "按位与",
+            "指针乘法"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "Read失败但写出无效输出成功，可能是？",
+          "options": [
+            "status0,published1,valid1",
+            "status-2,published1,valid0",
+            "status-4,published0,valid1"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "雷达数据无效但Read返回0时，应用应如何处理？",
+          "options": [
+            "强制输出valid1",
+            "返回-3，发布valid0",
+            "把雷达0当距离0"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "Write失败后，旧g_last能否作为本轮新输出？",
+          "options": [
+            "可以",
+            "不能；published=0",
+            "只有警告=1才可以"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "本例VehicleIf_Read/Write是否为AUTOSAR生成RTE？",
+          "options": [
+            "是",
+            "不是，是自定义教学接口模拟",
+            "只要文件名是.c就是"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "场景0第二帧距离34m，阈值35m；场景1第二帧Read失败，场景3第二帧Write失败，另有无效结果。请按本课约定填写4个整数。",
+        "values": [
+          0
+        ],
+        "fields": [
+          {
+            "id": "warning2",
+            "label": "P1 · 正常第二帧warning",
+            "kind": "number"
+          },
+          {
+            "id": "read_status",
+            "label": "P2 · Read失败应用status",
+            "kind": "number"
+          },
+          {
+            "id": "write_published",
+            "label": "P3 · Write失败本轮published",
+            "kind": "number"
+          },
+          {
+            "id": "bad_valid",
+            "label": "P4 · 无效结果valid",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "34<=35，因此warning=1。",
+          "Read失败、无效输出写成功时应用status=-2。",
+          "Write失败不会增加成功发布次数，published=0。",
+          "无效结果的valid=0，不能用warning=0判断安全。"
+        ]
+      },
+      "pass_rule": "5个场景、10道基础题、4道整数题在线模拟通过才算在线练习通过；本地真实C需用户在WSL独立编译运行。",
+      "assets": [
+        {
+          "name": "vehicle_if.h",
+          "group": "main",
+          "language": "c",
+          "text": "#ifndef VEHICLE_IF_H\n#define VEHICLE_IF_H\n#include <stdint.h> /* uint32_t代表32位无符号采样周期号。 */\n\n/* 【共享数据类型】注意：typedef定义类型，还没有创建sample变量。 */\ntypedef struct {\n    float speed_kmh;   /* 车速，单位km/h。 */\n    float distance_m;  /* 前车距离，单位m。 */\n    int radar_valid;   /* 1有效，0无效。 */\n    uint32_t cycle;    /* 输入所属的采样轮次；不代表线程同步。 */\n} VehicleSample;\ntypedef struct {\n    int warning;       /* 距离偏小提示，1为提示，0为不提示。 */\n    int valid;         /* 1表示本轮结果有效；无效时不能把warning=0解释为安全。 */\n    uint32_t cycle;    /* 输出对应的采样轮次。 */\n} VehicleResult;\n\n/* 【函数声明】末尾分号：让编译器知道函数接口，实现位于mock.c。 */\n/* Read参数out为指向真实VehicleSample对象的指针；函数通过*out写入。 */\nint VehicleIf_Read(VehicleSample *out);\n/* Write的参数是只读结构体指针；模拟层读取它，不修改它。 */\nint VehicleIf_Write(const VehicleResult *result);\n#endif\n"
+        },
+        {
+          "name": "app.h",
+          "group": "main",
+          "language": "c",
+          "text": "#ifndef APP_H\n#define APP_H\n/* 应用函数声明；void表示不从main直接接收输入帧。 */\n/* 返回0成功，-2读取失败，-3输入无效，-4发布失败。 */\nint App_RunOnce(void);\n#endif\n"
+        },
+        {
+          "name": "app.c",
+          "group": "main",
+          "language": "c",
+          "text": "#include \"app.h\"       /* 应用函数接口声明。 */\n#include \"vehicle_if.h\" /* 只依赖Read/Write接口，不依赖mock的数组。 */\n#include <math.h>      /* isfinite：检测float是否为有限数。 */\n\n/* 【ASW角色】本文件只是教学应用逻辑，并非AUTOSAR生成的SWC/RTE。 */\nint App_RunOnce(void)\n{\n    /* 【1 创建本轮对象】sample是结构体对象，成员使用点号 . 。 */\n    VehicleSample sample = {0}; /* Read成功后将填入整帧数据。 */\n    VehicleResult result = {0}; /* 默认无效：valid=0、warning=0。 */\n\n    /* 【2 请求输入】&sample取对象地址，匹配VehicleSample *out形参。 */\n    int read_status = VehicleIf_Read(&sample);\n    if (read_status != 0) {\n        /* Read失败：不要读取旧数据，尝试发布“无效输出”。 */\n        if (VehicleIf_Write(&result) != 0) return -4;\n        return -2; /* 发布无效输出成功，不等于读取成功。 */\n    }\n\n    /* 【3 先检查输入】sample是对象，用sample.member，不用->。 */\n    result.cycle = sample.cycle; /* 只做来源关联，不证明并发一致。 */\n    if (!isfinite(sample.speed_kmh) || sample.speed_kmh < 0.0f ||\n        sample.speed_kmh > 250.0f || !isfinite(sample.distance_m) ||\n        sample.distance_m < 0.0f || sample.distance_m > 500.0f ||\n        sample.radar_valid != 1) {\n        /* result仍valid=0、warning=0；这不是一次有效风险判断。 */\n        if (VehicleIf_Write(&result) != 0) return -4;\n        return -3;\n    }\n\n    /* 【4 计算】本课固定35m单阈值，仅演示接口，不复现D10滞环。 */\n    /* ?: 条件表达式；距离<=35时得到1，否则得到0。 */\n    result.warning = sample.distance_m <= 35.0f ? 1 : 0;\n    result.valid = 1; /* 只有输入有效才将本轮结果标记为有效。 */\n\n    /* 【5 发布】传&result地址；Write会在模拟文件中读取结构体。 */\n    if (VehicleIf_Write(&result) != 0) return -4;\n    return 0; /* 读取、输入检查及发布全成功。 */\n}\n"
+        },
+        {
+          "name": "mock.h",
+          "group": "main",
+          "language": "c",
+          "text": "#ifndef MOCK_H\n#define MOCK_H\n#include \"vehicle_if.h\"\n#include <stddef.h> /* size_t用于计数；不是传感器物理量。 */\n\n/* 【仅供demo/test使用】应用app.c绝不包含这个模拟专用头文件。 */\nint Mock_Select(int scenario);      /* 选择0～4的预设实验并重置内部状态。 */\nsize_t Mock_PublishedCount(void);   /* 返回成功Write次数。 */\nint Mock_Last(VehicleResult *out);  /* 把最后成功发布结果复制给*out。 */\n#endif\n"
+        },
+        {
+          "name": "mock.c",
+          "group": "main",
+          "language": "c",
+          "text": "#include \"mock.h\"\n#include <stddef.h> /* NULL指针常量。 */\n\n/* 【模拟数据结构】一条实验记录包含一帧输入和两个故障开关。 */\ntypedef struct {\n    VehicleSample frame; /* 本轮若读取成功，提供的完整输入结构体。 */\n    int read_fail;       /* 1：本轮模拟Read失败。 */\n    int write_fail;      /* 1：本轮模拟Write失败。 */\n} MockStep;\n\n/* 【五组实验，每组3帧】未写出的结构体字段按0初始化。 */\n/* 每帧顺序：{车速、距离、雷达有效、周期}，读故障，写故障。 */\nstatic const MockStep STEPS[5][3] = {\n    { /* 场景0：正常45m→34m→42m。 */\n        {{72.0f,45.0f,1,100U},0,0},\n        {{73.0f,34.0f,1,101U},0,0},\n        {{74.0f,42.0f,1,102U},0,0}\n    },\n    { /* 场景1：中间一轮Read失败。 */\n        {{72.0f,45.0f,1,100U},0,0}, {{0},1,0}, {{73.0f,34.0f,1,102U},0,0}\n    },\n    { /* 场景2：中间一轮雷达标记无效，但Read函数成功。 */\n        {{72.0f,45.0f,1,100U},0,0}, {{72.0f,25.0f,0,101U},0,0}, {{73.0f,34.0f,1,102U},0,0}\n    },\n    { /* 场景3：中间一轮Write失败。 */\n        {{72.0f,45.0f,1,100U},0,0}, {{73.0f,34.0f,1,101U},0,1}, {{74.0f,42.0f,1,102U},0,0}\n    },\n    { /* 场景4：中间一轮车速-1，不合法。 */\n        {{72.0f,45.0f,1,100U},0,0}, {{-1.0f,34.0f,1,101U},0,0}, {{73.0f,34.0f,1,102U},0,0}\n    }\n};\n\n/* 【mock自己的状态】static表示文件内可用，不表示值永远不能变。 */\nstatic int g_scenario = -1;          /* 当前被选中的实验，-1表示未选择。 */\nstatic size_t g_next = 0U;           /* 下一次Read将取的下标。 */\nstatic size_t g_current = 0U;        /* 本轮Read选中的下标，Write要对应它。 */\nstatic size_t g_published = 0U;      /* 多少次Write真正成功。 */\nstatic VehicleResult g_last = {0};   /* 最后一次成功发布的结构体副本。 */\n\nint Mock_Select(int scenario)\n{\n    if (scenario < 0 || scenario > 4) return -1;\n    g_scenario = scenario;\n    g_next = 0U; g_current = 0U; g_published = 0U;\n    g_last = (VehicleResult){0}; /* 复合字面量：重新赋一个全零结构体。 */\n    return 0;\n}\n\n/* 【接口的定义】vehicle_if.h只有声明，这个.c提供真实函数体。 */\nint VehicleIf_Read(VehicleSample *out)\n{\n    if (out == NULL || g_scenario < 0 || g_next >= 3U) return -1;\n    /* &STEPS[...][...]取当前结构体元素地址；step是指针。 */\n    const MockStep *step = &STEPS[g_scenario][g_next];\n    g_current = g_next;\n    ++g_next; /* 下次Read进入下一个实验步骤。 */\n    if (step->read_fail != 0) return -1; /* 指针用->访问成员。 */\n    /* *out：指针指向的整个VehicleSample对象，即app.c中的sample。 */\n    /* step->frame：从指针读到的结构体成员；整体赋值复制四个字段。 */\n    *out = step->frame;\n    return 0;\n}\n\nint VehicleIf_Write(const VehicleResult *result)\n{\n    if (result == NULL || g_scenario < 0 || g_next == 0U) return -1;\n    if (STEPS[g_scenario][g_current].write_fail != 0) return -1;\n    g_last = *result; /* result是指针，*result取得整个输出结构体值。 */\n    ++g_published;   /* 只有成功才增加计数；失败时保留旧记录。 */\n    return 0;\n}\n\nsize_t Mock_PublishedCount(void) { return g_published; }\n\nint Mock_Last(VehicleResult *out)\n{\n    if (out == NULL || g_published == 0U) return -1;\n    *out = g_last; /* 将上一次成功发布的值复制给调用者。 */\n    return 0;\n}\n"
+        },
+        {
+          "name": "demo.c",
+          "group": "main",
+          "language": "c",
+          "text": "#include \"app.h\"  /* App_RunOnce函数原型；实现定义在app.c。 */\n#include \"mock.h\" /* 仅main配置模拟输入，不把它交给应用层。 */\n#include <stdio.h> /* scanf/printf声明。 */\n#include <stddef.h> /* size_t数据类型。 */\n\nint main(void) /* 这个main是演示程序的入口。 */\n{\n    int scenario = 0; /* 0正常；1读失败；2雷达无效；3写失败；4车速非法。 */\n    if (scanf(\"%d\", &scenario) != 1) {\n        printf(\"input_error=1\\n\");\n        return 1; /* scanf未能读入一个整数，本次不调用应用。 */\n    }\n    if (Mock_Select(scenario) != 0) {\n        printf(\"input_error=2\\n\");\n        return 1; /* 场景号不是0到4。 */\n    }\n    printf(\"scenario=%d steps=3\\n\", scenario);\n\n    /* 【重复执行】每一轮都是新的应用调用，模拟层提供下一帧。 */\n    for (size_t i = 0U; i < 3U; ++i) {\n        /* 发布计数只在Write真正成功时增加。 */\n        const size_t before = Mock_PublishedCount();\n        const int status = App_RunOnce(); /* 进入app.c，再进mock.c的接口。 */\n        const size_t after = Mock_PublishedCount();\n        const int published = after > before ? 1 : 0;\n\n        printf(\"step=%zu status=%d published=%d\", i, status, published);\n        if (published != 0) {\n            VehicleResult last = {0}; /* 真实结构体对象，用点号访问成员。 */\n            if (Mock_Last(&last) == 0) { /* &last取得地址，供mock写回。 */\n                printf(\" valid=%d warning=%d cycle=%u\", last.valid,\n                       last.warning, (unsigned int)last.cycle);\n            }\n        }\n        printf(\"\\n\"); /* 一帧结束，下一轮重新创建局部变量。 */\n    }\n    return 0; /* main正常结束，注意不代表每次应用都成功。 */\n}\n"
+        },
+        {
+          "name": "test_app.c",
+          "group": "main",
+          "language": "c",
+          "text": "#include \"app.h\"\n#include \"mock.h\"\n#include <stdio.h>\n\n/* 与demo.c的main分别编译到两个不同的可执行程序。 */\nint main(void)\n{\n    /* 行代表场景0到4，列代表每场景3次调用。 */\n    const int statuses[5][3] = {\n        {0,0,0},{0,-2,0},{0,-3,0},{0,-4,0},{0,-3,0}\n    };\n    const int published[5][3] = {\n        {1,1,1},{1,1,1},{1,1,1},{1,0,1},{1,1,1}\n    };\n    const int valids[5][3] = {\n        {1,1,1},{1,0,1},{1,0,1},{1,-1,1},{1,0,1}\n    };\n    const int warnings[5][3] = {\n        {0,1,0},{0,0,1},{0,0,1},{0,-1,0},{0,0,1}\n    };\n    for (int sc=0; sc<5; ++sc) {\n        if (Mock_Select(sc)!=0) return 1;\n        for (int i=0; i<3; ++i) {\n            size_t before=Mock_PublishedCount();\n            int status=App_RunOnce();\n            int did_publish=Mock_PublishedCount()>before ? 1 : 0;\n            if(status!=statuses[sc][i] || did_publish!=published[sc][i]) return 2;\n            if(did_publish!=0) {\n                VehicleResult got={0};\n                if(Mock_Last(&got)!=0 || got.valid!=valids[sc][i] ||\n                   got.warning!=warnings[sc][i]) return 3;\n            }\n        }\n    }\n    printf(\"PASS: normal, read failure, invalid input, write failure\\n\");\n    return 0;\n}\n"
+        },
+        {
+          "name": "CMakeLists.txt",
+          "group": "main",
+          "language": "text",
+          "text": "cmake_minimum_required(VERSION 3.16)\nproject(asw_interface_demo LANGUAGES C)\nset(CMAKE_C_STANDARD 17)\nset(CMAKE_C_STANDARD_REQUIRED ON)\n# 应用只依赖vehicle_if.h接口声明；mock.c提供函数实现。\nadd_library(app STATIC app.c)\ntarget_include_directories(app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\ntarget_link_libraries(app PUBLIC m)\nadd_library(mock STATIC mock.c)\ntarget_include_directories(mock PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\nadd_executable(vehicle_demo demo.c)\ntarget_link_libraries(vehicle_demo PRIVATE app mock)\ninclude(CTest)\nif(BUILD_TESTING)\n    add_executable(vehicle_tests test_app.c)\n    target_link_libraries(vehicle_tests PRIVATE app mock)\n    add_test(NAME interface_contract COMMAND vehicle_tests)\nendif()\n"
+        },
+        {
+          "name": "README.md",
+          "group": "main",
+          "language": "markdown",
+          "text": "# Day12：应用通过可替换接口读写车辆数据（教学mock）\n\n本项目在单线程预设输入下模拟接口，不连接真实车辆、CAN设备或ECU，**不是AUTOSAR RTE生成代码**。应用app.c只include vehicle_if.h，函数VehicleIf_Read/Write由mock.c提供模拟实现。35m是教学阈值，本次不复用Day10的滞环。\n\n文件：demo.c（唯一演示main）、app.h/app.c（业务调用）、vehicle_if.h（数据类型及接口声明）、mock.h/mock.c（模拟读写）、test_app.c（另一个独立测试main）、CMakeLists.txt（构建配置）。\n\n## WSL实际编译（不是网页JS模拟）\n把文件放在同一目录，在WSL里执行：\n```bash\ngcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g demo.c app.c mock.c -o vehicle_demo -lm\nprintf '0\\n' | ./vehicle_demo\nprintf '1\\n' | ./vehicle_demo\nprintf '2\\n' | ./vehicle_demo\nprintf '3\\n' | ./vehicle_demo\nprintf '4\\n' | ./vehicle_demo\ngcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g test_app.c app.c mock.c -o vehicle_tests -lm\n./vehicle_tests\n```\n\n场景0三次status=0/published=1，warning=0,1,0；场景1第二帧Read失败但发布无效结果，status=-2/published=1/valid=0；场景2第二帧雷达无效，status=-3/published=1/valid=0；场景3第二帧Write失败，status=-4/published=0；场景4第二帧车速-1非法，status=-3/published=1/valid=0。\n\n## CMake扩展\n```bash\ncmake -S . -B build\ncmake --build build\nctest --test-dir build --output-on-failure\n```\n这里STATIC指静态库，和C函数的static不是一回事。Include头文件提供声明，实际实现必须参与编译与链接。\n\n## 语法速查\n`sample.distance_m`：sample是结构体对象，使用点号。\n`step->frame`：step是结构体指针，使用箭头，等价`(*step).frame`。\n`VehicleIf_Read(&sample)`：取地址让函数写回。\n`VehicleSample *out`：声明指针参数。\n`*out = step->frame`：解引用，将一整份结构体数据写回。\nD11的`(tail+1)%4`中`%`是取余，不是四进制。\n`volatile`是类型限定符，不是跨线程同步机制，不能独自保证原子性和多成员一致快照。\n"
+        }
+      ],
+      "code": "#include \"app.h\"  /* App_RunOnce函数原型；实现定义在app.c。 */\n#include \"mock.h\" /* 仅main配置模拟输入，不把它交给应用层。 */\n#include <stdio.h> /* scanf/printf声明。 */\n#include <stddef.h> /* size_t数据类型。 */\n\nint main(void) /* 这个main是演示程序的入口。 */\n{\n    int scenario = 0; /* 0正常；1读失败；2雷达无效；3写失败；4车速非法。 */\n    if (scanf(\"%d\", &scenario) != 1) {\n        printf(\"input_error=1\\n\");\n        return 1; /* scanf未能读入一个整数，本次不调用应用。 */\n    }\n    if (Mock_Select(scenario) != 0) {\n        printf(\"input_error=2\\n\");\n        return 1; /* 场景号不是0到4。 */\n    }\n    printf(\"scenario=%d steps=3\\n\", scenario);\n\n    /* 【重复执行】每一轮都是新的应用调用，模拟层提供下一帧。 */\n    for (size_t i = 0U; i < 3U; ++i) {\n        /* 发布计数只在Write真正成功时增加。 */\n        const size_t before = Mock_PublishedCount();\n        const int status = App_RunOnce(); /* 进入app.c，再进mock.c的接口。 */\n        const size_t after = Mock_PublishedCount();\n        const int published = after > before ? 1 : 0;\n\n        printf(\"step=%zu status=%d published=%d\", i, status, published);\n        if (published != 0) {\n            VehicleResult last = {0}; /* 真实结构体对象，用点号访问成员。 */\n            if (Mock_Last(&last) == 0) { /* &last取得地址，供mock写回。 */\n                printf(\" valid=%d warning=%d cycle=%u\", last.valid,\n                       last.warning, (unsigned int)last.cycle);\n            }\n        }\n        printf(\"\\n\"); /* 一帧结束，下一轮重新创建局部变量。 */\n    }\n    return 0; /* main正常结束，注意不代表每次应用都成功。 */\n}\n"
     }
   },
   "rules": {
@@ -8262,6 +8872,103 @@
           "M05 · 输入值非法"
         ]
       ]
+    },
+    "12": {
+      "correct": {
+        "q1": 1,
+        "q2": 1,
+        "q3": 0,
+        "q4": 1,
+        "q5": 1,
+        "q6": 0,
+        "q7": 1,
+        "q8": 1,
+        "q9": 1,
+        "q10": 1
+      },
+      "explanations": {
+        "q1": "%为整数取余运算，(3+1)%4=0，不是四进制。",
+        "q2": "vehicle_if.h只有函数原型；mock.c提供真正的Read/Write定义，链接器把它们连接。",
+        "q3": "sample是结构体对象，因此用sample.distance_m。",
+        "q4": "out是指针形参，*out表示它所指向的整个sample对象。",
+        "q5": "step声明为结构体指针，用step->read_fail读取成员。",
+        "q6": "&sample取sample的地址，以匹配VehicleSample *out。",
+        "q7": "Read失败时App返回-2，仍可能写成功一份valid=0的输出。",
+        "q8": "Read成功不等于输入有效。radar_valid=0会触发校验并返回-3。",
+        "q9": "只有本轮发布次数真的增加，才能认定发生新Write；旧g_last仍可能存在。",
+        "q10": "本课自定义接口仅展示架构分层思想，不是AUTOSAR生成的RTE。"
+      },
+      "numeric": {
+        "warning2": [
+          1,
+          "第二帧距离34m满足<=35m。"
+        ],
+        "read_status": [
+          -2,
+          "读取失败后无效输出成功发布，应用返回-2。"
+        ],
+        "write_published": [
+          0,
+          "写接口失败，发布次数不增加。"
+        ],
+        "bad_valid": [
+          0,
+          "无效结果valid标记为0。"
+        ]
+      },
+      "labels": {
+        "q1": "第1题",
+        "q2": "第2题",
+        "q3": "第3题",
+        "q4": "第4题",
+        "q5": "第5题",
+        "q6": "第6题",
+        "q7": "第7题",
+        "q8": "第8题",
+        "q9": "第9题",
+        "q10": "第10题",
+        "warning2": "P1 · 第二帧warning",
+        "read_status": "P2 · Read失败状态",
+        "write_published": "P3 · Write失败是否发布",
+        "bad_valid": "P4 · 无效输出标志"
+      },
+      "needed": [
+        [
+          [
+            0
+          ],
+          "lab0",
+          "M01 · 正常三帧"
+        ],
+        [
+          [
+            1
+          ],
+          "lab1",
+          "M02 · 读取失败"
+        ],
+        [
+          [
+            2
+          ],
+          "lab2",
+          "M03 · 雷达无效"
+        ],
+        [
+          [
+            3
+          ],
+          "lab3",
+          "M04 · 写失败"
+        ],
+        [
+          [
+            4
+          ],
+          "lab4",
+          "M05 · 车速非法"
+        ]
+      ]
     }
   },
   "curriculum": [
@@ -9106,5 +9813,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "day11-20261027-teaching-v2"
+  "release": "day12-20261102-asw-interface-v1"
 }
