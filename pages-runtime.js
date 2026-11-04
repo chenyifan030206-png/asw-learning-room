@@ -126,6 +126,57 @@ function pagesSimulate(day,values){
     result={scenario,rows,steps:3,statuses:rows.map(x=>x.app_status),published:rows.map(x=>x.published),
       valids:rows.map(x=>x.valid),warnings:rows.map(x=>x.warning),
       publish_count:publishCount,compiler_log:'仅JavaScript模拟接口行为，不是本地C/真实RTE。'};
+  }else if(day===13){
+    // D13与下载C文件按相同的单线程教学规则计算；这里只执行JS。
+    const [scenario]=pagesNumbers(values,1);
+    if(!Number.isInteger(scenario)||scenario<0||scenario>8)throw Error('D13请输入场景号0到8。');
+    const normal=(speed=73,distance=34,cycle=101)=>({
+      speed,distance,radar:1,cycle,now:1010,stamp:960,enabled:1,fault_present:0
+    });
+    const first={...normal(72,45,100),now:1000,stamp:950};
+    const third={...normal(74,42,102),now:1020,stamp:970};
+    const middles=[
+      normal(),
+      {read_fail:1},
+      {...normal(),radar:0},
+      {...normal(),write_fail:1},
+      {...normal(),speed:-1},
+      {...normal(),speed:NaN},
+      {...normal(),stamp:909},
+      {...normal(),enabled:0},
+      {...normal(),fault_present:1}
+    ];
+    const frames=[first,middles[scenario],third];
+    let publishCount=0, last=null;
+    const rows=[];
+    for(const [i,x] of frames.entries()){
+      const before=publishCount,readOK=!x.read_fail;
+      let fault=0;
+      if(!readOK)fault=1;
+      else if(!Number.isFinite(x.speed)||!Number.isFinite(x.distance)||
+              x.speed<0||x.speed>250||x.distance<0||x.distance>500)fault=3;
+      else if(x.stamp>x.now||x.now-x.stamp>100)fault=4;
+      else if(x.radar!==1)fault=2;
+      else if(x.enabled!==1)fault=5;
+      else if(x.fault_present!==0)fault=6;
+      const candidate={valid:Number(fault===0),warning:fault===0&&x.distance<=35?1:0,
+        cycle:readOK?x.cycle:0,fault};
+      const writeOK=!x.write_fail;
+      const status=!writeOK?-4:!readOK?-2:fault!==0?-3:0;
+      if(writeOK){publishCount++;last=candidate;}
+      const published=Number(publishCount>before);
+      rows.push({step:i,read_status:readOK?0:-1,app_status:status,published,
+        valid:published?candidate.valid:null,warning:published?candidate.warning:null,
+        cycle:published?candidate.cycle:null,fault:published?candidate.fault:null,
+        distance_m:readOK?x.distance:null,age_ms:readOK?x.now-x.stamp:null,
+        explanation:!writeOK?'Write失败，旧g_last不算本轮发布':!readOK?'Read失败，输出无效':
+          fault!==0?'输入不可用或超时，发布带故障码的无效结果':'有效输入，正常发布'});
+    }
+    result={scenario,rows,steps:3,statuses:rows.map(x=>x.app_status),
+      published:rows.map(x=>x.published),valids:rows.map(x=>x.valid),
+      warnings:rows.map(x=>x.warning),faults:rows.map(x=>x.fault),
+      publish_count:publishCount,last_published_cycle:last?.cycle??null,
+      compiler_log:'D13仅使用JavaScript模拟9个场景；没有调用GCC、CMake、CTest，也不是实际RTE。'};
   }else if(day===11){
     // D11为完全单线程的JS教学演算，不模拟真实共享内存/线程同步。
     const v=pagesNumbers(values,1),scenario=v[0];
@@ -247,6 +298,17 @@ function pagesRegression(day){
     ['雷达无效',[2],{statuses:[0,-3,0],published:[1,1,1],valids:[1,0,1]}],
     ['写失败',[3],{statuses:[0,-4,0],published:[1,0,1],valids:[1,null,1],warnings:[0,null,0]}],
     ['车速非法',[4],{statuses:[0,-3,0],published:[1,1,1],valids:[1,0,1]}]
+  ];
+  cases[13]=[
+    ['T01 正常三帧',[0],{statuses:[0,0,0],published:[1,1,1],valids:[1,1,1],warnings:[0,1,0],faults:[0,0,0]}],
+    ['T02 读取失败',[1],{statuses:[0,-2,0],published:[1,1,1],valids:[1,0,1],faults:[0,1,0]}],
+    ['T03 雷达无效',[2],{statuses:[0,-3,0],published:[1,1,1],valids:[1,0,1],faults:[0,2,0]}],
+    ['T05 Write失败',[3],{statuses:[0,-4,0],published:[1,0,1],valids:[1,null,1],faults:[0,null,0]}],
+    ['T03 负车速',[4],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,3,0]}],
+    ['T03 NaN',[5],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,3,0]}],
+    ['T04 超时101ms',[6],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,4,0]}],
+    ['T03 未启用',[7],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,5,0]}],
+    ['T03 设备故障',[8],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,6,0]}]
   ];
   cases[11]=[
     ['基本先入先出',[0],{head:1,tail:2,count:1,received_cycles:[100],statuses:[0,0,0]}],
