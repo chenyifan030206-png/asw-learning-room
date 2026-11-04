@@ -7387,6 +7387,687 @@
         }
       ],
       "code": "#include \"app.h\"  /* App_RunOnce函数原型；实现定义在app.c。 */\n#include \"mock.h\" /* 仅main配置模拟输入，不把它交给应用层。 */\n#include <stdio.h> /* scanf/printf声明。 */\n#include <stddef.h> /* size_t数据类型。 */\n\nint main(void) /* 这个main是演示程序的入口。 */\n{\n    int scenario = 0; /* 0正常；1读失败；2雷达无效；3写失败；4车速非法。 */\n    if (scanf(\"%d\", &scenario) != 1) {\n        printf(\"input_error=1\\n\");\n        return 1; /* scanf未能读入一个整数，本次不调用应用。 */\n    }\n    if (Mock_Select(scenario) != 0) {\n        printf(\"input_error=2\\n\");\n        return 1; /* 场景号不是0到4。 */\n    }\n    printf(\"scenario=%d steps=3\\n\", scenario);\n\n    /* 【重复执行】每一轮都是新的应用调用，模拟层提供下一帧。 */\n    for (size_t i = 0U; i < 3U; ++i) {\n        /* 发布计数只在Write真正成功时增加。 */\n        const size_t before = Mock_PublishedCount();\n        const int status = App_RunOnce(); /* 进入app.c，再进mock.c的接口。 */\n        const size_t after = Mock_PublishedCount();\n        const int published = after > before ? 1 : 0;\n\n        printf(\"step=%zu status=%d published=%d\", i, status, published);\n        if (published != 0) {\n            VehicleResult last = {0}; /* 真实结构体对象，用点号访问成员。 */\n            if (Mock_Last(&last) == 0) { /* &last取得地址，供mock写回。 */\n                printf(\" valid=%d warning=%d cycle=%u\", last.valid,\n                       last.warning, (unsigned int)last.cycle);\n            }\n        }\n        printf(\"\\n\"); /* 一帧结束，下一轮重新创建局部变量。 */\n    }\n    return 0; /* main正常结束，注意不代表每次应用都成功。 */\n}\n"
+    },
+    "13": {
+      "day": 13,
+      "revision": "2026-11-04-day13-requirements-feedback-v1",
+      "title": "需求—测试—故障记录：看懂二维数组、static与结构体复合字面量",
+      "source": "demo.c",
+      "runner": "vehicle_requirements_day13",
+      "project_name": "day13_vehicle_requirements",
+      "time": "约3小时：45分钟补语法、45分钟执行链、45分钟场景与需求测试、45分钟WSL真实C。真实C验收独立进行。",
+      "summary": "承接D12已完成的在线练习，重点修补STEPS[5][3]、static、(VehicleResult){0}，保留ASW→接口→mock执行链。新增六条可测试需求、九个三帧场景与明确故障码，并在本地演示NaN检查修复前后差别。",
+      "goals": [
+        "能解释D12原STEPS[5][3]与本课STEPS[9][3]的数组元素类型、合法下标和场景→帧两级索引。",
+        "区分文件作用域static的内部链接、静态存储期，以及const的不可通过对象修改约束。",
+        "能对照VehicleResult tmp={0}与g_last=(VehicleResult){0}，解释复合字面量是表达式而非变量定义。",
+        "沿main→App_RunOnce→VehicleIf_Read→App校验→VehicleIf_Write→main追踪一帧的sample、result与g_last。",
+        "把需求R01—R06与9个故障注入场景、测试编号T01—T06和status/published/valid/fault逐一对应。",
+        "解释NaN为什么会绕过单纯的<0/>250比较，并在个人本地副本完成失败/修复回归。",
+        "WSL实际编译运行演示main和测试main；浏览器在线练习成绩与真实C通关严格分开。"
+      ],
+      "flow_text": "【静态结构】vehicle_if.h声明类型与Read/Write→app.c实现应用判断→mock.c以STEPS[9][3]提供输入并保存写出记录→demo.c逐帧调用；【执行】main→Mock_Select重置static状态(g_last=(VehicleResult){0})→App_RunOnce创建sample/result→VehicleIf_Read(&sample)→mock指针step=&STEPS[scenario][frame]并通过*out写回→app对NaN/范围/时间戳/使能/故障逐项判定→VehicleIf_Write(&result)→mock成功更新g_last与g_published→main比较before/after打印本帧结果。",
+      "remediation_title": "D12笔记补习：二维数组、static与(VehicleResult){0}",
+      "project_intro": {
+        "title": "从D12的真实疑问出发：数据从哪里来，为什么一个错误要有测试证据？",
+        "paragraphs": [
+          "D12的浏览器练习已经完成，但本地C尚未验收。你准确识别了STEPS[5][3]的两个维度：五个场景，每个场景三帧；还没有完全掌握static的作用与(VehicleResult){0}的语法。",
+          "D13不换架构：仍由demo.c的main调用app.c；app.c只看vehicle_if.h声明的读写接口；mock.c用二维数组模拟输入。原来5场景扩为9场景，以便检验NaN、超时、使能及故障位。",
+          "本课把软件工程的最小闭环加入：先写R01—R06需求，再让T01—T06明确覆盖具体场景。R01要求正常判断，R02读失败，R03非法/未使能/故障，R04超时，R05写失败，R06下一帧恢复。阈值35m与100ms都是教学约定。"
+        ]
+      },
+      "architecture": {
+        "headers": [
+          "文件/对象",
+          "第一次出现处",
+          "类型、用途与数据流"
+        ],
+        "rows": [
+          [
+            "vehicle_if.h",
+            "typedef struct VehicleSample / VehicleResult、FaultCode",
+            "共享输入/输出类型与故障枚举；没有创建实际输入对象"
+          ],
+          [
+            "demo.c main",
+            "int scenario、size_t before/after、VehicleResult last",
+            "选择场景，逐帧调用App_RunOnce；只比较发布次数判定本次是否有新结果"
+          ],
+          [
+            "app.h / app.c",
+            "int App_RunOnce(void)",
+            "声明在.h，函数体在.c；每次调用创建sample与result"
+          ],
+          [
+            "mock.c STEPS",
+            "static const MockStep STEPS[9][3]",
+            "9行场景×每行3帧；只读表，不是永久不变的全局状态"
+          ],
+          [
+            "mock.c g_next / g_last",
+            "static size_t g_next、static VehicleResult g_last",
+            "文件内可访问的可变模拟状态；选择新场景时明确重置"
+          ],
+          [
+            "Mock_Select",
+            "g_last=(VehicleResult){0}",
+            "复合字面量生成零初始化结构体值，赋给已有g_last"
+          ],
+          [
+            "VehicleIf_Read",
+            "const MockStep *step=&STEPS[g_scenario][g_next]",
+            "指针读step->frame；*out把整帧写到app.c的sample"
+          ],
+          [
+            "App校验",
+            "sample.speed_kmh / sample.now_ms等",
+            "先isfinite/范围，再时间戳、radar_valid、使能、故障位"
+          ],
+          [
+            "VehicleIf_Write",
+            "g_last=*result；++g_published",
+            "只有Write成功才记入已发布结果"
+          ],
+          [
+            "test_app.c",
+            "statuses[9][3]等预期矩阵",
+            "逐场景逐帧对照输出，与浏览器JS规则相互独立"
+          ]
+        ]
+      },
+      "symbols": [
+        {
+          "name": "STEPS[9][3]",
+          "file": "mock.c",
+          "match": "static const MockStep STEPS[9][3]",
+          "what": "二维数组，第一下标场景0-8，第二下标帧0-2；D12原为STEPS[5][3]",
+          "lifetime": "文件作用域static对象"
+        },
+        {
+          "name": "g_next",
+          "file": "mock.c",
+          "match": "static size_t g_next",
+          "what": "可变化的下一帧位置；static不禁止g_next++",
+          "lifetime": "程序全程存在；Mock_Select重置"
+        },
+        {
+          "name": "g_last",
+          "file": "mock.c",
+          "match": "static VehicleResult g_last = {0}",
+          "what": "文件内最近成功发布的输出副本；Write失败不覆盖",
+          "lifetime": "程序全程存在"
+        },
+        {
+          "name": "复合字面量",
+          "file": "mock.c",
+          "match": "g_last = (VehicleResult){0};",
+          "what": "创建零初始化的无名VehicleResult结构体值并赋给已有对象，不是声明",
+          "lifetime": "表达式用法；用于赋值"
+        },
+        {
+          "name": "sample",
+          "file": "app.c",
+          "match": "VehicleSample sample = {0};",
+          "what": "命名局部结构体对象，Read通过地址写入",
+          "lifetime": "每次App_RunOnce调用"
+        },
+        {
+          "name": "result",
+          "file": "app.c",
+          "match": "VehicleResult result = {0};",
+          "what": "命名局部输出对象，保留valid与fault等字段",
+          "lifetime": "每次App_RunOnce调用"
+        },
+        {
+          "name": "step",
+          "file": "mock.c",
+          "match": "const MockStep *step =",
+          "what": "结构体指针；使用->读成员，&STEPS取元素地址",
+          "lifetime": "每次VehicleIf_Read调用"
+        },
+        {
+          "name": "out",
+          "file": "mock.c",
+          "match": "int VehicleIf_Read(VehicleSample *out)",
+          "what": "指针形参，*out表示整个被写入的结构体",
+          "lifetime": "每次VehicleIf_Read调用"
+        },
+        {
+          "name": "isfinite",
+          "file": "app.c",
+          "match": "if (!isfinite(sample.speed_kmh)",
+          "what": "检查浮点数是否有限，拒绝NaN和无穷大",
+          "lifetime": "每次App输入检查"
+        },
+        {
+          "name": "FaultCode",
+          "file": "vehicle_if.h",
+          "match": "typedef enum {",
+          "what": "故障枚举0至6；不是UDS诊断DTC",
+          "lifetime": "编译时类型"
+        },
+        {
+          "name": "status/published/valid/fault",
+          "file": "demo.c",
+          "match": "printf(\"step=%zu status=%d published=%d\"",
+          "what": "应用返回码/本轮是否真正写成功/输出是否有效/原因编号，四者需分别解释",
+          "lifetime": "每一帧"
+        }
+      ],
+      "run_fields": [
+        {
+          "id": "scenario",
+          "label": "S01–S09 · 选择场景（0–8）",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "S01 · 正常三帧"
+            ],
+            [
+              "1",
+              "S02 · 第1帧Read失败"
+            ],
+            [
+              "2",
+              "S03 · 第1帧雷达无效"
+            ],
+            [
+              "3",
+              "S04 · 第1帧Write失败"
+            ],
+            [
+              "4",
+              "S05 · 第1帧负车速"
+            ],
+            [
+              "5",
+              "S06 · 第1帧NaN"
+            ],
+            [
+              "6",
+              "S07 · 第1帧时间戳超时101ms"
+            ],
+            [
+              "7",
+              "S08 · 第1帧未启用"
+            ],
+            [
+              "8",
+              "S09 · 第1帧设备故障"
+            ]
+          ]
+        }
+      ],
+      "reading": [
+        {
+          "title": "00 · D12的三个批注：先找到语法的位置",
+          "text": "① STEPS[5][3]确为五个场景×每场景三帧。D13扩为STEPS[9][3]，含27个MockStep元素；STEPS[8][2]指向最后一个场景的最后一帧，STEPS[9][0]越界。\n② 文件作用域static规定名字只在该翻译单元内可链接使用；它不禁止重新赋值，所以g_next++合法。static局部变量同样具有静态存储期，但名称的作用域仍在其局部块内。\n③ (VehicleResult){0}是C99的复合字面量：括号中的VehicleResult是类型，{0}是初始化列表。g_last=(VehicleResult){0}构造一个零初始化结构体值，赋给已经存在的g_last；与VehicleResult tmp={0}定义命名变量的写法区别开。"
+        },
+        {
+          "title": "01 · 数组维度：二维不等于二维空间图",
+          "text": "先看typedef struct ... MockStep定义了一帧：frame/read_fail/write_fail。static const MockStep STEPS[9][3]定义了9个数组，每个内部数组有3个MockStep。类型由内向外看：STEPS[4]是一组3帧；STEPS[4][1]才是单帧结构体；&STEPS[4][1]是它的地址（MockStep *类型，可转成const MockStep *）。for循环先sc从0到8，再frame从0到2，每轮访问一帧。\nD12五场景×三帧的理解准确，不需要把二维数组当成图像坐标。"
+        },
+        {
+          "title": "02 · static、const与花括号不是一回事",
+          "text": "mock.c里static const MockStep STEPS[9][3]同时用到static与const：static在文件作用域限制名字的外部链接，const使元素不能通过该对象修改；全局文件作用域对象默认就有静态存储期，static并非只负责延长寿命。\nstatic size_t g_next=0U没有const，Read里++g_next会变化，Mock_Select里g_next=0U也可重置。函数内部static int counter=0则在多次调用间保留值，但只在该块作用域中能直接按名称访问。\n不要把CMake中的STATIC静态库和C语言的static关键字混同。"
+        },
+        {
+          "title": "03 · 结构体零初始化：两种写法对照",
+          "text": "VehicleResult tmp={0}是定义一个名叫tmp的对象，初始化其首个成员为0，其余未显式列出的成员按规则初始化为空值/零值；这种写法用于变量初始化。\n(VehicleResult){0}是一个复合字面量表达式，在使用处构造一个无名的VehicleResult对象；因此可以写g_last=(VehicleResult){0}，给已经存在的对象整体赋零初始化值，也可以return (VehicleResult){0}从返回结构体的函数中返回该值。不能写g_last={0};作为普通赋值。\n在块作用域的复合字面量具有自动存储期，其生命周期不是“下一行立刻销毁”；这里用整体赋值复制结构体值，不保留临时对象地址。"
+        },
+        {
+          "title": "04 · 执行地图：五个文件串起来",
+          "text": "main()创建scenario，Mock_Select(0)重置g_scenario、g_next、g_current、g_published和g_last。main进入for第0帧，先记before，再调用App_RunOnce()。\napp.c创建sample={0}和result={0}。VehicleIf_Read(&sample)跳到mock.c，按STEPS[g_scenario][g_next]找场景帧，const MockStep *step拿到地址，*out=step->frame将整个输入结构体复制回sample。返回app，使用sample.字段检查后，写result.字段，调用VehicleIf_Write(&result)。mock成功才g_last=*result，++g_published。最后main的after>before才打印新发布的valid/warning/fault。"
+        },
+        {
+          "title": "05 · R01：正常三帧的数值怎样从需求变成测试",
+          "text": "本课定义R01：数据有效、未超时、已使能且无设备故障时，distance_m<=35.0f则warning=1，否则0，valid=1且fault=0。场景0依次是72km/h/45m、73km/h/34m、74km/h/42m；三次结果依次warning=0/1/0、status=0、published=1、valid=1。\n这是为演示需求覆盖而设的教学规则，不是车辆控制或安全阈值建议。"
+        },
+        {
+          "title": "06 · R02/R03：读失败、非法输入、NaN为什么要分别记录",
+          "text": "R02要求Read失败时App不读取无效sample，尝试发布valid=0、fault=1并返回-2；若Write也失败，返回-4且本轮不发布。R03要求雷达无效fault=2、范围非法或NaN fault=3、未使能fault=5、设备故障fault=6时发布valid=0、warning=0，返回-3。注意0的warning只是占位，不等于风险已排除。\nNaN是特殊浮点值，x<0和x>250都返回假；若没有!isfinite，简单范围检查会放行它。本课修复版使用isfinite，场景5明确验证fault=3。"
+        },
+        {
+          "title": "07 · R04：时间戳与100ms边界",
+          "text": "sample.now_ms与sample.stamp_ms均为本课模拟的毫秒整数，同一非回绕时间域。若stamp_ms>now_ms，则时间戳来自未来；若now_ms-stamp_ms>100U，则输入过期。正常帧1010-960=50ms有效，场景6的1010-909=101ms无效：status=-3、published=1、valid=0、fault=4。\n正好100ms不算超时；本课暂不处理无符号计数器回绕，后续D14专讲时间戳边界。"
+        },
+        {
+          "title": "08 · R05：一次Write失败与旧g_last",
+          "text": "场景3第1帧，Read正常，App计算warning=1、valid=1，但Write返回-1；因此应用返回status=-4，g_published没有增加，main得到published=0。g_last仍保存前一帧的cycle100，但本轮没有新的valid/warning/fault可打印；不能把上一次的有效数据当作本轮发布。\n这里的status、published、valid、fault分别回答：应用执行情况、接口是否确实发布、被发布结果是否有效、为何无效。"
+        },
+        {
+          "title": "09 · R06：异常后的下一帧必须恢复",
+          "text": "所有场景的第2帧都提供合法数据（74km/h、42m、有效雷达、时间戳差50ms、已启用、无设备故障），所以即便第1帧出现读失败/非法/超时/写失败，最后一帧仍要得到status=0、published=1、valid=1、warning=0、fault=0。测试不能只检查异常帧；恢复能力也需要单独测试编号T06。"
+        },
+        {
+          "title": "10 · 测试闭环：R01～R06 ↔ T01～T06",
+          "text": "R01→T01场景0；R02→T02场景1；R03→T03场景2、4、5、7、8；R04→T04场景6；R05→T05场景3；R06→T06场景1～8末帧。test_app.c使用statuses/published/valids/faults等二维期望数组逐帧核对，而非用目测判断。\n实作时先记录需求编号，再说明输入、期望状态、检查点和故障码；最后保存GCC/CTest的结果。网上模拟过关只表明JS题目正确，本地真实C由你在WSL核验。"
+        },
+        {
+          "title": "11 · 本地故障注入：先让NaN测试失败，再修复",
+          "text": "将本站下载的9份文件放入同一目录，首先用GCC编译demo与test并运行。复制app.c备份后，仅在你的本地副本里临时删掉!isfinite(sample.speed_kmh) ||，然后重新编译运行场景5；如果编译警告、语法变化或测试失败，记录原始输出。再恢复isfinite，重新编译和执行场景5及./vehicle_tests，保留前后对照。\nCMake/CTest是另一条构建验证路径；要与GCC手动编译分开记录。此过程不会自动写入个人GitHub记录，也不代表网站已经在浏览器里运行C。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "S01 · main选择场景并初始化static状态",
+          "file": "demo.c",
+          "start": "int main(void)",
+          "end": "    printf(\"scenario=%d steps=3",
+          "pattern": "scanf(&scenario)读取整数；Mock_Select重置g_last。",
+          "text": "从main开始，只选择场景号，不直接读STEPS数组。",
+          "trace": "输入0→scenario=0，模拟层重置发布次数与复合字面量赋值。"
+        },
+        {
+          "title": "S02 · mock.c：static、const和二维数组",
+          "file": "mock.c",
+          "start": "typedef struct {",
+          "end": "int Mock_Select(int scenario)",
+          "pattern": "MockStep类型先定义，再创建static const MockStep STEPS[9][3]。",
+          "text": "从一个MockStep元素类型推导二维数组：9场景×3帧；g_next是可变static变量。",
+          "trace": "STEPS[0][1]读取正常场景的第1帧（73km/h、34m）。"
+        },
+        {
+          "title": "S03 · Mock_Select与(VehicleResult){0}",
+          "file": "mock.c",
+          "start": "int Mock_Select(int scenario)",
+          "end": "int VehicleIf_Read(VehicleSample *out)",
+          "pattern": "(VehicleResult){0}是表达式，g_last已经存在；区别于命名对象声明。",
+          "text": "重置g_next/g_published并给g_last重新赋全零结构体。",
+          "trace": "上一场景的发布结果不应泄漏到新场景。"
+        },
+        {
+          "title": "S04 · app.c创建有名字的sample/result",
+          "file": "app.c",
+          "start": "int App_RunOnce(void)",
+          "end": "    /* 【3 关联周期】",
+          "pattern": "VehicleSample sample={0}和VehicleResult result={0}定义命名对象；&sample取地址。",
+          "text": "Read接口接受&sample，函数的*out会整体写入。",
+          "trace": "第0轮Read成功后sample.distance_m=45。"
+        },
+        {
+          "title": "S05 · vehicle_if.h：共享类型与故障枚举",
+          "file": "vehicle_if.h",
+          "start": "typedef struct {",
+          "end": "#endif",
+          "pattern": "结构体成员与枚举值是类型定义；不等于实际变量赋值。",
+          "text": "输入含时间戳、使能、故障位；输出增加fault_code。",
+          "trace": "FAULT_TIMEOUT=4；VehicleResult result={0}默认FAULT_NONE=0。"
+        },
+        {
+          "title": "S06 · mock.Read：双下标与指针整体写回",
+          "file": "mock.c",
+          "start": "int VehicleIf_Read(VehicleSample *out)",
+          "end": "int VehicleIf_Write(const VehicleResult *result)",
+          "pattern": "&STEPS[sc][frame]取单个元素地址，step->frame读取成员，*out写回整帧。",
+          "text": "这里能用同一套C语法看清场景0第一、二、三帧如何传入应用。",
+          "trace": "STEPS[0][1]→step->frame→app的sample。"
+        },
+        {
+          "title": "S07 · app.c：输入范围、NaN、超时、使能",
+          "file": "app.c",
+          "start": "    /* 【3 关联周期】",
+          "end": "    /* 【5 无效路径】",
+          "pattern": "先isfinite排除NaN，后做大小比较与100ms新鲜度检查；赋FaultCode。",
+          "text": "将实际检查顺序对照R03、R04。",
+          "trace": "场景5fault3；场景6fault4；场景7fault5；场景8fault6。"
+        },
+        {
+          "title": "S08 · app.c：无效输出与正常输出",
+          "file": "app.c",
+          "start": "    /* 【5 无效路径】",
+          "end": "    return 0;",
+          "pattern": "result是结构体对象，用result.valid；传&result给Write。",
+          "text": "无效输出会显式记录故障码，且不允许warning标记为有效。",
+          "trace": "场景0第1帧warning=1、valid=1；场景5第1帧warning=0、valid=0。"
+        },
+        {
+          "title": "S09 · mock.Write：发布成功才更新g_last",
+          "file": "mock.c",
+          "start": "int VehicleIf_Write(const VehicleResult *result)",
+          "end": "size_t Mock_PublishedCount(void)",
+          "pattern": "STEPS[g_scenario][g_current].write_fail是按两个下标访问；g_last=*result是整体结构体复制。",
+          "text": "写失败时不覆盖旧g_last，也不自增g_published。",
+          "trace": "场景3第1帧status=-4，published=0。"
+        },
+        {
+          "title": "S10 · main检查本帧是否真的发布",
+          "file": "demo.c",
+          "start": "    /* 【完整执行链】",
+          "end": "    return 0;",
+          "pattern": "比较after和before得到published，并且只在published非0时调用Mock_Last。",
+          "text": "不把旧输出冒充当前帧，打印status/valid/warning/cycle/fault。",
+          "trace": "场景3第1帧仅打印status=-4 published=0。"
+        },
+        {
+          "title": "S11 · test_app.c：从需求编号到期望矩阵",
+          "file": "test_app.c",
+          "start": "int main(void)",
+          "end": "    printf(\"PASS: R01-R06;",
+          "pattern": "int statuses[9][3]是期望值矩阵，逐场景逐帧检查；main与demo的main分开链接。",
+          "text": "先预测，再运行；9场景×3帧分别有status/published/valid/fault的预期。",
+          "trace": "R03→T03涵盖NaN/负数等，R06→T06检查异常后恢复。"
+        },
+        {
+          "title": "S12 · 构建与本地真实C验证",
+          "file": "CMakeLists.txt",
+          "start": "cmake_minimum_required",
+          "end": "endif()",
+          "pattern": "CMake的STATIC是静态库类型，不是C文件中的static。",
+          "text": "GCC直接编译demo/test为独立程序；CMake和CTest可重复验证。",
+          "trace": "gcc -std=c17 -Wall -Wextra -Wpedantic -Werror；test输出PASS。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "S01 · 正常三帧",
+          "values": [
+            0
+          ],
+          "optional": false,
+          "hint": "三帧有效，warning应是0、1、0",
+          "steps": [
+            "先在mock.c定位STEPS[场景号][1]，说出每个输入字段含义。",
+            "预测第1帧status/published/valid/fault，其中Write失败没有本轮valid/fault。",
+            "运行浏览器模拟，把输出与R01—R06需求、T01—T06测试对应；本地C仍须WSL独立运行。"
+          ]
+        },
+        {
+          "name": "S02 · 读取失败",
+          "values": [
+            1
+          ],
+          "optional": false,
+          "hint": "第1帧第1帧读取失败；第2帧恢复有效",
+          "steps": [
+            "先在mock.c定位STEPS[场景号][1]，说出每个输入字段含义。",
+            "预测第1帧status/published/valid/fault，其中Write失败没有本轮valid/fault。",
+            "运行浏览器模拟，把输出与R01—R06需求、T01—T06测试对应；本地C仍须WSL独立运行。"
+          ]
+        },
+        {
+          "name": "S03 · 雷达无效",
+          "values": [
+            2
+          ],
+          "optional": false,
+          "hint": "第1帧第1帧雷达标志无效；第2帧恢复有效",
+          "steps": [
+            "先在mock.c定位STEPS[场景号][1]，说出每个输入字段含义。",
+            "预测第1帧status/published/valid/fault，其中Write失败没有本轮valid/fault。",
+            "运行浏览器模拟，把输出与R01—R06需求、T01—T06测试对应；本地C仍须WSL独立运行。"
+          ]
+        },
+        {
+          "name": "S04 · 写失败",
+          "values": [
+            3
+          ],
+          "optional": false,
+          "hint": "第1帧第1帧写失败（保留旧发布记录）；第2帧恢复有效",
+          "steps": [
+            "先在mock.c定位STEPS[场景号][1]，说出每个输入字段含义。",
+            "预测第1帧status/published/valid/fault，其中Write失败没有本轮valid/fault。",
+            "运行浏览器模拟，把输出与R01—R06需求、T01—T06测试对应；本地C仍须WSL独立运行。"
+          ]
+        },
+        {
+          "name": "S05 · 负车速",
+          "values": [
+            4
+          ],
+          "optional": false,
+          "hint": "第1帧第1帧车速为负数；第2帧恢复有效",
+          "steps": [
+            "先在mock.c定位STEPS[场景号][1]，说出每个输入字段含义。",
+            "预测第1帧status/published/valid/fault，其中Write失败没有本轮valid/fault。",
+            "运行浏览器模拟，把输出与R01—R06需求、T01—T06测试对应；本地C仍须WSL独立运行。"
+          ]
+        },
+        {
+          "name": "S06 · NaN",
+          "values": [
+            5
+          ],
+          "optional": false,
+          "hint": "第1帧第1帧车速为NaN（仅比较范围会漏检）；第2帧恢复有效",
+          "steps": [
+            "先在mock.c定位STEPS[场景号][1]，说出每个输入字段含义。",
+            "预测第1帧status/published/valid/fault，其中Write失败没有本轮valid/fault。",
+            "运行浏览器模拟，把输出与R01—R06需求、T01—T06测试对应；本地C仍须WSL独立运行。"
+          ]
+        },
+        {
+          "name": "S07 · 超时101ms",
+          "values": [
+            6
+          ],
+          "optional": false,
+          "hint": "第1帧第1帧超时：1010-909=101ms；第2帧恢复有效",
+          "steps": [
+            "先在mock.c定位STEPS[场景号][1]，说出每个输入字段含义。",
+            "预测第1帧status/published/valid/fault，其中Write失败没有本轮valid/fault。",
+            "运行浏览器模拟，把输出与R01—R06需求、T01—T06测试对应；本地C仍须WSL独立运行。"
+          ]
+        },
+        {
+          "name": "S08 · 未启用",
+          "values": [
+            7
+          ],
+          "optional": false,
+          "hint": "第1帧第1帧驾驶员未启用；第2帧恢复有效",
+          "steps": [
+            "先在mock.c定位STEPS[场景号][1]，说出每个输入字段含义。",
+            "预测第1帧status/published/valid/fault，其中Write失败没有本轮valid/fault。",
+            "运行浏览器模拟，把输出与R01—R06需求、T01—T06测试对应；本地C仍须WSL独立运行。"
+          ]
+        },
+        {
+          "name": "S09 · 设备故障",
+          "values": [
+            8
+          ],
+          "optional": false,
+          "hint": "第1帧第1帧传感器上报故障；第2帧恢复有效",
+          "steps": [
+            "先在mock.c定位STEPS[场景号][1]，说出每个输入字段含义。",
+            "预测第1帧status/published/valid/fault，其中Write失败没有本轮valid/fault。",
+            "运行浏览器模拟，把输出与R01—R06需求、T01—T06测试对应；本地C仍须WSL独立运行。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "练习A（先补语法）：在mock.c找STEPS[9][3]、static g_next、g_last=(VehicleResult){0}；比较D12旧的[5][3]与新数组，回答总帧数和最后一个下标。",
+        "练习B（代码链）：先main→Mock_Select→app中的sample/result→mock中的step和*out→app校验→Write→main；为每步写出变量类型、定义文件及数据如何改变。",
+        "练习C（需求映射）：逐条写R01～R06对应的T01～T06、输入、期望status/published/valid/fault，运行9个浏览器模拟场景。",
+        "练习D（修复证据）：在个人WSL源码副本暂时删去针对speed的isfinite检查，记录场景5修复前输出/失败测试，再恢复后记录通过结果；不要改公开课程源码。",
+        "练习E（真实C）：用GCC分别构建两个main，再使用CMake/CTest运行；将终端日志与浏览器模拟结果分开保存。",
+        "练习F（批注）：可在完整源码和解释旁划线写自己的疑问；网页自动保存当前浏览器草稿，云同步按原设置运行，不需要修改D12笔记。"
+      ],
+      "test_steps": [
+        "9个场景S01～S09全部运行（浏览器JavaScript，不是实际C运行）。",
+        "10道Q1～Q10知识题与4道P1～P4数值题全部通过，保持明确题号。",
+        "独立解释R01～R06与T01～T06的对应关系；故障码不代表真实UDS DTC。",
+        "WSL手动完成GCC demo和test、CMake/CTest，并保存NaN修复前后证据；网站不自动标为真实C通关。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "D12的STEPS[5][3]按MockStep元素计算共有多少帧？",
+          "options": [
+            "15帧：5个场景×3帧",
+            "8帧：5+3",
+            "5帧：只看第一个下标"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "本课STEPS[9][3]中最后一个合法元素是哪一个？",
+          "options": [
+            "STEPS[9][3]",
+            "STEPS[8][2]",
+            "STEPS[8][3]"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "文件作用域static size_t g_next=0U以后还能g_next++吗？",
+          "options": [
+            "能；static不禁止改变值",
+            "不能；static等于const",
+            "只有宏定义后才行"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "static const MockStep STEPS[9][3]中const主要意味着什么？",
+          "options": [
+            "9场景自动变成常量数",
+            "通过STEPS不能修改预设元素",
+            "把数组放进堆内存"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "g_last=(VehicleResult){0};中的(VehicleResult){0}是什么？",
+          "options": [
+            "定义了一个名为VehicleResult的变量",
+            "结构体类型的复合字面量表达式",
+            "直接声明一个C++构造函数"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "以下哪项是真正定义名为tmp的结构体变量？",
+          "options": [
+            "VehicleResult tmp = {0};",
+            "g_last = (VehicleResult){0};",
+            "(VehicleResult){0};"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "为何仅判断speed<0 || speed>250不能可靠拒绝NaN？",
+          "options": [
+            "因为NaN会自动等于0",
+            "因为NaN的大小比较均不满足，需要isfinite",
+            "因为NaN只能用于整数"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "R04设定年龄超过100ms为超时，1010-909=101ms应该怎样？",
+          "options": [
+            "有效，status=0",
+            "无效，fault=4",
+            "有效，因为时间戳是整数"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "场景3中Write失败，是否能把g_last旧值称为本轮新发布？",
+          "options": [
+            "能，只要旧值valid=1",
+            "不能，本轮published=0",
+            "能，只要g_last不为空"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "需求R03与T03的关系应如何描述？",
+          "options": [
+            "只要网页通过就说明本地C通过",
+            "每条需求有明确场景和期望值供测试验证",
+            "需求编号就是硬件故障DTC"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "结合代码填写4个整数。把浏览器模拟结果与本地实际GCC结果区分开。",
+        "values": [
+          0
+        ],
+        "fields": [
+          {
+            "id": "total_frames",
+            "label": "P1 · STEPS[9][3]共有多少帧",
+            "kind": "number"
+          },
+          {
+            "id": "nan_fault",
+            "label": "P2 · NaN场景第1帧fault",
+            "kind": "number"
+          },
+          {
+            "id": "timeout_status",
+            "label": "P3 · 101ms超时场景第1帧status",
+            "kind": "number"
+          },
+          {
+            "id": "write_published",
+            "label": "P4 · Write失败第1帧published",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "9个场景×每场景3帧=27帧。",
+          "NaN被有限性检查拒绝，FAULT_RANGE=3。",
+          "超过100ms无效，App_RunOnce返回-3。",
+          "写失败未增加发布次数，published=0。"
+        ]
+      },
+      "pass_rule": "9个场景、10道Q题和4道P题在线通过，仅记录浏览器JS练习通过；本地真实C须学员本人WSL/GCC及CTest通过并保存日志。",
+      "assets": [
+        {
+          "name": "vehicle_if.h",
+          "group": "main",
+          "text": "#ifndef VEHICLE_IF_H\n#define VEHICLE_IF_H\n#include <stdint.h> /* uint32_t用于周期号和毫秒时间戳。 */\n\n/* 【输入类型】typedef给结构体类型起名；此处还没有创建sample对象。 */\ntypedef struct {\n    float speed_kmh;       /* 车速，单位km/h，必须是有限数且在0～250之间。 */\n    float distance_m;      /* 前车距离，单位m，必须是有限数且在0～500之间。 */\n    int radar_valid;       /* 1：雷达数据有效；0：不可用。 */\n    uint32_t cycle;        /* 采样轮次，供记录数据来源。 */\n    uint32_t now_ms;       /* 本次应用检查时刻，单位ms；模拟数据给定。 */\n    uint32_t stamp_ms;     /* 传感器采样时刻，单位ms；不处理计数器回绕。 */\n    int driver_enable;     /* 1：驾驶员启用；0：未启用。 */\n    int fault_present;     /* 1：传感器报告故障；0：未报告。 */\n} VehicleSample;\n\n/* 【故障枚举】一个明确的编号对应一个故障原因；不是硬件诊断DTC。 */\ntypedef enum {\n    FAULT_NONE = 0,        /* 数据有效，无故障。 */\n    FAULT_READ = 1,        /* VehicleIf_Read失败。 */\n    FAULT_SENSOR = 2,      /* 雷达有效标志不正确。 */\n    FAULT_RANGE = 3,       /* 速度或距离为NaN/inf/超范围。 */\n    FAULT_TIMEOUT = 4,     /* 时间戳超前，或数据年龄大于100ms。 */\n    FAULT_DISABLED = 5,    /* 驾驶员未启用，不能发布有效判断。 */\n    FAULT_DEVICE = 6       /* 传感器上报故障。 */\n} FaultCode;\n\n/* 【输出类型】valid=0时warning=0只是占位，不表示前车距离安全。 */\ntypedef struct {\n    int warning;           /* 1：距离<=35m；0：未触发，只有valid=1才有意义。 */\n    int valid;             /* 1：本次提示结果有效；0：不可用于决策。 */\n    uint32_t cycle;        /* 与输入采样轮次对应；Read失败时保持0。 */\n    FaultCode fault_code;  /* 本轮故障原因；Write失败时本轮结果根本未发布。 */\n} VehicleResult;\n\n/* 【接口声明】实现写在mock.c；app.c只调用这两个接口。 */\nint VehicleIf_Read(VehicleSample *out);              /* out指向应用的可写sample。 */\nint VehicleIf_Write(const VehicleResult *result);    /* result指向只读输出。 */\n#endif\n"
+        },
+        {
+          "name": "app.h",
+          "group": "main",
+          "text": "#ifndef APP_H\n#define APP_H\n/* 【应用入口】由demo.c每帧调用一次，输入来自VehicleIf_Read接口。 */\n/* 返回0成功；-2读取失败；-3输入不可用；-4写接口失败。 */\n/* 返回码、输出valid、是否真的published是三件不同的事。 */\nint App_RunOnce(void);\n#endif\n"
+        },
+        {
+          "name": "app.c",
+          "group": "main",
+          "text": "#include \"app.h\"       /* App_RunOnce函数声明。 */\n#include \"vehicle_if.h\" /* 输入/输出结构体、FaultCode和接口函数原型。 */\n#include <math.h>      /* isfinite：必须显式排除NaN与无穷大。 */\n\n/* 【业务函数】mock可替换为别的接口实现，app不访问STEPS数组。 */\nint App_RunOnce(void)\n{\n    /* 【1 创建对象】这是有名字的局部对象，每次调用重新初始化。 */\n    VehicleSample sample = {0}; /* sample本身是结构体，访问成员用点号。 */\n    VehicleResult result = {0}; /* valid=0、warning=0、fault_code=0。 */\n\n    /* 【2 读输入】&sample取对象地址；mock.c的*out会覆盖整个sample。 */\n    int read_status = VehicleIf_Read(&sample);\n    if (read_status != 0) {\n        result.fault_code = FAULT_READ;\n        /* 即使Read失败，也尝试写出一份明确标为无效的结果。 */\n        if (VehicleIf_Write(&result) != 0) return -4;\n        return -2;\n    }\n\n    /* 【3 关联周期】只有Read成功后，sample.cycle才来自本轮输入。 */\n    result.cycle = sample.cycle;\n\n    /* 【4 需求R03：有限性和范围】NaN与任何大小比较通常都为假。 */\n    /* 因此只写speed<0或speed>250不能拒绝NaN，必须先用isfinite。 */\n    if (!isfinite(sample.speed_kmh) || !isfinite(sample.distance_m) ||\n        sample.speed_kmh < 0.0f || sample.speed_kmh > 250.0f ||\n        sample.distance_m < 0.0f || sample.distance_m > 500.0f) {\n        result.fault_code = FAULT_RANGE;\n    }\n    /* 【需求R04：数据新鲜度】先检查未来时间，再进行无符号减法。 */\n    else if (sample.stamp_ms > sample.now_ms ||\n             sample.now_ms - sample.stamp_ms > 100U) {\n        result.fault_code = FAULT_TIMEOUT;\n    }\n    /* 【需求R03：传感器状态、使能和故障】检查顺序决定优先记录什么。 */\n    else if (sample.radar_valid != 1) {\n        result.fault_code = FAULT_SENSOR;\n    }\n    else if (sample.driver_enable != 1) {\n        result.fault_code = FAULT_DISABLED;\n    }\n    else if (sample.fault_present != 0) {\n        result.fault_code = FAULT_DEVICE;\n    }\n\n    /* 【5 无效路径】故障码!=0时，保持valid=0且warning=0。 */\n    if (result.fault_code != FAULT_NONE) {\n        if (VehicleIf_Write(&result) != 0) return -4;\n        return -3;\n    }\n\n    /* 【6 正常路径】35m仅为教学阈值；不控制真实车辆执行器。 */\n    result.warning = sample.distance_m <= 35.0f ? 1 : 0;\n    result.valid = 1;\n    result.fault_code = FAULT_NONE;\n\n    /* 【7 写输出】Write成功才认为这一帧发布；失败时返回-4。 */\n    if (VehicleIf_Write(&result) != 0) return -4;\n    return 0;\n}\n"
+        },
+        {
+          "name": "mock.h",
+          "group": "main",
+          "text": "#ifndef MOCK_H\n#define MOCK_H\n#include \"vehicle_if.h\"\n#include <stddef.h> /* size_t是数组下标/计数类型。 */\n\n/* 【测试专用接口】只允许demo.c/test_app.c访问，应用app.c不包含。 */\nint Mock_Select(int scenario);    /* 选择0～8场景，重置三帧的读取位置。 */\nsize_t Mock_PublishedCount(void); /* 返回已成功发布的总次数。 */\nint Mock_Last(VehicleResult *out);/* 把最近成功发布的结果复制给调用者。 */\n#endif\n"
+        },
+        {
+          "name": "mock.c",
+          "group": "main",
+          "text": "#include \"mock.h\"  /* mock公开的测试函数和共享结构体类型。 */\n#include <stddef.h> /* NULL表示空指针。 */\n#include <math.h>   /* NAN用于演示“只做范围比较”的漏洞。 */\n\n/* 【一帧模拟输入】read_fail/write_fail是故障注入开关。 */\ntypedef struct {\n    VehicleSample frame; /* 在Read成功时复制到app.c的sample。 */\n    int read_fail;       /* 1：这帧Read函数主动返回失败。 */\n    int write_fail;      /* 1：这帧Write函数主动返回失败。 */\n} MockStep;\n\n/* 【二维数组】9个场景，每个场景3帧；合法下标为[0..8][0..2]。 */\n/* static：该名字具有内部链接，仅在mock.c本翻译单元可引用。 */\n/* const：通过STEPS不可修改预置内容；两者不是同一个意思。 */\nstatic const MockStep STEPS[9][3] = {\n    { /* 场景0：正常三帧，第1帧34m触发warning=1。 */\n        {{72.0f,45.0f,1,100U,1000U,950U,1,0},0,0},\n        {{73.0f,34.0f,1,101U,1010U,960U,1,0},0,0},\n        {{74.0f,42.0f,1,102U,1020U,970U,1,0},0,0}\n    },\n    { /* 场景1：第1帧读取失败。 */\n        {{72.0f,45.0f,1,100U,1000U,950U,1,0},0,0},\n        {{0.0f,0.0f,0,0U,0U,0U,0,0},1,0},\n        {{74.0f,42.0f,1,102U,1020U,970U,1,0},0,0}\n    },\n    { /* 场景2：第1帧雷达标志无效。 */\n        {{72.0f,45.0f,1,100U,1000U,950U,1,0},0,0},\n        {{73.0f,34.0f,0,101U,1010U,960U,1,0},0,0},\n        {{74.0f,42.0f,1,102U,1020U,970U,1,0},0,0}\n    },\n    { /* 场景3：第1帧写失败（保留旧发布记录）。 */\n        {{72.0f,45.0f,1,100U,1000U,950U,1,0},0,0},\n        {{73.0f,34.0f,1,101U,1010U,960U,1,0},0,1},\n        {{74.0f,42.0f,1,102U,1020U,970U,1,0},0,0}\n    },\n    { /* 场景4：第1帧车速为负数。 */\n        {{72.0f,45.0f,1,100U,1000U,950U,1,0},0,0},\n        {{-1.0f,34.0f,1,101U,1010U,960U,1,0},0,0},\n        {{74.0f,42.0f,1,102U,1020U,970U,1,0},0,0}\n    },\n    { /* 场景5：第1帧车速为NaN（仅比较范围会漏检）。 */\n        {{72.0f,45.0f,1,100U,1000U,950U,1,0},0,0},\n        {{NAN,34.0f,1,101U,1010U,960U,1,0},0,0},\n        {{74.0f,42.0f,1,102U,1020U,970U,1,0},0,0}\n    },\n    { /* 场景6：第1帧超时：1010-909=101ms。 */\n        {{72.0f,45.0f,1,100U,1000U,950U,1,0},0,0},\n        {{73.0f,34.0f,1,101U,1010U,909U,1,0},0,0},\n        {{74.0f,42.0f,1,102U,1020U,970U,1,0},0,0}\n    },\n    { /* 场景7：第1帧驾驶员未启用。 */\n        {{72.0f,45.0f,1,100U,1000U,950U,1,0},0,0},\n        {{73.0f,34.0f,1,101U,1010U,960U,0,0},0,0},\n        {{74.0f,42.0f,1,102U,1020U,970U,1,0},0,0}\n    },\n    { /* 场景8：第1帧传感器上报故障。 */\n        {{72.0f,45.0f,1,100U,1000U,950U,1,0},0,0},\n        {{73.0f,34.0f,1,101U,1010U,960U,1,1},0,0},\n        {{74.0f,42.0f,1,102U,1020U,970U,1,0},0,0}\n    }\n};\n\n/* 【模拟模块状态】这些对象是可变的；static绝不是“永远不变”。 */\n/* 它们位于文件作用域，具有静态存储期和内部链接。 */\nstatic int g_scenario = -1;          /* 当前场景，-1表示尚未选定。 */\nstatic size_t g_next = 0U;           /* 下次Read将访问的帧索引。 */\nstatic size_t g_current = 0U;        /* 刚才Read使用的帧索引。 */\nstatic size_t g_published = 0U;      /* Write成功次数，不是调用次数。 */\nstatic VehicleResult g_last = {0};   /* 最近一次成功发布的结果副本。 */\n\nint Mock_Select(int scenario)\n{\n    if (scenario < 0 || scenario >= 9) return -1;\n    g_scenario = scenario;\n    g_next = 0U; g_current = 0U; g_published = 0U;\n\n    /* 【重要语法】(VehicleResult){0}是C99复合字面量，形成一个结构体对象。 */\n    /* 它不是声明新变量；这里把零初始化的结构体值赋给已有g_last。 */\n    /* 对比：VehicleResult tmp = {0}; 定义了一个名叫tmp的新变量。 */\n    g_last = (VehicleResult){0};\n    return 0;\n}\n\nint VehicleIf_Read(VehicleSample *out)\n{\n    if (out == NULL || g_scenario < 0 || g_next >= 3U) return -1;\n    /* 【两层下标】先选场景，再选帧；&取那个MockStep元素的地址。 */\n    const MockStep *step = &STEPS[g_scenario][g_next];\n    g_current = g_next;\n    ++g_next; /* 下一次Read读取同一场景的下一帧。 */\n    if (step->read_fail != 0) return -1;\n    /* 【指针写回】*out表示调用者app.c的整个sample对象。 */\n    *out = step->frame; /* 将输入结构体完整复制；不是逐成员动态绑定。 */\n    return 0;\n}\n\nint VehicleIf_Write(const VehicleResult *result)\n{\n    if (result == NULL || g_scenario < 0 || g_next == 0U) return -1;\n    if (STEPS[g_scenario][g_current].write_fail != 0) return -1;\n    /* 只有成功写出，才能覆盖g_last并递增成功发布计数。 */\n    g_last = *result;\n    ++g_published;\n    return 0;\n}\n\nsize_t Mock_PublishedCount(void)\n{\n    return g_published;\n}\n\nint Mock_Last(VehicleResult *out)\n{\n    if (out == NULL || g_published == 0U) return -1;\n    *out = g_last; /* 再复制一次，把上次发布的值交给demo/test。 */\n    return 0;\n}\n"
+        },
+        {
+          "name": "demo.c",
+          "group": "main",
+          "text": "#include \"app.h\"   /* 应用函数声明。 */\n#include \"mock.h\"  /* main选择模拟场景，应用app.c不碰mock。 */\n#include <stdio.h> /* scanf和printf的声明。 */\n#include <stddef.h>/* size_t与%zu。 */\n\nint main(void)\n{\n    int scenario = 0; /* 0～8；第1帧是故障注入位置（下标1）。 */\n    if (scanf(\"%d\", &scenario) != 1 || Mock_Select(scenario) != 0) {\n        printf(\"input_error=1\\n\"); /* 不执行任何车辆业务逻辑。 */\n        return 1;\n    }\n\n    printf(\"scenario=%d steps=3\\n\", scenario);\n    /* 【完整执行链】main→App_RunOnce→mock.Read→app校验→mock.Write→main。 */\n    for (size_t i = 0U; i < 3U; ++i) {\n        size_t before = Mock_PublishedCount(); /* 本轮前成功发布次数。 */\n        int status = App_RunOnce();            /* 函数调用期间main暂停。 */\n        size_t after = Mock_PublishedCount();  /* 本轮后成功发布次数。 */\n        int published = after > before ? 1 : 0;\n        printf(\"step=%zu status=%d published=%d\", i, status, published);\n        if (published != 0) {\n            VehicleResult last = {0}; /* 命名对象，不是复合字面量表达式。 */\n            if (Mock_Last(&last) == 0) {\n                /* 点号访问对象成员，故障码是enum数值。 */\n                printf(\" valid=%d warning=%d cycle=%u fault=%d\",\n                       last.valid, last.warning,\n                       (unsigned int)last.cycle, (int)last.fault_code);\n            }\n        }\n        /* 写失败时不打印旧g_last，让“本轮没有发布”一目了然。 */\n        printf(\"\\n\");\n    }\n    return 0;\n}\n"
+        },
+        {
+          "name": "test_app.c",
+          "group": "main",
+          "text": "#include \"app.h\"\n#include \"mock.h\"\n#include <stdio.h>\n\n/* 【六条需求与九组场景】表中行是场景，列是0/1/2帧。 */\n/* 不使用assert：避免编译器设置NDEBUG后跳过检查。 */\nint main(void)\n{\n    const int statuses[9][3] = {\n        {0,0,0},{0,-2,0},{0,-3,0},{0,-4,0},{0,-3,0},\n        {0,-3,0},{0,-3,0},{0,-3,0},{0,-3,0}\n    };\n    const int published[9][3] = {\n        {1,1,1},{1,1,1},{1,1,1},{1,0,1},{1,1,1},\n        {1,1,1},{1,1,1},{1,1,1},{1,1,1}\n    };\n    const int valids[9][3] = {\n        {1,1,1},{1,0,1},{1,0,1},{1,-1,1},{1,0,1},\n        {1,0,1},{1,0,1},{1,0,1},{1,0,1}\n    };\n    const int faults[9][3] = {\n        {0,0,0},{0,1,0},{0,2,0},{0,-1,0},{0,3,0},\n        {0,3,0},{0,4,0},{0,5,0},{0,6,0}\n    };\n    const int warnings[9][3] = {\n        {0,1,0},{0,0,0},{0,0,0},{0,-1,0},{0,0,0},\n        {0,0,0},{0,0,0},{0,0,0},{0,0,0}\n    };\n\n    for (int sc = 0; sc < 9; ++sc) {\n        if (Mock_Select(sc) != 0) return 1;\n        for (int frame = 0; frame < 3; ++frame) {\n            size_t before = Mock_PublishedCount();\n            int got_status = App_RunOnce();\n            size_t after = Mock_PublishedCount();\n            int got_published = after > before ? 1 : 0;\n\n            if (got_status != statuses[sc][frame] ||\n                got_published != published[sc][frame]) {\n                printf(\"FAIL status: scenario=%d frame=%d\\n\", sc, frame);\n                return 2;\n            }\n            if (got_published != 0) {\n                VehicleResult got = {0};\n                if (Mock_Last(&got) != 0 ||\n                    got.valid != valids[sc][frame] ||\n                    (int)got.fault_code != faults[sc][frame] ||\n                    got.warning != warnings[sc][frame]) {\n                    printf(\"FAIL result: scenario=%d frame=%d\\n\", sc, frame);\n                    return 3;\n                }\n            } else {\n                /* 【需求R05】Write失败不能计为新发布，旧g_last仍可读。 */\n                VehicleResult previous = {0};\n                if (after != before || before == 0U ||\n                    Mock_Last(&previous) != 0 ||\n                    previous.cycle != 100U) {\n                    printf(\"FAIL stale output reused: scenario=%d\\n\", sc);\n                    return 4;\n                }\n            }\n        }\n    }\n    printf(\"PASS: R01-R06; nine scenarios x three frames\\n\");\n    return 0;\n}\n"
+        },
+        {
+          "name": "CMakeLists.txt",
+          "group": "main",
+          "text": "cmake_minimum_required(VERSION 3.16)\nproject(day13_requirements_mock LANGUAGES C)\nset(CMAKE_C_STANDARD 17)\nset(CMAKE_C_STANDARD_REQUIRED ON)\n\n# app.c只依赖vehicle_if.h，不依赖mock数据；mock.c实现接口。\nadd_library(app STATIC app.c)\ntarget_include_directories(app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\ntarget_link_libraries(app PUBLIC m)\nadd_library(mock STATIC mock.c)\ntarget_include_directories(mock PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\n\n# 演示main与测试main必须编译成两个不同的程序。\nadd_executable(vehicle_demo demo.c)\ntarget_link_libraries(vehicle_demo PRIVATE app mock)\ninclude(CTest)\nif(BUILD_TESTING)\n    add_executable(vehicle_tests test_app.c)\n    target_link_libraries(vehicle_tests PRIVATE app mock)\n    add_test(NAME d13_requirements_test COMMAND vehicle_tests)\nendif()\n"
+        },
+        {
+          "name": "README.md",
+          "group": "main",
+          "text": "# D13 · 需求、测试与故障记录（D12接口工程进阶）\n\n本课是**单线程教学mock**，不是实际RTE、CAN或车辆功能安全软件。沿用D12的main→app→VehicleIf接口→mock→main执行链。浏览器只是JavaScript模拟；真实C通关仅在你自己的WSL/Linux实际编译运行后记录。\n\n## 六条可测试需求（教学用）\n| ID | 具体需求 | 对应测试 |\n| --- | --- | --- |\n| R01 | 输入有效且已启用、无故障、未超时，35m及以下输出warning=1，否则0，valid=1 | T01 场景0 |\n| R02 | Read失败时写出valid=0、fault=1（若Write成功），返回status=-2 | T02 场景1 |\n| R03 | 雷达无效、速度/距离异常（含NaN与负数）、未启用或设备故障，输出valid=0并记录具体fault | T03 场景2/4/5/7/8 |\n| R04 | timestamp比now晚，或数据年龄严格大于100ms时，输出valid=0、fault=4 | T04 场景6 |\n| R05 | Write失败时返回status=-4，不增加published，不能把上轮g_last当作新输出 | T05 场景3 |\n| R06 | 一次异常之后，后续合法输入可恢复valid=1，不能沿用前轮fault | T06 场景1～8第三帧 |\n\n注意本课假设now_ms与stamp_ms处于同一非回绕时间区间；真实系统必须额外设计时钟回绕与跨周期一致性处理。暂不涉及并发。\n\n## 从D12笔记补起\n`STEPS[9][3]`是9个场景×每场景3帧（D12原版为`[5][3]`），`STEPS[8][2]`才是最后一帧。文件作用域的`static`限制名字的外部链接，并使对象具静态存储期；`g_next`值仍然会改变。`const`限制通过该对象修改。`g_last = (VehicleResult){0};`是用C99复合字面量构造一个零初始化的结构体值，再赋给已经存在的`g_last`；`VehicleResult tmp = {0};`则声明一个新对象。\n\n## 本地真实C验收\n把本站下载的所有文件放到同一目录后，在WSL/Linux运行：\n```bash\ngcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g demo.c app.c mock.c -o vehicle_demo -lm\ngcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g test_app.c app.c mock.c -o vehicle_tests -lm\n./vehicle_tests\nfor i in 0 1 2 3 4 5 6 7 8; do printf '%s\\n' \"$i\" | ./vehicle_demo; done\ncmake -S . -B build -DCMAKE_BUILD_TYPE=Debug\ncmake --build build\nctest --test-dir build --output-on-failure\n```\n\n验收：test打印`PASS: R01-R06; nine scenarios x three frames`且退出码为0；场景5第二帧NaN得到`status=-3 valid=0 fault=3`；场景6第二帧超时得到`fault=4`；场景3第二帧必须`published=0`，且不显示上一帧valid/warning。\n\n## 进阶故障注入：先失败再修复\n仅在**本地个人副本**的app.c中暂时删除`!isfinite(sample.speed_kmh) ||`检查，留下只针对NaN的范围判断；重新构建并运行场景5与test，记录错误输出/失败测试。之后恢复原本的`isfinite`检查、重新构建、保存通过日志。这份“修复前→修复后”证据由你在本地完成，不应把故障版本推送到课程主分支。\n\n## 文件职责\n`vehicle_if.h`声明输入/输出、故障码与接口；`app.h/app.c`是应用处理；`mock.h/mock.c`保存二维场景数组及模拟接口实现；`demo.c`含演示main；`test_app.c`含独立测试main；`CMakeLists.txt`用于编译链接和CTest。\n"
+        }
+      ],
+      "code": "#include \"app.h\"   /* 应用函数声明。 */\n#include \"mock.h\"  /* main选择模拟场景，应用app.c不碰mock。 */\n#include <stdio.h> /* scanf和printf的声明。 */\n#include <stddef.h>/* size_t与%zu。 */\n\nint main(void)\n{\n    int scenario = 0; /* 0～8；第1帧是故障注入位置（下标1）。 */\n    if (scanf(\"%d\", &scenario) != 1 || Mock_Select(scenario) != 0) {\n        printf(\"input_error=1\\n\"); /* 不执行任何车辆业务逻辑。 */\n        return 1;\n    }\n\n    printf(\"scenario=%d steps=3\\n\", scenario);\n    /* 【完整执行链】main→App_RunOnce→mock.Read→app校验→mock.Write→main。 */\n    for (size_t i = 0U; i < 3U; ++i) {\n        size_t before = Mock_PublishedCount(); /* 本轮前成功发布次数。 */\n        int status = App_RunOnce();            /* 函数调用期间main暂停。 */\n        size_t after = Mock_PublishedCount();  /* 本轮后成功发布次数。 */\n        int published = after > before ? 1 : 0;\n        printf(\"step=%zu status=%d published=%d\", i, status, published);\n        if (published != 0) {\n            VehicleResult last = {0}; /* 命名对象，不是复合字面量表达式。 */\n            if (Mock_Last(&last) == 0) {\n                /* 点号访问对象成员，故障码是enum数值。 */\n                printf(\" valid=%d warning=%d cycle=%u fault=%d\",\n                       last.valid, last.warning,\n                       (unsigned int)last.cycle, (int)last.fault_code);\n            }\n        }\n        /* 写失败时不打印旧g_last，让“本轮没有发布”一目了然。 */\n        printf(\"\\n\");\n    }\n    return 0;\n}\n"
     }
   },
   "rules": {
@@ -8969,6 +9650,131 @@
           "M05 · 车速非法"
         ]
       ]
+    },
+    "13": {
+      "correct": {
+        "q1": 0,
+        "q2": 1,
+        "q3": 0,
+        "q4": 1,
+        "q5": 1,
+        "q6": 0,
+        "q7": 1,
+        "q8": 1,
+        "q9": 1,
+        "q10": 1
+      },
+      "explanations": {
+        "q1": "STEPS[5][3]包含5×3=15个MockStep元素；元素是帧，不是字节。",
+        "q2": "下标从0开始，所以最后一个合法下标是[8][2]。",
+        "q3": "static在文件作用域限制外部链接，g_next非const，可递增与重置。",
+        "q4": "const限制通过STEPS修改元素内容；static和const各自控制不同方面。",
+        "q5": "(VehicleResult){0}是C复合字面量表达式；这里用于整体赋值。",
+        "q6": "VehicleResult tmp={0}声明并初始化名为tmp的对象。",
+        "q7": "NaN与常规数值的大小比较不成立，需要isfinite显式检查。",
+        "q8": "101ms>100ms，返回status=-3、fault_code=FAULT_TIMEOUT(4)。",
+        "q9": "Write失败不能把旧g_last作为本帧新结果；published=0。",
+        "q10": "需求应对应输入条件、预期输出以及可执行测试。"
+      },
+      "numeric": {
+        "total_frames": [
+          27,
+          "9×3=27个MockStep元素。"
+        ],
+        "nan_fault": [
+          3,
+          "FAULT_RANGE=3；NaN被isfinite拒绝。"
+        ],
+        "timeout_status": [
+          -3,
+          "时间戳101ms过期，应用status=-3。"
+        ],
+        "write_published": [
+          0,
+          "写失败不增加g_published。"
+        ]
+      },
+      "labels": {
+        "q1": "Q01 · 基础题",
+        "q2": "Q02 · 基础题",
+        "q3": "Q03 · 基础题",
+        "q4": "Q04 · 基础题",
+        "q5": "Q05 · 基础题",
+        "q6": "Q06 · 基础题",
+        "q7": "Q07 · 基础题",
+        "q8": "Q08 · 基础题",
+        "q9": "Q09 · 基础题",
+        "q10": "Q10 · 基础题",
+        "total_frames": "P1 · 总帧数",
+        "nan_fault": "P2 · NaN故障码",
+        "timeout_status": "P3 · 超时应用状态",
+        "write_published": "P4 · 写失败发布标志"
+      },
+      "needed": [
+        [
+          [
+            0
+          ],
+          "lab0",
+          "S01 · 正常三帧"
+        ],
+        [
+          [
+            1
+          ],
+          "lab1",
+          "S02 · 读取失败"
+        ],
+        [
+          [
+            2
+          ],
+          "lab2",
+          "S03 · 雷达无效"
+        ],
+        [
+          [
+            3
+          ],
+          "lab3",
+          "S04 · 写失败"
+        ],
+        [
+          [
+            4
+          ],
+          "lab4",
+          "S05 · 负车速"
+        ],
+        [
+          [
+            5
+          ],
+          "lab5",
+          "S06 · NaN"
+        ],
+        [
+          [
+            6
+          ],
+          "lab6",
+          "S07 · 超时101ms"
+        ],
+        [
+          [
+            7
+          ],
+          "lab7",
+          "S08 · 未启用"
+        ],
+        [
+          [
+            8
+          ],
+          "lab8",
+          "S09 · 设备故障"
+        ]
+      ]
     }
   },
   "curriculum": [
@@ -9813,5 +10619,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "day12-20261102-asw-interface-v1"
+  "release": "day13-20261104-requirements-v1"
 }

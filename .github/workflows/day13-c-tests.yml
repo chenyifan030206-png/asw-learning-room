@@ -1,0 +1,107 @@
+name: Day13 C requirements and browser regression
+
+on:
+  pull_request:
+    paths:
+      - 'courses.json'
+      - 'pages-runtime.js'
+      - 'index.html'
+      - '.github/workflows/day13-c-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'courses.json'
+      - 'pages-runtime.js'
+      - 'index.html'
+      - '.github/workflows/day13-c-tests.yml'
+
+jobs:
+  real-c-and-js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract the exact nine C project files delivered to D13
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          b=json.loads(Path('courses.json').read_text(encoding='utf-8'))
+          assert b['release'].startswith('day13-')
+          lesson=b['lessons']['13']
+          assert lesson['day']==13
+          folder=Path('day13-ci')
+          folder.mkdir()
+          expected={'vehicle_if.h','app.h','app.c','mock.h','mock.c','demo.c','test_app.c','CMakeLists.txt','README.md'}
+          names={x['name'] for x in lesson['assets']}
+          assert names==expected,(names,expected)
+          for a in lesson['assets']:
+              (folder/a['name']).write_text(a['text'],encoding='utf-8')
+          assert len(lesson['experiments'])==9
+          assert len(lesson['questions'])==10
+          assert len(b['rules']['13']['needed'])==9
+          assert b['rules']['13']['numeric']['total_frames'][0]==27
+          for s in lesson['code_sections']:
+              content=(folder/s['file']).read_text(encoding='utf-8')
+              start=content.index(s['start'])
+              assert content.find(s['end'],start+len(s['start']))!=-1,s['title']
+          print('D13 source, sections, questions and rule integrity: PASS')
+          PY
+      - name: Build real C with strict GCC warnings
+        run: |
+          set -euxo pipefail
+          cd day13-ci
+          gcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g demo.c app.c mock.c -o vehicle_demo -lm
+          gcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g test_app.c app.c mock.c -o vehicle_tests -lm
+          ./vehicle_tests
+      - name: Check all C scenarios, statuses and output distinction
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          wanted_status=[0,-2,-3,-4,-3,-3,-3,-3,-3]
+          wanted_fault=[0,1,2,None,3,3,4,5,6]
+          for sc in range(9):
+              process=subprocess.run(['./day13-ci/vehicle_demo'],input=str(sc)+'\n',capture_output=True,text=True,check=True)
+              text=process.stdout
+              lines=[x.strip() for x in text.splitlines() if x.startswith('step=')]
+              assert len(lines)==3,(sc,text)
+              assert 'step=0 status=0 published=1 valid=1 warning=0 cycle=100 fault=0' in lines[0],(sc,lines)
+              mid=lines[1]
+              assert f'step=1 status={wanted_status[sc]}' in mid,(sc,mid)
+              assert f'published={0 if sc==3 else 1}' in mid,(sc,mid)
+              if sc==3:
+                  assert mid=='step=1 status=-4 published=0',mid
+              else:
+                  assert f'fault={wanted_fault[sc]}' in mid,(sc,mid)
+                  assert f'valid={1 if sc==0 else 0}' in mid,(sc,mid)
+              assert lines[2]=='step=2 status=0 published=1 valid=1 warning=0 cycle=102 fault=0',(sc,lines)
+              print(f'S{sc+1:02d} PASS\n'+text)
+          PY
+      - name: CMake and CTest from the same actual C source
+        run: |
+          cmake -S day13-ci -B day13-ci/build -DCMAKE_BUILD_TYPE=Debug
+          cmake --build day13-ci/build
+          ctest --test-dir day13-ci/build --output-on-failure
+      - name: JavaScript syntax, D01-D13 regression and browser-only labeling
+        run: |
+          node --check pages-runtime.js
+          node --check app.js
+          node <<'NODE'
+          const fs=require('fs'),vm=require('vm');
+          const src=fs.readFileSync('pages-runtime.js','utf8');
+          const cx={window:{dispatchEvent(){}},document:{documentElement:{dataset:{courseVersion:'test'}}},
+            location:{href:'https://example.org/'},URL:class{constructor(){this.pathname='/';this.searchParams={set(){}}}},
+            fetch:async()=>({ok:true,json:async()=>({})}),localStorage:{getItem(){return null},setItem(){}},
+            crypto:{randomUUID(){return 'mock'}}};
+          vm.createContext(cx);vm.runInContext(src,cx);
+          let count=0;
+          for(let day=1;day<=13;day++){
+            for(const x of cx.pagesRegression(day)){
+              if(!x.passed)throw Error('D'+day+' '+x.name+' failed: '+JSON.stringify(x.actual));
+              count++;
+            }
+          }
+          const r=cx.pagesSimulate(13,[3]);
+          if(r.rows[1].published!==0||r.rows[1].valid!==null||
+             !r.compiler_log.includes('JavaScript'))throw Error('False C passing or stale publish');
+          console.log('PASS: '+count+' JS cases across D01-D13; browser/C boundary preserved');
+          NODE
