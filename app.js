@@ -403,7 +403,27 @@ $('runButton').onclick=async()=>{
   try{const values=lesson.run_fields.map(f=>$(f.id).value.trim());const result=await api('/api/run',{day,values});
     $('output').replaceChildren();const grid=document.createElement('div');grid.className='output-grid';
     let explanation,summaryText;
-    if(lesson.runner==='vehicle_interface_day12'){
+    if(lesson.runner==='vehicle_requirements_day13'){
+      // D13是逐帧结构体结果，不能退回D01单帧mode/valid展示。
+      grid.append(item('实验场景',result.scenario),item('本轮帧数',result.steps),
+        item('成功发布总数',result.publish_count),
+        item('三帧应用状态status',result.statuses.join(' / ')),
+        item('三帧发布published',result.published.join(' / ')),
+        item('三帧结果valid',result.valids.map(x=>x===null?'—':x).join(' / ')),
+        item('三帧故障fault',result.faults.map(x=>x===null?'—':x).join(' / ')));
+      explanation='请阅读下方逐帧表：status是App_RunOnce返回码，published是本轮是否真正写成功；published=0时，valid/fault记为—，不是0。fault是课程模拟故障码，不是UDS DTC。';
+      summaryText='D13 场景'+result.scenario+'；status='+result.statuses.join('/')+'；published='+result.published.join('/')+'；fault='+result.faults.map(x=>x??'—').join('/');
+    }else if(lesson.runner==='acc_monitor_day14'){
+      const names=['OFF关闭','READY输入不可用','ACTIVE有效监视','FAULT故障锁存'];
+      grid.append(item('场景编号',result.scenario),item('帧数',result.steps),
+        item('本轮累计成功发布',result.publish_count),
+        item('各帧应用status',result.statuses.join(' / ')),
+        item('各帧mode',result.modes.map(n=>names[n]||'未知').join(' / ')),
+        item('各帧valid',result.valids.join(' / ')),
+        item('各帧alert',result.alerts.join(' / ')));
+      explanation='D14周期监视器：速度原单位km/h，计算前除以3.6；数据年龄>100ms拒绝；告警开启距离<=期望距离，关闭距离>=期望距离+6m。invalid帧的alert是无效占位，不代表安全。';
+      summaryText='D14 场景'+result.scenario+' status='+result.statuses.join('/')+' mode='+result.modes.join('/')+' valid='+result.valids.join('/')+' alert='+result.alerts.join('/');
+    }else     if(lesson.runner==='vehicle_interface_day12'){
       grid.append(item('实验场景',result.scenario),item('执行次数',result.steps),item('已成功发布',result.publish_count),item('状态码',result.statuses.join(',')),item('发布标志',result.published.join(',')));
       explanation='status、published、valid含义不同。写失败没有新输出；无效输出即使写成功也不能当作有效距离判断。仅JavaScript模拟，不是C程序运行。';
       summaryText='D12 statuses='+result.statuses.join(',')+' published='+result.published.join(',');
@@ -473,6 +493,25 @@ $('runButton').onclick=async()=>{
       summaryText=`${mode}，status=${result.status}，valid=${result.valid}${result.valid?`，期望=${result.desired}m，误差=${result.error}m`:''}`;
     }
     $('output').append(grid);const p=document.createElement('p');p.textContent=explanation;$('output').append(p);
+    if(lesson.runner==='vehicle_requirements_day13'){
+      const help=document.createElement('p');
+      help.textContent='D13 逐帧模拟结果：fault 0正常、1读取失败、2雷达无效、3数值非法（含NaN）、4时间戳过期、5未使能、6设备故障；—表示本轮未发布，不可当成valid=0。';
+      $('output').append(help,makeTable(
+        ['帧','Read状态','应用status','published','valid','warning','cycle','fault','距离(m)','数据年龄(ms)','解释'],
+        result.rows.map(r=>[r.step,r.read_status,r.app_status,r.published,
+          r.valid??'—',r.warning??'—',r.cycle??'—',r.fault??'—',
+          r.distance_m??'—',r.age_ms??'—',r.explanation])));
+    }
+    if(lesson.runner==='acc_monitor_day14'){
+      const names=['OFF关闭','READY等待','ACTIVE监视','FAULT锁存'];
+      const help=document.createElement('p');
+      help.textContent='D14逐帧模拟：status=0正常运行；-2输入无效、-3时间戳不可用、-4故障锁存；published=0代表无本次输出；valid=0的alert不具有效控制含义。dt只针对连续有效ACTIVE帧计算。';
+      $('output').append(help,makeTable(
+        ['帧','输入距离m','车速km/h','age(ms)','dt(ms)','期望间距m','mode','status','published','valid','alert','解释'],
+        result.rows.map(r=>[r.step,r.distance_m??'—',r.speed_kmh??'—',
+          r.age_ms??'—',r.dt_ms??'—',r.desired_m===null?'—':Number(r.desired_m).toFixed(2),
+          names[r.mode]||'未知',r.app_status,r.published,r.valid,r.alert,r.explanation])));
+    }
     if(lesson.runner==='vehicle_interface_day12'){
       const p=document.createElement('p');p.textContent='published=0表示本轮没有新结果；published=1且valid=0表示确实发布了一份无效结果。';
       $('output').append(p,makeTable(['轮次','Read码','应用状态','本轮发布','valid','warning','周期','距离m','解释'],
