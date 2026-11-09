@@ -236,6 +236,74 @@ function pagesSimulate(day,values){
       statuses:rows.map(x=>x.status),valids:rows.map(x=>x.valid),
       alerts:rows.map(x=>x.alert),
       compiler_log:'D14只是浏览器JS离散时间场景模拟；没有执行GCC、CTest或真实20ms任务。'};
+  }else if(day===15){
+    // D15网页是JS教学模拟：输入对应课程提供的CSV样例，不会执行Python/NumPy/Matplotlib。
+    const [scenario]=pagesNumbers(values,1);
+    if(!Number.isInteger(scenario)||scenario<0||scenario>5)throw Error('D15场景号必须为0到5。');
+    const fileNames=['sample_log.csv','bad_string.csv','bad_missing.csv',
+      'bad_mode.csv','bad_time.csv','bad_nan.csv'];
+    const columns=['time_ms','speed_kmh','distance_m','mode'];
+    const sourceRows=[
+      ['0','72.0','45.0','0'],['20','72.5','43.0','0'],
+      ['40','73.0','39.0','0'],['60','73.2','35.0','1'],
+      ['80','73.5','34.0','1'],['100','73.0','36.0','1'],
+      ['120','72.0','41.0','0'],['140','71.0','44.0','0'],
+      ['160','70.0','46.0','0'],['180','69.0','47.0','0']
+    ];
+    const rows=sourceRows.map(r=>r.slice());
+    if(scenario===1)rows[3][1]='oops';
+    if(scenario===2)rows[2][2]='';
+    if(scenario===3)rows[5][3]='9';
+    if(scenario===4)rows[4][0]='60';
+    if(scenario===5)rows[6][1]='nan';
+    let previousTime=null,failed=null;
+    const matrix=[];
+    for(const [index,record] of rows.entries()){
+      const line=index+2; // 第1行是表头，数据从物理行2开始。
+      const vals=[];
+      for(const [column,raw] of record.entries()){
+        const field=columns[column];
+        if(raw.trim()===''){failed={error_line:line,error_field:field,error_kind:'missing'};break;}
+        if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(raw)&&
+           !/^[+-]?(?:nan|inf|infinity)$/i.test(raw)){
+          failed={error_line:line,error_field:field,error_kind:'not_number'};break;
+        }
+        const value=Number(raw);
+        if(!Number.isFinite(value)){failed={error_line:line,error_field:field,error_kind:'nonfinite'};break;}
+        vals.push(value);
+      }
+      if(failed)break;
+      const [time,speed,distance,mode]=vals;
+      if(time<0||!Number.isInteger(time))failed={error_line:line,error_field:'time_ms',error_kind:'time_format'};
+      else if(previousTime!==null&&time<=previousTime)failed={error_line:line,error_field:'time_ms',error_kind:'non_increasing'};
+      else if(speed<0||speed>250)failed={error_line:line,error_field:'speed_kmh',error_kind:'speed_range'};
+      else if(distance<0||distance>500)failed={error_line:line,error_field:'distance_m',error_kind:'distance_range'};
+      else if(!Number.isInteger(mode)||![0,1,2].includes(mode))failed={error_line:line,error_field:'mode',error_kind:'mode_range'};
+      if(failed)break;
+      previousTime=time;matrix.push(vals);
+    }
+    if(failed){
+      result={scenario,source:fileNames[scenario],status:-2,valid:0,
+        chart_count:0,parsed_rows:matrix.length,...failed,
+        diagnostic:'停止读取，没有将异常行过滤，也没有把失败数据当作有效图线。',
+        compiler_log:'浏览器JavaScript模拟CSV校验；没有执行真实Python、NumPy、Matplotlib。'};
+    }else {
+      const time_ms=matrix.map(x=>x[0]),speed_kmh=matrix.map(x=>x[1]),
+        distance_m=matrix.map(x=>x[2]),mode=matrix.map(x=>x[3]);
+      const mean_speed_kmh=Math.round(speed_kmh.reduce((a,b)=>a+b,0)/matrix.length*100)/100;
+      const mode_counts=[0,1,2].map(v=>mode.filter(x=>x===v).length);
+      const mode_changes=mode.slice(1).filter((x,i)=>x!==mode[i]).length;
+      result={scenario,source:fileNames[scenario],status:0,valid:1,
+        rows_count:matrix.length,columns:4,matrix_shape:[matrix.length,4],
+        time_shape:[matrix.length],first_speed_kmh:speed_kmh[0],
+        mean_speed_kmh,min_distance_m:Math.min(...distance_m),
+        mode_counts,mode_changes,chart_count:3,
+        chart_names:['01_speed_kmh.png','02_distance_m.png','03_mode.png'],
+        rows:matrix.map((r,i)=>({csv_line:i+2,time_ms:r[0],speed_kmh:r[1],
+          distance_m:r[2],mode:r[3]})),
+        plot_series:{time_ms,speed_kmh,distance_m,mode},
+        compiler_log:'浏览器只预览与Python源文件相同的教学样例及公式；3张PNG必须由本地Matplotlib生成。'};
+    }
   }else if(day===11){
     // D11为完全单线程的JS教学演算，不模拟真实共享内存/线程同步。
     const v=pagesNumbers(values,1),scenario=v[0];
@@ -369,6 +437,16 @@ function pagesRegression(day){
     ['T03 未启用',[7],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,5,0]}],
     ['T03 设备故障',[8],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,6,0]}]
   ];
+  cases[15]=[
+    ['S01 合法CSV的shape与统计',[0],{status:0,valid:1,rows_count:10,columns:4,
+      matrix_shape:[10,4],time_shape:[10],first_speed_kmh:72,
+      mean_speed_kmh:71.92,min_distance_m:34,mode_counts:[7,3,0],mode_changes:2,chart_count:3}],
+    ['S02 非数值字符串的物理行',[1],{status:-2,valid:0,error_line:5,error_field:'speed_kmh',error_kind:'not_number',chart_count:0}],
+    ['S03 缺失距离值的物理行',[2],{status:-2,valid:0,error_line:4,error_field:'distance_m',error_kind:'missing',chart_count:0}],
+    ['S04 非法模式的物理行',[3],{status:-2,valid:0,error_line:7,error_field:'mode',error_kind:'mode_range',chart_count:0}],
+    ['S05 时间重复的物理行',[4],{status:-2,valid:0,error_line:6,error_field:'time_ms',error_kind:'non_increasing',chart_count:0}],
+    ['S06 NaN的物理行',[5],{status:-2,valid:0,error_line:8,error_field:'speed_kmh',error_kind:'nonfinite',chart_count:0}]
+  ];
   cases[14]=[
     ['S01 正常七帧',[0],{statuses:[0,0,0,0,0,0,0],valids:[1,1,1,1,1,1,1],alerts:[0,1,1,1,0,1,0]}],
     ['S02 单位错误',[1],{statuses:[0,0,-2,0,0,0,0],valids:[1,1,0,1,1,1,1],alerts:[0,1,0,0,0,1,0]}],
@@ -394,7 +472,7 @@ function pagesRegression(day){
     ['故障锁存',[3],{states:[2,3,3,0,2],alerts:[1,0,0,0,1]}],
     ['非法输入',[4],{statuses:[-2,0],valids:[0,1],states:[3,2]}]
   ];
-  return cases[day].map(([name,input,expected])=>{const actual=pagesSimulate(day,input),passed=Object.entries(expected).every(([k,v])=>Array.isArray(v)?JSON.stringify(actual[k])===JSON.stringify(v):Math.abs(actual[k]-v)<0.001);return {name:'浏览器模拟 · '+name,passed,expected,actual};});
+  return cases[day].map(([name,input,expected])=>{const actual=pagesSimulate(day,input),passed=Object.entries(expected).every(([k,v])=>Array.isArray(v)?JSON.stringify(actual[k])===JSON.stringify(v):typeof v==='string'?actual[k]===v:Math.abs(actual[k]-v)<0.001);return {name:'浏览器模拟 · '+name,passed,expected,actual};});
 }
 function pagesValidateAnnotations(marks,files){
   if(!Array.isArray(marks)||!files||Array.isArray(files)||typeof files!=='object')throw Error('批注结构不正确。');
