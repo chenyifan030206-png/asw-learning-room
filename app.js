@@ -69,10 +69,10 @@ function coloredCode(target,source,firstLine=1){
   function newLine(){line=document.createElement('span');line.className='code-line';line.dataset.line=lineNo;const n=document.createElement('span');n.className='line-number';n.textContent=lineNo++;n.setAttribute('aria-hidden','true');content=document.createElement('span');line.append(n,content);target.append(line);}newLine();
   // 先识别完整注释和字符串，再识别语法；不使用innerHTML，用户文本不会变成HTML。
   // L/UL/ULL等后缀也必须保留；最后一项逐字符兜底，未知语法不能被丢弃。
-  const token=/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:0[xX][\da-fA-F]+|\b(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)[uUlLfF]*|\b[a-zA-Z_]\w*\b|[\s\S]/g;
+  const token=/\/\*[\s\S]*?\*\/|\/\/[^\n]*|#[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:0[xX][\da-fA-F]+|\b(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)[uUlLfF]*|\b[a-zA-Z_]\w*\b|[\s\S]/g;
   for(const match of source.matchAll(token)){const t=match[0];let cls='';
-    if(t.startsWith('/*')||t.startsWith('//'))cls='syntax-comment';else if(t[0]==='"'||t[0]==="'")cls='syntax-string';else if(/^\d/.test(t))cls='syntax-number';
-    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|Codec_Encode|Codec_Decode|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process|Acc_Step|Timeline_Run|Queue_Push|Queue_Pop|App_RunOnce|VehicleIf_Read|VehicleIf_Write)$/.test(t))cls='syntax-function';
+    if(t.startsWith('/*')||t.startsWith('//')||t.startsWith('#'))cls='syntax-comment';else if(t[0]==='"'||t[0]==="'")cls='syntax-string';else if(/^\d/.test(t))cls='syntax-number';
+    else if(/^(if|else|for|return|const|typedef|enum|struct|static|sizeof|def|class|import|from|as|try|except|raise|with|in|while|not|and|or|None|True|False|is|pass)$/.test(t))cls='syntax-keyword';else if(/^(int|float|double|void|char|long|size_t|uint8_t|uint32_t|unsigned|str|bool|list|dict|Path|np)$/.test(t))cls='syntax-type';else if(/^(scanf|printf|roundf|isfinite|Encode|Decode|EncodeTemp|DecodeTemp|Codec_Encode|Codec_Decode|PrintFrame|PrintBits|main|AnalyzeSpeeds|Acc_Process|Acc_Step|Timeline_Run|Queue_Push|Queue_Pop|App_RunOnce|VehicleIf_Read|VehicleIf_Write)$/.test(t))cls='syntax-function';
     t.split('\n').forEach((part,i)=>{if(i)newLine();if(part){const span=document.createElement('span');span.className=cls;span.textContent=part;content.append(span);}});
   }
 }
@@ -90,7 +90,7 @@ function showStep(index){
 $('prevStep').onclick=()=>showStep(stepIndex-1);$('nextStep').onclick=()=>showStep(stepIndex+1);
 function renderCode(){
   $('downloadProject')?.remove();
-  activeFile=lesson.project_name?(lesson.assets.find(a=>a.name==='demo.c')||lesson.assets.find(a=>a.name.endsWith('.c'))).name:lesson.source;
+  activeFile=lesson.project_name?(lesson.assets.find(a=>a.name===lesson.source)||lesson.assets.find(a=>a.name==='demo.c')||lesson.assets.find(a=>a.name.endsWith('.c')||a.name.endsWith('.py'))||lesson.assets[0]).name:lesson.source;
   renderProjectIntro();$('fileTabs').replaceChildren();let extraFiles=null;if(lesson.project_name)for(const file of lesson.assets){const b=document.createElement('button');b.textContent=file.name;b.dataset.file=file.name;b.onclick=()=>chooseFile(file.name);if(file.group==='appendix'){if(!extraFiles){extraFiles=document.createElement('details');extraFiles.id='appendixFileTabs';const summary=document.createElement('summary');summary.textContent='附录文件（补原D08；主课可先不读）';extraFiles.append(summary);$('fileTabs').append(extraFiles);}extraFiles.append(b);}else $('fileTabs').append(b);}
   coloredCode($('code'),sourceFile().text);$('code').dataset.annotationScope='code:'+activeFile;
   codeView='original';$('code').hidden=false;$('codeNotesLabel').hidden=true;
