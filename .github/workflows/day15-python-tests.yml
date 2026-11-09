@@ -105,8 +105,7 @@ jobs:
           const app=fs.readFileSync('app.js','utf8');
           if(!app.includes("lesson.runner==='python_numpy_logs_day15'")||
              !app.includes('renderDay15Preview(result)')||
-             !app.includes("lesson.assets.find(a=>a.name===lesson.source)")||
-             !app.includes("x.error_line")&&false)throw Error('D15 UI renderer missing');
+             !app.includes("lesson.assets.find(a=>a.name===lesson.source)"))throw Error('D15 UI renderer missing');
           const storage=new Map();
           const progress=Array.from({length:14},(_,i)=>({day:i+1,method:'test',
             detail:'browser only',updated:'2026-11-09T00:00:00Z'}));
@@ -129,10 +128,10 @@ jobs:
           if(good.mean_speed_kmh!==71.92||good.matrix_shape[1]!==4||good.chart_count!==3||
              bad.error_line!==4||bad.error_field!=='distance_m'||bad.chart_count!==0)
             throw Error('D15 simulation output mismatch');
-          cx.pagesAPI('/api/state').then(s=>{
+          cx.window.pagesAPI('/api/state').then(s=>{
             if(s.frontier!==15||s.courses[14].published!==true||s.progress.length!==14)
               throw Error('D15 access or old study records changed');
-            return cx.pagesAPI('/api/lesson?day=15');
+            return cx.window.pagesAPI('/api/lesson?day=15');
           }).then(r=>{
             if(r.lesson.assets.length!==13)throw Error('D15 assets missing');
             console.log('PASS '+count+' JS regressions; D15 accessible; old records retained');
