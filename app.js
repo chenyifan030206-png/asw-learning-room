@@ -397,6 +397,57 @@ $('runFields').addEventListener('input',()=>renderBytePreview());
 $('runFields').addEventListener('change',updateTimingFields);
 function setInputs(values,hint,guide){lesson.run_fields.forEach((f,i)=>$(f.id).value=values[i]);renderBytePreview(values);updateTimingFields();$('timelineLab').hidden=true;$('hint').textContent=hint||'';steps('experimentSteps',guide||['输入已经填好。','先写自己的预测，再点击运行案例。','检查结果后回到做检测继续。']);}
 $('transferRun').onclick=()=>{setInputs(lesson.practice.values,'迁移实验：输入已填好。请先保留你的手算答案，再点击运行案例。');tab('run');$('prediction').focus();};
+function renderDay15Preview(result){
+  if(!result.valid||!result.plot_series)return;
+  const source=result.plot_series;
+  const heading=document.createElement('h4');
+  heading.textContent='三条曲线 · 浏览器JavaScript预览（PNG需本地Python生成）';
+  $('output').append(heading);
+  const ns='http://www.w3.org/2000/svg';
+  function el(name,attributes,label){
+    const node=document.createElementNS(ns,name);
+    for(const [k,v] of Object.entries(attributes||{}))node.setAttribute(k,String(v));
+    if(label!==undefined)node.textContent=String(label);
+    return node;
+  }
+  const graphs=[
+    ['车速随时间变化','车速（km/h）','speed_kmh',false],
+    ['前车距离随时间变化','距离（m）','distance_m',false],
+    ['监视模式随时间变化','模式（0正常、1提示、2故障）','mode',true]
+  ];
+  for(const [title,ylabel,key,steps] of graphs){
+    const block=document.createElement('div');
+    const label=document.createElement('p');
+    label.textContent=title;
+    block.append(label);
+    const svg=el('svg',{viewBox:'0 0 650 240',width:'100%',height:'240',
+      role:'img','aria-label':title+'，横轴时间毫秒，纵轴'+ylabel});
+    const x0=65,x1=625,y0=24,y1=182;
+    const vals=source[key],time=source.time_ms;
+    const min=steps?0:Math.min(...vals),max=steps?2:Math.max(...vals);
+    const delta=Math.max(max-min,1);
+    const x=t=>x0+(t-time[0])/(time.at(-1)-time[0])*(x1-x0);
+    const y=v=>y1-(v-min)/delta*(y1-y0);
+    svg.append(el('line',{x1:x0,y1:y0,x2:x0,y2:y1,stroke:'currentColor','stroke-width':1}),
+      el('line',{x1:x0,y1:y1,x2:x1,y2:y1,stroke:'currentColor','stroke-width':1}),
+      el('text',{x:8,y:16,'font-size':13,fill:'currentColor'},ylabel),
+      el('text',{x:325,y:230,'font-size':13,fill:'currentColor','text-anchor':'middle'},'时间（ms）'),
+      el('text',{x:x0-7,y:y0+4,'text-anchor':'end','font-size':12,fill:'currentColor'},String(max)),
+      el('text',{x:x0-7,y:y1+4,'text-anchor':'end','font-size':12,fill:'currentColor'},String(min)));
+    const points=vals.map((v,i)=>({x:x(time[i]),y:y(v)}));
+    let d='M '+points[0].x+' '+points[0].y;
+    for(let i=1;i<points.length;i++){
+      if(steps)d+=' H '+points[i].x+' V '+points[i].y;
+      else d+=' L '+points[i].x+' '+points[i].y;
+    }
+    svg.append(el('path',{d,fill:'none',stroke:'currentColor','stroke-width':2}));
+    for(const p of points)svg.append(el('circle',{cx:p.x,cy:p.y,r:3,fill:'currentColor'}));
+    svg.append(el('text',{x:x0,y:204,'font-size':12,fill:'currentColor','text-anchor':'middle'},time[0]),
+      el('text',{x:x1,y:204,'font-size':12,fill:'currentColor','text-anchor':'middle'},time.at(-1)));
+    block.append(svg);
+    $('output').append(block);
+  }
+}
 function item(label,value,cls){const d=document.createElement('div'),l=document.createElement('div'),v=document.createElement('div');l.className='muted';l.textContent=label;v.className='value '+(cls||'');v.textContent=value;d.append(l,v);return d;}
 $('runButton').onclick=async()=>{
   if(busy)return;busy=true;const b=$('runButton');b.disabled=true;b.textContent='正在浏览器模拟…';
@@ -407,6 +458,32 @@ $('runButton').onclick=async()=>{
       grid.append(item('实验场景',result.scenario),item('执行次数',result.steps),item('已成功发布',result.publish_count),item('状态码',result.statuses.join(',')),item('发布标志',result.published.join(',')));
       explanation='status、published、valid含义不同。写失败没有新输出；无效输出即使写成功也不能当作有效距离判断。仅JavaScript模拟，不是C程序运行。';
       summaryText='D12 statuses='+result.statuses.join(',')+' published='+result.published.join(',');
+    }else if(lesson.runner==='python_numpy_logs_day15'){
+      grid.append(item('CSV样例文件',result.source),
+        item('解析status',result.status,result.status===0?'good':'bad'),
+        item('结果valid',result.valid,result.valid?'good':'bad'));
+      if(result.valid){
+        grid.append(item('矩阵shape', '('+result.matrix_shape.join(', ')+')'),
+          item('时间列shape','('+result.time_shape.join(', ')+',)'),
+          item('首个速度（km/h）',result.first_speed_kmh.toFixed(1)),
+          item('平均速度（km/h）',result.mean_speed_kmh.toFixed(2)),
+          item('最小距离（m）',result.min_distance_m.toFixed(1)),
+          item('模式0/1/2帧数',result.mode_counts.join(' / ')),
+          item('模式切换次数',result.mode_changes),
+          item('应在本地生成PNG',result.chart_count+'张'));
+        explanation='解析通过：10行×4列二维矩阵；整列是shape=(10,)的一维向量，matrix[0,1]是标量。网页只预览曲线，本地Python/Matplotlib才生成PNG。';
+        summaryText='D15有效CSV shape='+result.matrix_shape.join('x')+
+          '，平均车速='+result.mean_speed_kmh+'km/h，模式变化='+result.mode_changes;
+      }else{
+        grid.append(item('错误物理行号',result.error_line,'bad'),
+          item('出错列',result.error_field,'bad'),
+          item('错误类别',result.error_kind,'bad'),
+          item('本次生成图片',result.chart_count+'张'));
+        explanation='解析失败：第'+result.error_line+'物理行的'+result.error_field+
+          '列出现'+result.error_kind+'；不会悄悄丢弃或填零，也不产生有效图表。';
+        summaryText='D15 '+result.source+' status='+result.status+'，第'+result.error_line+
+          '行 '+result.error_field+' '+result.error_kind;
+      }
     }else if(lesson.runner==='vehicle_requirements_day13'){
       // D13原先漏掉自己的显示分支，错误落入D01模式/valid展示逻辑。
       grid.append(item('实验场景',result.scenario),item('执行次数',result.steps),
@@ -498,6 +575,21 @@ $('runButton').onclick=async()=>{
         result.rows.map(x=>[x.step,x.read_status,x.app_status,x.published,
           x.valid===null?'—':x.valid,x.warning===null?'—':x.warning,
           x.cycle===null?'—':x.cycle,x.distance_m===null?'—':x.distance_m,x.explanation])));
+    }
+    if(lesson.runner==='python_numpy_logs_day15'){
+      if(result.valid){
+        const explain=document.createElement('p');
+        explain.textContent='下表是网页模拟用的教学CSV数值（第1行是CSV表头）；查看源码sample_log.csv及Python函数可确认。';
+        $('output').append(explain,makeTable(
+          ['CSV物理行','time_ms','speed_kmh','distance_m','mode'],
+          result.rows.map(x=>[x.csv_line,x.time_ms,x.speed_kmh,x.distance_m,x.mode])));
+        renderDay15Preview(result);
+      }else{
+        const msg=document.createElement('p');
+        msg.textContent='错误定位：'+result.source+' 第'+result.error_line+'行，字段'+
+          result.error_field+'，类别'+result.error_kind+'。原始CSV可在完整工程文件标签中查看。';
+        $('output').append(msg);
+      }
     }
     if(lesson.runner==='vehicle_requirements_day13'){
       const desc=document.createElement('p');
