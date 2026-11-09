@@ -1,0 +1,113 @@
+name: Day14 ACC monitor C and Pages UI regression
+
+on:
+  pull_request:
+    paths:
+      - 'courses.json'
+      - 'pages-runtime.js'
+      - 'app.js'
+      - 'index.html'
+      - '.github/workflows/day14-c-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'courses.json'
+      - 'pages-runtime.js'
+      - 'app.js'
+      - 'index.html'
+      - '.github/workflows/day14-c-tests.yml'
+
+jobs:
+  real-c-js-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract C files exactly as downloaded by D14 learners
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('courses.json').read_text(encoding='utf-8'))
+          lesson=j['lessons']['14']
+          assert lesson['runner']=='acc_monitor_day14'
+          assert len(lesson['experiments'])==9
+          assert len(lesson['questions'])==10
+          assert len(j['rules']['14']['needed'])==9
+          files={'monitor.h','monitor.c','mock.h','mock.c','demo.c','test_monitor.c','CMakeLists.txt','README.md'}
+          target=Path('day14-ci')
+          target.mkdir()
+          assert {x['name'] for x in lesson['assets']}==files
+          for a in lesson['assets']:
+              (target/a['name']).write_text(a['text'],encoding='utf-8')
+          for s in lesson['code_sections']:
+              t=(target/s['file']).read_text(encoding='utf-8')
+              start=t.index(s['start'])
+              assert t.find(s['end'],start+len(s['start']))>=0,s['title']
+          print('D14 course and source integrity PASS')
+          PY
+      - name: Compile and execute real C independently with strict warnings
+        run: |
+          set -euxo pipefail
+          cd day14-ci
+          gcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g demo.c monitor.c mock.c -o acc_demo -lm
+          gcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g test_monitor.c monitor.c mock.c -o acc_tests -lm
+          ./acc_tests
+      - name: Nine real C run transcripts and invalid-output invariant
+        run: |
+          python3 - <<'PY'
+          import subprocess,re
+          expected=[0,-2,-3,0,-4,-6,-5,0,-7]
+          for sc in range(9):
+              out=subprocess.run(['./day14-ci/acc_demo'],input=f'{sc}\n',text=True,capture_output=True,check=True).stdout
+              lines=[x for x in out.splitlines() if x.startswith('frame=')]
+              assert len(lines)==7,(sc,out)
+              assert f'status={expected[sc]}' in lines[2],(sc,lines[2])
+              if sc==7:
+                  assert 'state=0 valid=0 alert=0' in lines[2],lines[2]
+              elif sc!=0 and sc!=3:
+                  assert 'state=3 valid=0 alert=0' in lines[2],lines[2]
+              assert 'status=0 state=2 valid=1' in lines[3],(sc,lines[3])
+              if sc==3:
+                  assert 'frame=4 ' in lines[4] and 'alert=1' in lines[4],lines[4]
+                  assert 'alert=0' in lines[5],lines[5]
+              print('PASS scenario',sc)
+          PY
+      - name: CMake and CTest actually run the extracted C code
+        run: |
+          cmake -S day14-ci -B day14-ci/build -DCMAKE_BUILD_TYPE=Debug
+          cmake --build day14-ci/build
+          ctest --test-dir day14-ci/build --output-on-failure
+      - name: JS syntax, D01-D14 regressions and D13 renderer guard
+        run: |
+          node --check pages-runtime.js
+          node --check app.js
+          node <<'NODE'
+          const fs=require('fs'),vm=require('vm');
+          const src=fs.readFileSync('pages-runtime.js','utf8');
+          const app=fs.readFileSync('app.js','utf8');
+          if(!app.includes("lesson.runner==='vehicle_requirements_day13'")||
+             !app.includes("lesson.runner==='acc_monitor_day14'")||
+             !app.includes("x.fault===null?'—':x.fault")||
+             !app.includes("result.rows.map(x=>["))throw Error('D13 per-frame output renderer missing');
+          const cx={window:{dispatchEvent(){}},document:{documentElement:{dataset:{courseVersion:'ci'}}},
+            location:{href:'https://example.org/'},
+            URL:class{constructor(){this.pathname='/';this.searchParams={set(){}}}},
+            fetch:async()=>({ok:true,json:async()=>({})}),
+            localStorage:{getItem(){return null},setItem(){}},
+            crypto:{randomUUID(){return 'ci'}}};
+          vm.createContext(cx);vm.runInContext(src,cx);
+          let count=0;
+          for(let day=1;day<=14;day++){
+            for(const x of cx.pagesRegression(day)){
+              if(!x.passed)throw Error('D'+day+' '+x.name+' failed: '+JSON.stringify(x.actual));
+              count++;
+            }
+          }
+          const d13=cx.pagesSimulate(13,[5]);
+          if(d13.rows[1].app_status!==-3||d13.rows[1].valid!==0||
+             d13.rows[1].fault!==3)throw Error('D13 underlying output mismatch');
+          const d14=cx.pagesSimulate(14,[8]);
+          if(d14.rows[2].dt_ms!==40||d14.rows[2].status!==-7||
+             d14.rows[2].valid!==0)throw Error('D14 delay mismatch');
+          console.log('PASS '+count+' JS cases D01–D14; D13 field regression; D14 dt/age');
+          NODE
