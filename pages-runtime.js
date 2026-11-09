@@ -177,6 +177,65 @@ function pagesSimulate(day,values){
       warnings:rows.map(x=>x.warning),faults:rows.map(x=>x.fault),
       publish_count:publishCount,last_published_cycle:last?.cycle??null,
       compiler_log:'D13仅使用JavaScript模拟9个场景；没有调用GCC、CMake、CTest，也不是实际RTE。'};
+  }else if(day===14){
+    // D14只用JavaScript逐帧模拟：不会执行monitor.c中的真实C函数。
+    const [scenario]=pagesNumbers(values,1);
+    if(!Number.isInteger(scenario)||scenario<0||scenario>8)throw Error('D14场景号必须是0到8的整数。');
+    const baseDistances=[45,34,38,40,42,34,42];
+    const jitterDistances=[36,34,36,39,40,41,42];
+    let state=0,alert=0,lastTick=0,hasTick=false;
+    const rows=[];
+    for(let i=0;i<7;i++){
+      let now=1000+i*20,stamp=now-20,unit=0,radar=1,enabled=1,fault=0;
+      let speedCycle=100+i,distanceCycle=100+i;
+      if(scenario===8&&i>=2){now+=20;stamp+=20;}
+      const distance=(scenario===3?jitterDistances:baseDistances)[i];
+      if(i===2){
+        if(scenario===1)unit=1;
+        if(scenario===2)stamp=now-101;
+        if(scenario===4)distanceCycle++;
+        if(scenario===5)fault=1;
+        if(scenario===6)radar=0;
+        if(scenario===7)enabled=0;
+      }
+      const speed=20;
+      const dt=hasTick&&now>=lastTick?now-lastTick:0;
+      const first=!hasTick;hasTick=true;lastTick=now;
+      let age=0,status=-2;
+      if(!Number.isFinite(speed)||!Number.isFinite(distance)||
+         speed<0||speed>50||distance<0||distance>500||unit!==0)status=-2;
+      else if(stamp>now)status=-3;
+      else if(now-stamp>100){age=now-stamp;status=-3;}
+      else if(speedCycle!==distanceCycle)status=-4;
+      else if(radar!==1)status=-5;
+      else if(fault!==0)status=-6;
+      else if(!first&&dt!==20)status=-7;
+      else {age=now-stamp;status=0;}
+      let valid=0;
+      if(status!==0){state=3;alert=0;}
+      else if(enabled!==1){state=0;alert=0;}
+      else {
+        if(state!==2)alert=0;
+        state=2;
+        if(alert===0&&distance<=35)alert=1;
+        else if(alert===1&&distance>=41)alert=0;
+        valid=1;
+      }
+      rows.push({frame:i,now_ms:now,speed_mps:speed,distance_m:distance,
+        age_ms:age,dt_ms:dt,status,state,valid,alert,
+        explanation:status===-2?'单位错误或输入越界':
+          status===-3?'时间戳超前或数据过期':
+          status===-4?'车速/距离周期号不一致':
+          status===-5?'雷达无效':
+          status===-6?'设备故障':
+          status===-7?'20ms任务周期违约':
+          !enabled?'驾驶员未启用，OFF且valid=0':
+          '有效数据，按35/41m滞环更新'});
+    }
+    result={scenario,frame_count:7,rows,states:rows.map(x=>x.state),
+      statuses:rows.map(x=>x.status),valids:rows.map(x=>x.valid),
+      alerts:rows.map(x=>x.alert),
+      compiler_log:'D14只是浏览器JS离散时间场景模拟；没有执行GCC、CTest或真实20ms任务。'};
   }else if(day===11){
     // D11为完全单线程的JS教学演算，不模拟真实共享内存/线程同步。
     const v=pagesNumbers(values,1),scenario=v[0];
@@ -309,6 +368,17 @@ function pagesRegression(day){
     ['T04 超时101ms',[6],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,4,0]}],
     ['T03 未启用',[7],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,5,0]}],
     ['T03 设备故障',[8],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,6,0]}]
+  ];
+  cases[14]=[
+    ['S01 正常七帧',[0],{statuses:[0,0,0,0,0,0,0],valids:[1,1,1,1,1,1,1],alerts:[0,1,1,1,0,1,0]}],
+    ['S02 单位错误',[1],{statuses:[0,0,-2,0,0,0,0],valids:[1,1,0,1,1,1,1],alerts:[0,1,0,0,0,1,0]}],
+    ['S03 数据过期',[2],{statuses:[0,0,-3,0,0,0,0],valids:[1,1,0,1,1,1,1],alerts:[0,1,0,0,0,1,0]}],
+    ['S04 滞环抖动',[3],{statuses:[0,0,0,0,0,0,0],alerts:[0,1,1,1,1,0,0]}],
+    ['S05 多源周期',[4],{statuses:[0,0,-4,0,0,0,0],valids:[1,1,0,1,1,1,1]}],
+    ['S06 设备故障',[5],{statuses:[0,0,-6,0,0,0,0],valids:[1,1,0,1,1,1,1]}],
+    ['S07 雷达无效',[6],{statuses:[0,0,-5,0,0,0,0],valids:[1,1,0,1,1,1,1]}],
+    ['S08 未启用',[7],{statuses:[0,0,0,0,0,0,0],states:[2,2,0,2,2,2,2],valids:[1,1,0,1,1,1,1]}],
+    ['S09 漏执行',[8],{statuses:[0,0,-7,0,0,0,0],valids:[1,1,0,1,1,1,1]}]
   ];
   cases[11]=[
     ['基本先入先出',[0],{head:1,tail:2,count:1,received_cycles:[100],statuses:[0,0,0]}],
