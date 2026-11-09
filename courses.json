@@ -8698,6 +8698,610 @@
         }
       ],
       "code": "#include \"monitor.h\" /* Monitor_Init与Monitor_Step声明。 */\n#include \"mock.h\"    /* 预设场景输入和场景数量。 */\n#include <stdio.h>   /* scanf和printf。 */\n\nint main(void)\n{\n    int scenario = 0; /* 用户输入0～8，代表一次完整7帧测试。 */\n    if (scanf(\"%d\", &scenario) != 1 || scenario < 0 ||\n        scenario >= SCENARIO_COUNT) {\n        printf(\"input_error=1\\n\");\n        return 1;\n    }\n\n    MonitorContext ctx;   /* 同一个ctx必须保留七次调用后的状态。 */\n    Monitor_Init(&ctx);   /* 初始化发生在for循环之前，只有一次。 */\n    printf(\"scenario=%d frames=%d\\n\", scenario, FRAME_COUNT);\n\n    for (int i = 0; i < FRAME_COUNT; ++i) {\n        MonitorInput input = {0}; /* 每一帧新建输入对象。 */\n        if (Mock_GetFrame(scenario, i, &input) != 0) return 2;\n        /* main→Mock_GetFrame→Monitor_Step→main，真实执行顺序。 */\n        MonitorResult result = Monitor_Step(&ctx, &input);\n        printf(\"frame=%d now=%u speed=%.1f distance=%.1f dt=%u \"\n               \"status=%d state=%d valid=%d alert=%d age=%u\\n\",\n               i, (unsigned)input.now_ms, (double)input.speed_mps,\n               (double)input.distance_m, (unsigned)result.dt_ms,\n               result.status, (int)result.state, result.valid, result.alert,\n               (unsigned)result.age_ms);\n    }\n    return 0;\n}\n"
+    },
+    "15": {
+      "day": 15,
+      "revision": "2026-11-09-d15-python-numpy-csv-v1",
+      "title": "Python与NumPy基础：CSV日志、数组shape与三条曲线",
+      "source": "demo.py",
+      "runner": "python_numpy_logs_day15",
+      "project_name": "day15_python_numpy_logs",
+      "time": "建议3小时：Python语法和执行链40分钟、CSV/NumPy 50分钟、浏览器错误场景30分钟、本地实际Python和图片验证60分钟。",
+      "summary": "按第3周原计划学习Python/NumPy。入口demo.py调用log_reader.py验证日志，再由log_analysis.py提取向量和计算统计量，plot_logs.py输出速度、距离、模式三张独立图；五种错误都有原CSV行号和列名。浏览器只是JavaScript模拟，本地需实际运行Python。",
+      "goals": [
+        "能认出Python的def函数、import模块、if __name__ == '__main__'入口，以及与此前C工程main的对应关系。",
+        "能说明CSV表头、物理行号、数据列与四种单位/模式约定，不把样例数据当作实车记录。",
+        "能区分NumPy矩阵shape=(N,4)、一列向量shape=(N,)与单个标量matrix[0,1]。",
+        "能够执行np.mean、np.min、np.diff和按列切片，核对车速均值、最小距离和模式变化。",
+        "能够在本地生成3张独立PNG图，中文标题和坐标、速度km/h、距离m、模式类别准确。",
+        "能用异常捕获报告缺失值、字符串、超范围模式、时间重复和NaN的具体物理行号。",
+        "本地用Python/NumPy/Matplotlib真正运行脚本及unittest；浏览器通过和真实本地实验保持分开。"
+      ],
+      "flow_text": "【构建/依赖】Python运行demo.py→import log_reader/log_analysis/plot_logs；requirements.txt安装NumPy和Matplotlib。 【执行】demo.py main解析--scenario→选择sample/bad_*.csv→load_log()逐行csv.reader验证字段、单位、有限性与时间顺序→成功返回float64矩阵(N,4)→summarize()用matrix[:,i]得到向量与均值→save_charts()绘制三张独立PNG→main输出指标和图路径。错误时LogFormatError携带原行号/字段/类别，main显示status=-2后不画图。",
+      "remediation_title": "开课基础：Python从入口到模块，和此前C多文件工程怎样对应",
+      "project_intro": {
+        "title": "第3周首课：把模拟车辆日志从CSV变成可以检查的数据和图",
+        "paragraphs": [
+          "上一周用C实现了简化车辆监视器。这一周按既定路线转入Python与NumPy，学习怎样读取离线CSV日志、诊断数据质量、画出速度、距离和模式随时间变化的曲线。D15使用明确标注的教学样例，不声称它是D14程序导出的真实C日志。",
+          "demo.py是程序入口，log_reader.py负责把CSV逐行解析并检查，log_analysis.py用NumPy把数据变成矩阵/向量并做统计，plot_logs.py负责输出三个独立PNG。Python中的函数也有参数和返回值，只是写法与C不同。",
+          "正常数据每20ms一行、共10行4列。错误样例各注入一个问题，必须指出具体行号和列名，不允许默默删除异常记录或把非法值绘成正常曲线。"
+        ]
+      },
+      "architecture": {
+        "headers": [
+          "文件/数据",
+          "职责",
+          "输入→输出"
+        ],
+        "rows": [
+          [
+            "demo.py / main",
+            "程序入口，处理场景参数并组织顺序",
+            "scenario→CSV文件→状态/图表路径"
+          ],
+          [
+            "log_reader.py / load_log",
+            "使用csv.reader逐物理行检查表头、列数、缺失、字符串、非有限性、时间和范围",
+            "CSV文本→NumPy二维矩阵或LogFormatError"
+          ],
+          [
+            "log_analysis.py / summarize",
+            "解释矩阵行列、切片、标量/向量，计算均值/最小值/模式变化",
+            "shape=(N,4)矩阵→指标字典dict"
+          ],
+          [
+            "plot_logs.py / save_charts",
+            "使用Matplotlib生成3张独立中文标注PNG",
+            "矩阵+输出目录→图片路径列表"
+          ],
+          [
+            "test_log.py / unittest",
+            "独立单元测试：正确数据、五类错误、图文件和表头",
+            "源文件→本地实际Python测试结果"
+          ],
+          [
+            "CSV文件",
+            "教学样例数据与5个独立损坏版本",
+            "time_ms、speed_kmh、distance_m、mode四列"
+          ],
+          [
+            "requirements.txt",
+            "列出第三方Python依赖",
+            "pip安装NumPy、Matplotlib"
+          ]
+        ]
+      },
+      "symbols": [
+        {
+          "name": "main",
+          "file": "demo.py",
+          "match": "def main() -> int:",
+          "what": "Python程序的入口控制函数；return int是类型提示，实际返回整数状态码",
+          "lifetime": "运行demo.py时由if __name__触发"
+        },
+        {
+          "name": "load_log",
+          "file": "log_reader.py",
+          "match": "def load_log(path: str | Path) -> np.ndarray:",
+          "what": "接收CSV路径，成功返回二维NumPy数组，失败抛LogFormatError",
+          "lifetime": "每次调用"
+        },
+        {
+          "name": "LogFormatError",
+          "file": "log_reader.py",
+          "match": "class LogFormatError(ValueError):",
+          "what": "携带原CSV行号、字段及错误类别的异常对象",
+          "lifetime": "遇到不合法输入时"
+        },
+        {
+          "name": "csv.reader",
+          "file": "log_reader.py",
+          "match": "reader = csv.reader(handle, strict=True)",
+          "what": "CSV解析器，保留物理行号reader.line_num",
+          "lifetime": "文件读取期间"
+        },
+        {
+          "name": "matrix.shape",
+          "file": "log_analysis.py",
+          "match": "matrix.shape[1] != 4",
+          "what": "matrix的行列维度，N行4列；不是数据总和",
+          "lifetime": "NumPy ndarray属性"
+        },
+        {
+          "name": "matrix[:, 0]",
+          "file": "log_analysis.py",
+          "match": "time_ms = matrix[:, 0]",
+          "what": "取所有行的第0列，返回shape=(N,)的一维向量",
+          "lifetime": "summarize调用内部"
+        },
+        {
+          "name": "matrix[0, 1]",
+          "file": "log_analysis.py",
+          "match": "first_speed = float(matrix[0, 1])",
+          "what": "取得单个数值，即第0行第1列，不是整列数组",
+          "lifetime": "summarize调用内部"
+        },
+        {
+          "name": "save_charts",
+          "file": "plot_logs.py",
+          "match": "def save_charts(matrix: np.ndarray, output_dir: str | Path)",
+          "what": "对一个矩阵分别保存三张独立PNG、包含中文坐标和单位",
+          "lifetime": "每次成功分析"
+        },
+        {
+          "name": "unittest",
+          "file": "test_log.py",
+          "match": "class TestLogAnalysis(unittest.TestCase):",
+          "what": "本地独立Python测试，不等于网页模拟",
+          "lifetime": "运行python -m unittest时"
+        }
+      ],
+      "run_fields": [
+        {
+          "id": "scenario",
+          "label": "选择CSV案例（0–5）",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "S01 · 正常10行"
+            ],
+            [
+              "1",
+              "S02 · 车速字符串（第5行）"
+            ],
+            [
+              "2",
+              "S03 · 距离缺失（第4行）"
+            ],
+            [
+              "3",
+              "S04 · 模式9（第7行）"
+            ],
+            [
+              "4",
+              "S05 · 时间重复（第6行）"
+            ],
+            [
+              "5",
+              "S06 · NaN（第8行）"
+            ]
+          ]
+        }
+      ],
+      "reading": [
+        {
+          "title": "01 · D15为什么转入Python和NumPy",
+          "text": "84天路线中第15天原定Python与NumPy基础，任务是读取控制日志CSV并画速度、距离、模式三张曲线。Python常用于测试自动化、日志分析和绘图；本课不改变D14的C逻辑，也不要求在Python复刻ACC状态机。C本地验收继续由你自行完成，D15则独立做真正的本地Python运行。"
+        },
+        {
+          "title": "02 · Python入口与三个文件职责",
+          "text": "demo.py在执行时通过if __name__ == '__main__'触发main()，依次调用log_reader.load_log、log_analysis.summarize、plot_logs.save_charts。log_reader先决定数据能否消费，log_analysis负责计算，plot_logs只画图；异常则由demo的except捕获并返回退出码2。Python import相当于加载模块并引用定义，不等于直接执行对方main。"
+        },
+        {
+          "title": "03 · CSV到底有几列、几行",
+          "text": "样例CSV首行是time_ms,speed_kmh,distance_m,mode，后面10条数据记录，所以文件有11个物理行（无额外注释时）。时间0,20,...,180ms；速度单位km/h；距离单位m；mode=0正常、1提示、2故障。第1行是表头，数据第一行从CSV第2行开始。"
+        },
+        {
+          "title": "04 · NumPy数组的shape：矩阵、向量和标量",
+          "text": "load_log返回10行4列float64矩阵，matrix.shape=(10,4)。matrix[:,0]表示所有行第0列，得到时间向量，shape=(10,)；matrix[:,1]是速度向量；matrix[0,1]则只取第0行第1列的标量72.0。一个标量不再具有“10行”的维度。NumPy同一二维数组中使用float64保存模式整数，分析前astype(np.int64)转换为整数。"
+        },
+        {
+          "title": "05 · 为什么用NumPy，而不是逐行手算",
+          "text": "np.mean(speed_kmh)计算速度均值；np.min(distance_m)找最小距离；np.count_nonzero(mode==1)统计提示状态帧数；np.diff(mode)!=0找模式发生变化的位置。先掌握沿列切片与向量运算，下一课再把相同思路用于二维旋转矩阵。"
+        },
+        {
+          "title": "06 · 解析错误必须给出物理行号",
+          "text": "csv.reader的line_num告诉我们当前记录结束时的物理行。字符串oops位于第5行速度列；缺失距离位于第4行；非法mode=9第7行；重复时间第6行；nan第8行。先检查缺失，再float转换，再math.isfinite，最后检查范围/时间/模式，不把错误的行直接过滤后继续画图。"
+        },
+        {
+          "title": "07 · 为什么mode应该用阶梯图",
+          "text": "速度和距离是连续物理量，可以用折线展示离散采样点；mode是0/1/2类别，不存在mode=0.5的真实中间状态，因此用step阶梯图，不用普通线性插值。横轴为时间（ms），速度纵轴（km/h）、距离纵轴（m），模式纵轴说明类别无单位。三张图独立生成PNG，不挤在一张图误导单位。"
+        },
+        {
+          "title": "08 · 运行S01并核对每个数字",
+          "text": "sample_log.csv有10条记录；矩阵shape=(10,4)，时间向量shape=(10,)，首个速度值72.0km/h，最小距离34m，模式0出现7次、模式1出现3次、模式2出现0次，变化2次。脚本成功后输出3张独立PNG。请先手动核对这些值，再对比浏览器模拟。"
+        },
+        {
+          "title": "09 · 修复前后证据如何留下",
+          "text": "复制bad_missing.csv到你本地个人工作目录，运行python demo.py --scenario 2会提示第4行distance_m缺失。再只在自己的CSV副本中恢复39.0，或用独立小脚本调用load_log(你修改的文件)，保存修改前后运行日志。不能把经过修复的数据伪装成未经改动的原始日志；作为教学演练记录文件版本即可。"
+        },
+        {
+          "title": "10 · 真实Python在本地验收与下一课",
+          "text": "在本地venv安装requirements后，运行python demo.py --scenario 0 --out charts、python -m unittest -v test_log，打开三张图片检查中文标题、轴标签、单位和内容。缺中文字体时按README安装Noto Sans CJK。浏览器只执行JavaScript离线模拟，不会安装Python包或生成真正的Matplotlib图；第16天再学习线性代数和坐标变换。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "S01 · demo.py入口与场景选择",
+          "file": "demo.py",
+          "start": "def main() -> int:",
+          "end": "    try:",
+          "pattern": "argparse读取--scenario；main返回int状态码，Python脚本入口在文件末尾。",
+          "text": "程序不是从CSV第一行自动启动，而是先进入demo.py的main。",
+          "trace": "输入--scenario 0，选sample_log.csv。"
+        },
+        {
+          "title": "S02 · load_log检查表头和物理行",
+          "file": "log_reader.py",
+          "start": "def load_log(path: str | Path)",
+          "end": "        for fields in reader:",
+          "pattern": "with打开文件；csv.reader和reader.line_num保留行位置；header必须完全一致。",
+          "text": "第一行是列名；数据从物理第2行开始。",
+          "trace": "数据第一行time=0，speed=72.0。"
+        },
+        {
+          "title": "S03 · CSV缺失、字符串与NaN的检查",
+          "file": "log_reader.py",
+          "start": "        for fields in reader:",
+          "end": "            time_ms, speed_kmh, distance_m, mode = parsed",
+          "pattern": "raw.strip空值、float转换、math.isfinite分别对应三类输入错误。",
+          "text": "遇到错误要抛包含行号、列名、类别的异常，不继续绘图。",
+          "trace": "字符串第5行、缺失第4行、NaN第8行。"
+        },
+        {
+          "title": "S04 · 范围、模式和时间严格递增",
+          "file": "log_reader.py",
+          "start": "            time_ms, speed_kmh, distance_m, mode = parsed",
+          "end": "            rows.append(parsed)",
+          "pattern": "时间整数且递增，速度/距离范围及mode集合校验。",
+          "text": "非法模式9和重复时间两类问题与浮点解析错误不同。",
+          "trace": "模式第7行；时间重复第6行。"
+        },
+        {
+          "title": "S05 · 成功数据变为二维NumPy矩阵",
+          "file": "log_reader.py",
+          "start": "    if not rows:",
+          "end": "    return np.asarray(rows, dtype=np.float64)",
+          "pattern": "np.asarray(rows)把二维Python列表变成shape=(N,4)的ndarray。",
+          "text": "先保留完整行，再统一构造数值矩阵。",
+          "trace": "10条有效记录→matrix.shape=(10,4)。"
+        },
+        {
+          "title": "S06 · 数组shape、列切片与标量",
+          "file": "log_analysis.py",
+          "start": "def summarize(matrix: np.ndarray)",
+          "end": "    # matrix[0, 1]",
+          "pattern": "matrix[:,0]取整列向量，matrix[0,1]取标量。",
+          "text": "区别N×4矩阵、(N,)向量和单个数。",
+          "trace": "matrix[0,1]=72.0，time.shape=(10,)。"
+        },
+        {
+          "title": "S07 · NumPy统计与模式变化",
+          "file": "log_analysis.py",
+          "start": "    # matrix[0, 1]",
+          "end": "    return {",
+          "pattern": "np.mean、np.min、np.count_nonzero、np.diff。",
+          "text": "不是手写for循环，而是使用向量操作。",
+          "trace": "最小距离34m；mode_counts=[7,3,0]；mode_changes=2。"
+        },
+        {
+          "title": "S08 · 第一张速度曲线及中文单位",
+          "file": "plot_logs.py",
+          "start": "def save_charts(matrix: np.ndarray",
+          "end": "    # ② 距离曲线",
+          "pattern": "速度纵轴必须是km/h，横轴是时间ms，输出独立PNG。",
+          "text": "无桌面环境也能保存图片；中文字体取本机可用字体。",
+          "trace": "01_speed_kmh.png。"
+        },
+        {
+          "title": "S09 · 距离曲线和离散模式阶梯图",
+          "file": "plot_logs.py",
+          "start": "    # ② 距离曲线",
+          "end": "    return charts",
+          "pattern": "距离m和模式0/1/2分别作图；step避免类别被插值。",
+          "text": "检查三张图的轴文字、单位以及状态切换位置。",
+          "trace": "02_distance_m.png、03_mode.png。"
+        },
+        {
+          "title": "S10 · 回到demo显示分析或错误",
+          "file": "demo.py",
+          "start": "    try:",
+          "end": "    return 0",
+          "pattern": "try/except处理输入错误并返回2；成功统计和保存图路径。",
+          "text": "成功才有mean、shape、3张图；错误输出line/field/kind。",
+          "trace": "S02→status=-2、error_line=5。"
+        },
+        {
+          "title": "S11 · unittest独立验证实际Python",
+          "file": "test_log.py",
+          "start": "class TestLogAnalysis",
+          "end": "if __name__ == \"__main__\":",
+          "pattern": "unittest覆盖成功、5个异常、图片生成及错误表头。",
+          "text": "本地真正调用load_log、summarize和save_charts，不等于网页JS回归。",
+          "trace": "python -m unittest -v test_log。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "S01 · 正常10行日志",
+          "values": [
+            0
+          ],
+          "optional": false,
+          "hint": "status=0，shape=(10,4)，生成3张PNG（网页只模拟结果）",
+          "steps": [
+            "先找到CSV中对应的原始行，预测是否能通过解析。",
+            "运行浏览器模拟，核对status、valid、error_line、error_field和shape；错误案例不能生成有效图片。",
+            "切到源码对应模块，解释是哪一个检查分支；本地真实Python由你单独执行。"
+          ]
+        },
+        {
+          "name": "S02 · 车速包含字符串",
+          "values": [
+            1
+          ],
+          "optional": false,
+          "hint": "第5行 speed_kmh=oops，not_number",
+          "steps": [
+            "先找到CSV中对应的原始行，预测是否能通过解析。",
+            "运行浏览器模拟，核对status、valid、error_line、error_field和shape；错误案例不能生成有效图片。",
+            "切到源码对应模块，解释是哪一个检查分支；本地真实Python由你单独执行。"
+          ]
+        },
+        {
+          "name": "S03 · 距离出现缺失值",
+          "values": [
+            2
+          ],
+          "optional": false,
+          "hint": "第4行 distance_m为空，missing",
+          "steps": [
+            "先找到CSV中对应的原始行，预测是否能通过解析。",
+            "运行浏览器模拟，核对status、valid、error_line、error_field和shape；错误案例不能生成有效图片。",
+            "切到源码对应模块，解释是哪一个检查分支；本地真实Python由你单独执行。"
+          ]
+        },
+        {
+          "name": "S04 · 模式超出允许范围",
+          "values": [
+            3
+          ],
+          "optional": false,
+          "hint": "第7行 mode=9，mode_range",
+          "steps": [
+            "先找到CSV中对应的原始行，预测是否能通过解析。",
+            "运行浏览器模拟，核对status、valid、error_line、error_field和shape；错误案例不能生成有效图片。",
+            "切到源码对应模块，解释是哪一个检查分支；本地真实Python由你单独执行。"
+          ]
+        },
+        {
+          "name": "S05 · 时间戳重复",
+          "values": [
+            4
+          ],
+          "optional": false,
+          "hint": "第6行 time_ms=60重复，non_increasing",
+          "steps": [
+            "先找到CSV中对应的原始行，预测是否能通过解析。",
+            "运行浏览器模拟，核对status、valid、error_line、error_field和shape；错误案例不能生成有效图片。",
+            "切到源码对应模块，解释是哪一个检查分支；本地真实Python由你单独执行。"
+          ]
+        },
+        {
+          "name": "S06 · 车速为NaN",
+          "values": [
+            5
+          ],
+          "optional": false,
+          "hint": "第8行 speed_kmh=nan，nonfinite",
+          "steps": [
+            "先找到CSV中对应的原始行，预测是否能通过解析。",
+            "运行浏览器模拟，核对status、valid、error_line、error_field和shape；错误案例不能生成有效图片。",
+            "切到源码对应模块，解释是哪一个检查分支；本地真实Python由你单独执行。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "L01：用自己的话解释demo.py、log_reader.py、log_analysis.py、plot_logs.py、test_log.py分别做什么。按照main→load_log→summarize→save_charts→main画执行链。",
+        "L02：打开sample_log.csv，指出第1行表头和第2行首个数据；手算10×4矩阵shape以及时间列向量shape，读出第0行速度72.0。",
+        "L03：运行S01，核对速度均值、最低距离、mode计数与两次模式变化；确认三个图的横纵轴、中文、单位与阶梯线类型。",
+        "L04：依次运行S02–S06，预测第几物理行哪一列错误；查看错误为什么不该被静默删除。",
+        "L05：在本地复制并修复一个坏CSV，保存修复前后日志；不要覆盖公共的错误样本。可以额外用load_log(自定义文件)进行直接验证。",
+        "L06：真实Python验收：本地venv安装NumPy/Matplotlib，运行demo.py、unittest并打开3张PNG；与浏览器成绩分开记录。",
+        "L07：完成Q01–Q10和P1–P4；重点理解shape/标量/向量/物理行号，不需要提前学习高级机器学习。"
+      ],
+      "test_steps": [
+        "浏览器S01–S06全部完成，每例显示status和行号或成功shape；在线练习不能视为本地Python执行。",
+        "10道Q题与4道P题检查入口、shape、索引、模式类型、行号和单位。",
+        "本地实际运行Python脚本、unittest，逐图检查中文字体和单位；D14之前的真实C仍由学员在本地单独验收。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "D15的实际Python入口在哪里？",
+          "options": [
+            "CSV首行",
+            "demo.py中的main，受__name__保护",
+            "log_reader.py的类定义"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "一张有10行4列的NumPy矩阵shape是什么？",
+          "options": [
+            "(4,10)",
+            "(10,4)",
+            "(40,)"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "matrix[:,1]是怎样的数据？",
+          "options": [
+            "所有行第1列，shape=(10,)",
+            "第1行所有列，shape=(4,)",
+            "一个标量"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "matrix[0,1]得到什么？",
+          "options": [
+            "所有速度数据",
+            "首行速度的一个标量72.0",
+            "二维矩阵"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "csv.reader.line_num记录什么？",
+          "options": [
+            "本次读取的物理行位置",
+            "NumPy列数",
+            "模式变化次数"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "字段填了oops，正确做法是什么？",
+          "options": [
+            "丢掉该行继续绘图",
+            "报准确行号及字段，停止分析",
+            "自动用0替换"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "为什么要用math.isfinite处理nan？",
+          "options": [
+            "NaN不适合当作有效有限数值参与日志分析",
+            "NaN一定等于0",
+            "NaN只能出现在整数列"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "模式0/1/2随时间变化，适合什么图？",
+          "options": [
+            "插值的连续速度线",
+            "离散阶梯图step",
+            "把模式相加当距离"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "三幅图正确的单位是什么？",
+          "options": [
+            "车速km/h、距离m、模式为类别无单位，时间轴ms",
+            "全部是m/s",
+            "全部无单位"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "网页D15模拟通过是否意味着已在本地执行Python或C？",
+          "options": [
+            "是，和unittest一样",
+            "不是，本地实际运行及保存日志需单独完成",
+            "已验证实际车辆ECU"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "根据正常样例CSV的10条数据与错误样例定位，填写四个整数。",
+        "values": [
+          0
+        ],
+        "fields": [
+          {
+            "id": "row_count",
+            "label": "P1 · 正常CSV数据行数（不算表头）",
+            "kind": "number"
+          },
+          {
+            "id": "column_count",
+            "label": "P2 · NumPy矩阵列数",
+            "kind": "number"
+          },
+          {
+            "id": "string_line",
+            "label": "P3 · 字符串oops所在CSV物理行号",
+            "kind": "number"
+          },
+          {
+            "id": "mode_changes",
+            "label": "P4 · 正常样例模式变化次数",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "表头第1行，后面10条数据→10行。",
+          "time、speed、distance、mode四列→4列。",
+          "oops在数据第4条，包含表头的物理第5行。",
+          "mode从0→1，再从1→0，共2次变化。"
+        ]
+      },
+      "pass_rule": "在线：6个案例、Q01–Q10及P1–P4全部通过，仅记浏览器JS练习；实际Python/NumPy/Matplotlib在本人本地验收。此前C真实通关不由网页或CI自动授予。",
+      "assets": [
+        {
+          "name": "demo.py",
+          "group": "main",
+          "text": "\"\"\"D15入口：main选择场景→读取CSV→NumPy分析→绘图或定位错误。\"\"\"\nimport argparse\nfrom pathlib import Path\n\nfrom log_reader import LogFormatError, load_log\nfrom log_analysis import summarize\nfrom plot_logs import save_charts\n\nFILES = (\n    \"sample_log.csv\",\n    \"bad_string.csv\",\n    \"bad_missing.csv\",\n    \"bad_mode.csv\",\n    \"bad_time.csv\",\n    \"bad_nan.csv\",\n)\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description=\"D15 Python/NumPy车辆日志分析\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(len(FILES)),\n                        default=0, help=\"0正常，1字符串，2缺失，3模式错，4时间错，5NaN\")\n    parser.add_argument(\"--out\", default=\"charts\", help=\"三个PNG图片的输出目录\")\n    args = parser.parse_args()\n    source = Path(__file__).resolve().parent / FILES[args.scenario]\n    print(f\"scenario={args.scenario} source={source.name}\")\n\n    try:\n        matrix = load_log(source)          # ① 读取CSV并校验各物理行。\n    except LogFormatError as exc:\n        # 错误须保留“第几行、哪一列、什么原因”，不能静默删除。\n        print(f\"status=-2 valid=0 error_line={exc.line} \"\n              f\"error_field={exc.field} error_kind={exc.kind}\")\n        print(f\"detail={exc}\")\n        return 2\n\n    result = summarize(matrix)             # ② NumPy矩阵按列分析。\n    charts = save_charts(matrix, args.out) # ③ 分别绘制3张PNG。\n    print(f\"status=0 valid=1 rows={result['rows']} cols={result['cols']}\")\n    print(f\"shape={tuple(result['shape'])} time_shape={tuple(result['time_shape'])}\")\n    print(f\"first_speed_kmh={result['first_speed_kmh']:.1f} \"\n          f\"mean_speed_kmh={result['mean_speed_kmh']:.2f} \"\n          f\"min_distance_m={result['min_distance_m']:.1f}\")\n    print(f\"mode_counts={result['mode_counts']} \"\n          f\"mode_changes={result['mode_changes']} chart_count={len(charts)}\")\n    for path in charts:\n        print(f\"chart={path}\")\n    return 0\n\n\nif __name__ == \"__main__\":  # 作为程序运行才执行；import时不自动生成图片。\n    raise SystemExit(main())\n"
+        },
+        {
+          "name": "log_reader.py",
+          "group": "main",
+          "text": "\"\"\"D15日志读取：使用标准库CSV定位具体物理行，再交给NumPy存放。\"\"\"\nimport csv\nimport math\nfrom pathlib import Path\n\nimport numpy as np\n\nCOLUMNS = (\"time_ms\", \"speed_kmh\", \"distance_m\", \"mode\")\n\n\nclass LogFormatError(ValueError):\n    \"\"\"错误附带文件行号、列名和类别，便于定位原始日志。\"\"\"\n\n    def __init__(self, line: int, field: str, kind: str, detail: str):\n        self.line = line\n        self.field = field\n        self.kind = kind\n        super().__init__(f\"第{line}行 [{field}] {kind}：{detail}\")\n\n\ndef load_log(path: str | Path) -> np.ndarray:\n    \"\"\"返回N行4列的float64数组，列顺序与CSV表头完全对应。\"\"\"\n    rows: list[list[float]] = []\n    last_time: float | None = None\n\n    # newline=\"\"让csv正确处理换行；utf-8-sig也兼容带BOM的CSV。\n    with Path(path).open(\"r\", encoding=\"utf-8-sig\", newline=\"\") as handle:\n        reader = csv.reader(handle, strict=True)\n        try:\n            header = next(reader)\n        except StopIteration as exc:\n            raise LogFormatError(1, \"header\", \"empty_file\", \"文件没有表头\") from exc\n        if tuple(header) != COLUMNS:\n            raise LogFormatError(1, \"header\", \"wrong_header\",\n                                 \"表头必须是 \"+\",\".join(COLUMNS))\n\n        for fields in reader:\n            line = reader.line_num  # 当前CSV记录结束时所在的物理行号。\n            if len(fields) != len(COLUMNS):\n                raise LogFormatError(line, \"row\", \"column_count\",\n                                     f\"需要4列，实际{len(fields)}列\")\n            parsed: list[float] = []\n            for field, raw in zip(COLUMNS, fields):\n                # 空字符串不能交给float转换，否则不容易告诉学员是哪一列。\n                if not raw.strip():\n                    raise LogFormatError(line, field, \"missing\",\n                                         \"单元格为空，不能跳过该帧\")\n                try:\n                    value = float(raw)\n                except ValueError as exc:\n                    raise LogFormatError(line, field, \"not_number\",\n                                         f\"不能转换数字：{raw!r}\") from exc\n                if not math.isfinite(value):\n                    raise LogFormatError(line, field, \"nonfinite\",\n                                         \"NaN和无穷大不能用于本次分析\")\n                parsed.append(value)\n\n            time_ms, speed_kmh, distance_m, mode = parsed\n            if time_ms < 0 or not time_ms.is_integer():\n                raise LogFormatError(line, \"time_ms\", \"time_format\",\n                                     \"时间必须是非负整数毫秒\")\n            if last_time is not None and time_ms <= last_time:\n                raise LogFormatError(line, \"time_ms\", \"non_increasing\",\n                                     \"时间必须严格递增，不能重复或倒退\")\n            if speed_kmh < 0 or speed_kmh > 250:\n                raise LogFormatError(line, \"speed_kmh\", \"speed_range\",\n                                     \"本课车速范围为0～250 km/h\")\n            if distance_m < 0 or distance_m > 500:\n                raise LogFormatError(line, \"distance_m\", \"distance_range\",\n                                     \"本课距离范围为0～500 m\")\n            if not mode.is_integer() or int(mode) not in (0, 1, 2):\n                raise LogFormatError(line, \"mode\", \"mode_range\",\n                                     \"模式只允许整数0、1、2\")\n            last_time = time_ms\n            rows.append(parsed)\n\n    if not rows:\n        raise LogFormatError(2, \"row\", \"no_data\", \"表头之后没有数据\")\n    # 二维NumPy数组：shape=(N,4)，每一行是一条日志、每一列是一类信号。\n    return np.asarray(rows, dtype=np.float64)\n"
+        },
+        {
+          "name": "log_analysis.py",
+          "group": "main",
+          "text": "\"\"\"D15 NumPy分析：先定位列，再解释标量、向量、矩阵的shape。\"\"\"\nimport numpy as np\n\n\ndef summarize(matrix: np.ndarray) -> dict:\n    \"\"\"读取经过校验的N×4日志矩阵，返回可以打印的汇总结果。\"\"\"\n    if matrix.ndim != 2 or matrix.shape[1] != 4 or matrix.shape[0] == 0:\n        raise ValueError(\"需要至少1行、固定4列的二维矩阵\")\n\n    # matrix[:, 0]表示第0列所有行，是一维向量，shape=(N,)。\n    time_ms = matrix[:, 0]\n    speed_kmh = matrix[:, 1]\n    distance_m = matrix[:, 2]\n    mode = matrix[:, 3].astype(np.int64)\n\n    # matrix[0, 1]只取第0行第1列，是一个标量，不再是一维向量。\n    first_speed = float(matrix[0, 1])\n    avg_speed = float(np.mean(speed_kmh))\n    min_distance = float(np.min(distance_m))\n    mode_counts = [int(np.count_nonzero(mode == x)) for x in (0, 1, 2)]\n    mode_changes = int(np.count_nonzero(np.diff(mode) != 0))\n    return {\n        \"rows\": int(matrix.shape[0]),\n        \"cols\": int(matrix.shape[1]),\n        \"shape\": [int(matrix.shape[0]), int(matrix.shape[1])],\n        \"time_shape\": [int(time_ms.shape[0])],\n        \"first_speed_kmh\": first_speed,\n        \"mean_speed_kmh\": round(avg_speed, 2),\n        \"min_distance_m\": min_distance,\n        \"mode_counts\": mode_counts,\n        \"mode_changes\": mode_changes,\n        \"first_time_ms\": int(time_ms[0]),\n        \"last_time_ms\": int(time_ms[-1]),\n    }\n"
+        },
+        {
+          "name": "plot_logs.py",
+          "group": "main",
+          "text": "\"\"\"D15绘图：三个独立PNG，中文标题、坐标与单位均明确。\"\"\"\nfrom pathlib import Path\nimport warnings\n\nimport matplotlib\nmatplotlib.use(\"Agg\")  # 本地WSL/CI无桌面时也可输出PNG。\nfrom matplotlib import pyplot as plt\nfrom matplotlib import font_manager\nimport numpy as np\n\n\ndef setup_chinese_font() -> str | None:\n    \"\"\"优先使用系统可用的中文字体；不能凭空声称所有系统都安装了。\"\"\"\n    choices = (\n        \"Noto Sans CJK SC\", \"Noto Sans CJK JP\", \"Microsoft YaHei\",\n        \"SimHei\", \"WenQuanYi Micro Hei\", \"PingFang SC\"\n    )\n    installed = {f.name for f in font_manager.fontManager.ttflist}\n    for name in choices:\n        if name in installed:\n            plt.rcParams[\"font.sans-serif\"] = [name]\n            plt.rcParams[\"axes.unicode_minus\"] = False\n            return name\n    warnings.warn(\"本机未检测到中文字体；请安装Noto Sans CJK，否则PNG中文可能显示方框\",\n                  stacklevel=2)\n    return None\n\n\ndef save_charts(matrix: np.ndarray, output_dir: str | Path) -> list[Path]:\n    \"\"\"独立输出三张曲线图；坐标x统一为时间(ms)。\"\"\"\n    output = Path(output_dir)\n    output.mkdir(parents=True, exist_ok=True)\n    setup_chinese_font()\n\n    time_ms = matrix[:, 0]\n    speed_kmh = matrix[:, 1]\n    distance_m = matrix[:, 2]\n    mode = matrix[:, 3].astype(int)\n    charts: list[Path] = []\n\n    # ① 车速曲线：数值列的单位是km/h；不会和上课的m/s混淆。\n    fig, ax = plt.subplots(figsize=(8, 4))\n    ax.plot(time_ms, speed_kmh, marker=\"o\")\n    ax.set(title=\"车辆速度随时间变化\", xlabel=\"时间（ms）\", ylabel=\"车速（km/h）\")\n    ax.grid(True, alpha=0.3)\n    fig.tight_layout()\n    path = output / \"01_speed_kmh.png\"\n    fig.savefig(path, dpi=160)\n    plt.close(fig)\n    charts.append(path)\n\n    # ② 距离曲线：它与速度不同单位，因此独立成图。\n    fig, ax = plt.subplots(figsize=(8, 4))\n    ax.plot(time_ms, distance_m, marker=\"o\")\n    ax.set(title=\"前车距离随时间变化\", xlabel=\"时间（ms）\", ylabel=\"前车距离（m）\")\n    ax.grid(True, alpha=0.3)\n    fig.tight_layout()\n    path = output / \"02_distance_m.png\"\n    fig.savefig(path, dpi=160)\n    plt.close(fig)\n    charts.append(path)\n\n    # ③ 离散模式：0正常、1提示、2故障，用阶梯图而不是插值曲线。\n    fig, ax = plt.subplots(figsize=(8, 4))\n    ax.step(time_ms, mode, where=\"post\")\n    ax.set(title=\"监视模式随时间变化\", xlabel=\"时间（ms）\", ylabel=\"模式（类别，无单位）\")\n    ax.set_yticks([0, 1, 2], labels=[\"0 正常\", \"1 提示\", \"2 故障\"])\n    ax.set_ylim(-0.3, 2.3)\n    ax.grid(True, alpha=0.3)\n    fig.tight_layout()\n    path = output / \"03_mode.png\"\n    fig.savefig(path, dpi=160)\n    plt.close(fig)\n    charts.append(path)\n    return charts\n"
+        },
+        {
+          "name": "test_log.py",
+          "group": "main",
+          "text": "\"\"\"D15独立unittest：正确日志、五类行号错误、三个PNG文件。\"\"\"\nimport tempfile\nimport unittest\nfrom pathlib import Path\n\nimport numpy as np\n\nfrom log_reader import LogFormatError, load_log\nfrom log_analysis import summarize\nfrom plot_logs import save_charts\n\nHERE = Path(__file__).resolve().parent\n\n\nclass TestLogAnalysis(unittest.TestCase):\n    def test_good_shape_scalar_vector_and_mean(self):\n        matrix = load_log(HERE / \"sample_log.csv\")\n        self.assertEqual(matrix.shape, (10, 4))\n        self.assertEqual(matrix[:, 0].shape, (10,))\n        self.assertEqual(float(matrix[0, 1]), 72.0)\n        result = summarize(matrix)\n        self.assertEqual(result[\"rows\"], 10)\n        self.assertEqual(result[\"mode_counts\"], [7, 3, 0])\n        self.assertEqual(result[\"mode_changes\"], 2)\n        self.assertEqual(result[\"min_distance_m\"], 34.0)\n        self.assertAlmostEqual(result[\"mean_speed_kmh\"], 71.92, places=2)\n\n    def test_five_bad_csvs_report_exact_physical_line(self):\n        expected = {\n            \"bad_string.csv\": (5, \"speed_kmh\", \"not_number\"),\n            \"bad_missing.csv\": (4, \"distance_m\", \"missing\"),\n            \"bad_mode.csv\": (7, \"mode\", \"mode_range\"),\n            \"bad_time.csv\": (6, \"time_ms\", \"non_increasing\"),\n            \"bad_nan.csv\": (8, \"speed_kmh\", \"nonfinite\"),\n        }\n        for name, (line, field, kind) in expected.items():\n            with self.subTest(file=name), self.assertRaises(LogFormatError) as ctx:\n                load_log(HERE / name)\n            self.assertEqual((ctx.exception.line, ctx.exception.field,\n                              ctx.exception.kind), (line, field, kind))\n\n    def test_chart_files_are_generated(self):\n        matrix = load_log(HERE / \"sample_log.csv\")\n        with tempfile.TemporaryDirectory() as temp:\n            charts = save_charts(matrix, temp)\n            self.assertEqual(len(charts), 3)\n            self.assertEqual({x.name for x in charts},\n                             {\"01_speed_kmh.png\", \"02_distance_m.png\", \"03_mode.png\"})\n            for path in charts:\n                self.assertGreater(path.stat().st_size, 1000)\n\n    def test_empty_and_header_errors(self):\n        with tempfile.TemporaryDirectory() as temp:\n            p = Path(temp) / \"empty.csv\"\n            p.write_text(\"\", encoding=\"utf-8\")\n            with self.assertRaises(LogFormatError) as ctx:\n                load_log(p)\n            self.assertEqual(ctx.exception.kind, \"empty_file\")\n            p.write_text(\"time,speed,dist,mode\\n\", encoding=\"utf-8\")\n            with self.assertRaises(LogFormatError) as ctx:\n                load_log(p)\n            self.assertEqual(ctx.exception.kind, \"wrong_header\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        },
+        {
+          "name": "requirements.txt",
+          "group": "main",
+          "text": "numpy>=1.26,<3\nmatplotlib>=3.8,<4\n"
+        },
+        {
+          "name": "sample_log.csv",
+          "group": "main",
+          "text": "time_ms,speed_kmh,distance_m,mode\n0,72.0,45.0,0\n20,72.5,43.0,0\n40,73.0,39.0,0\n60,73.2,35.0,1\n80,73.5,34.0,1\n100,73.0,36.0,1\n120,72.0,41.0,0\n140,71.0,44.0,0\n160,70.0,46.0,0\n180,69.0,47.0,0\n"
+        },
+        {
+          "name": "bad_string.csv",
+          "group": "main",
+          "text": "time_ms,speed_kmh,distance_m,mode\n0,72.0,45.0,0\n20,72.5,43.0,0\n40,73.0,39.0,0\n60,oops,35.0,1\n80,73.5,34.0,1\n100,73.0,36.0,1\n120,72.0,41.0,0\n140,71.0,44.0,0\n160,70.0,46.0,0\n180,69.0,47.0,0\n"
+        },
+        {
+          "name": "bad_missing.csv",
+          "group": "main",
+          "text": "time_ms,speed_kmh,distance_m,mode\n0,72.0,45.0,0\n20,72.5,43.0,0\n40,73.0,,0\n60,73.2,35.0,1\n80,73.5,34.0,1\n100,73.0,36.0,1\n120,72.0,41.0,0\n140,71.0,44.0,0\n160,70.0,46.0,0\n180,69.0,47.0,0\n"
+        },
+        {
+          "name": "bad_mode.csv",
+          "group": "main",
+          "text": "time_ms,speed_kmh,distance_m,mode\n0,72.0,45.0,0\n20,72.5,43.0,0\n40,73.0,39.0,0\n60,73.2,35.0,1\n80,73.5,34.0,1\n100,73.0,36.0,9\n120,72.0,41.0,0\n140,71.0,44.0,0\n160,70.0,46.0,0\n180,69.0,47.0,0\n"
+        },
+        {
+          "name": "bad_time.csv",
+          "group": "main",
+          "text": "time_ms,speed_kmh,distance_m,mode\n0,72.0,45.0,0\n20,72.5,43.0,0\n40,73.0,39.0,0\n60,73.2,35.0,1\n60,73.5,34.0,1\n100,73.0,36.0,1\n120,72.0,41.0,0\n140,71.0,44.0,0\n160,70.0,46.0,0\n180,69.0,47.0,0\n"
+        },
+        {
+          "name": "bad_nan.csv",
+          "group": "main",
+          "text": "time_ms,speed_kmh,distance_m,mode\n0,72.0,45.0,0\n20,72.5,43.0,0\n40,73.0,39.0,0\n60,73.2,35.0,1\n80,73.5,34.0,1\n100,73.0,36.0,1\n120,nan,41.0,0\n140,71.0,44.0,0\n160,70.0,46.0,0\n180,69.0,47.0,0\n"
+        },
+        {
+          "name": "README.md",
+          "group": "main",
+          "text": "# D15 · Python 与 NumPy基础：CSV车辆日志分析与三张曲线\n\n按原84天路线的第3周首课制作。本课使用**Python**学习数据处理，不是将D14的C复合字面量或函数返回类型重新作为下一课主题。真实C工程仍在D01–D14由学员本人在WSL单独运行、留存日志；D15需在本地实际执行Python、NumPy和Matplotlib，网页只做JavaScript案例模拟。\n\n## 项目文件\n- `demo.py`：入口，选择数据场景，协调解析→分析→画图\n- `log_reader.py`：用标准库csv逐物理行验证日志，失败带行号、列名、错误类别\n- `log_analysis.py`：NumPy矩阵、向量、标量及均值、模式变化计算\n- `plot_logs.py`：输出三张独立PNG，速度km/h、距离m、模式类别；时间轴统一ms\n- `test_log.py`：独立unittest，检验正确输入、5种错误和图片\n- `sample_log.csv`：10行教学样例；`bad_*.csv`：各自复制后只注入一个可定位错误\n\n## CSV接口约定\n唯一合法表头为`time_ms,speed_kmh,distance_m,mode`，CSV每条记录一帧。time_ms为严格递增的非负整数毫秒；speed_kmh需0～250 km/h；distance_m需0～500 m；mode只允许0正常、1提示、2故障。此mode是D15样例日志的教学分类，不等于D14 AccState枚举，也不是量产车辆控制状态。\n\n`matrix.shape=(10,4)`代表10行4列；`matrix[:,0].shape=(10,)`代表取出时间列的一维向量；`matrix[0,1]`取单个车速数值。不要把`shape`和数组中的物理单位混淆。\n\n## 本地实作（WSL/Linux/Windows Python）\n把本站课程中的**全部源码、CSV及requirements.txt**下载在同一目录：\n```bash\npython3 -m venv .venv\nsource .venv/bin/activate\npython -m pip install -r requirements.txt\npython demo.py --scenario 0 --out charts\npython -m unittest -v test_log\npython demo.py --scenario 1 --out charts_bad\npython demo.py --scenario 2 --out charts_bad\npython demo.py --scenario 3 --out charts_bad\npython demo.py --scenario 4 --out charts_bad\npython demo.py --scenario 5 --out charts_bad\n```\n注意错误示例故意返回退出码2，不表示脚本失控；若批量执行请不要用`set -e`强制要求错误示例返回0。Windows激活虚拟环境的命令不同，但`python demo.py`调用方式一致。\n\n正常示例应输出status=0 valid=1 rows=10 cols=4；三张PNG分别包含中文标题和轴标签（若系统未安装中文字体，请安装Noto Sans CJK）。错误示例必须报告原CSV物理行号：\n- S02 字符串：第5行 speed_kmh，not_number\n- S03 缺失：第4行 distance_m，missing\n- S04 模式9：第7行 mode，mode_range\n- S05 时间重复：第6行 time_ms，non_increasing\n- S06 NaN：第8行 speed_kmh，nonfinite\n\n## 详细实作与修复前后证据\n1. 用`python demo.py --scenario 0`得到3张图，逐一指出速度、距离、模式的单位，确认离散mode使用阶梯线。\n2. 在个人副本编辑`bad_missing.csv`第4行空值，先运行S03看错误提示，再填回`39.0`，重新运行同文件并保存成功汇总。这里修改私有副本即可，不修改公开课程源文件。\n3. 比较`matrix[:,1]`向量与`matrix[0,1]`标量；尝试`matrix.shape`及`len(matrix)`。\n4. 提交`python -m unittest -v test_log`输出（本地真实Python），与网页JS通过分别记录。以前D01–D14的真实C仍需学员在本地独立运行，不能用CI通过替代。\n5. 本课数据为明确的示例日志，并非D14真实C执行导出的实车或ECU日志。\n\n## 下一课\nD16按照路线进入二维旋转、矩阵乘法顺序与齐次坐标变换，继续使用NumPy，不用在D15提前加入深度学习。\n"
+        }
+      ],
+      "code": "\"\"\"D15入口：main选择场景→读取CSV→NumPy分析→绘图或定位错误。\"\"\"\nimport argparse\nfrom pathlib import Path\n\nfrom log_reader import LogFormatError, load_log\nfrom log_analysis import summarize\nfrom plot_logs import save_charts\n\nFILES = (\n    \"sample_log.csv\",\n    \"bad_string.csv\",\n    \"bad_missing.csv\",\n    \"bad_mode.csv\",\n    \"bad_time.csv\",\n    \"bad_nan.csv\",\n)\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description=\"D15 Python/NumPy车辆日志分析\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(len(FILES)),\n                        default=0, help=\"0正常，1字符串，2缺失，3模式错，4时间错，5NaN\")\n    parser.add_argument(\"--out\", default=\"charts\", help=\"三个PNG图片的输出目录\")\n    args = parser.parse_args()\n    source = Path(__file__).resolve().parent / FILES[args.scenario]\n    print(f\"scenario={args.scenario} source={source.name}\")\n\n    try:\n        matrix = load_log(source)          # ① 读取CSV并校验各物理行。\n    except LogFormatError as exc:\n        # 错误须保留“第几行、哪一列、什么原因”，不能静默删除。\n        print(f\"status=-2 valid=0 error_line={exc.line} \"\n              f\"error_field={exc.field} error_kind={exc.kind}\")\n        print(f\"detail={exc}\")\n        return 2\n\n    result = summarize(matrix)             # ② NumPy矩阵按列分析。\n    charts = save_charts(matrix, args.out) # ③ 分别绘制3张PNG。\n    print(f\"status=0 valid=1 rows={result['rows']} cols={result['cols']}\")\n    print(f\"shape={tuple(result['shape'])} time_shape={tuple(result['time_shape'])}\")\n    print(f\"first_speed_kmh={result['first_speed_kmh']:.1f} \"\n          f\"mean_speed_kmh={result['mean_speed_kmh']:.2f} \"\n          f\"min_distance_m={result['min_distance_m']:.1f}\")\n    print(f\"mode_counts={result['mode_counts']} \"\n          f\"mode_changes={result['mode_changes']} chart_count={len(charts)}\")\n    for path in charts:\n        print(f\"chart={path}\")\n    return 0\n\n\nif __name__ == \"__main__\":  # 作为程序运行才执行；import时不自动生成图片。\n    raise SystemExit(main())\n"
     }
   },
   "rules": {
@@ -10530,6 +11134,110 @@
           "S09 · 周期漏执行"
         ]
       ]
+    },
+    "15": {
+      "correct": {
+        "q1": 1,
+        "q2": 1,
+        "q3": 0,
+        "q4": 1,
+        "q5": 0,
+        "q6": 1,
+        "q7": 0,
+        "q8": 1,
+        "q9": 0,
+        "q10": 1
+      },
+      "explanations": {
+        "q1": "脚本执行demo.py时通过__name__保护进入main，其他模块提供函数。",
+        "q2": "第一个维度是行N=10，第二维度是4列，shape=(10,4)。",
+        "q3": "matrix[:,1]按所有行读取第1列，是(10,)速度向量。",
+        "q4": "matrix[0,1]是第0行第1列标量，值72.0。",
+        "q5": "csv.reader.line_num记录CSV读到的物理行位置，用于报错。",
+        "q6": "字符串错误应保留原行号和字段，不能默默丢弃或填零。",
+        "q7": "非有限值NaN/inf必须显式排除，否则不能按有效物理量分析。",
+        "q8": "离散类别mode更适合step阶梯图，避免画出不存在的中间类别。",
+        "q9": "横轴时间ms；速度km/h、距离m；模式为离散类别无物理单位。",
+        "q10": "在线JS不执行Python、Matplotlib或C，实际运行要在学员本地完成。"
+      },
+      "numeric": {
+        "row_count": [
+          10,
+          "10条数据，表头不算数据行"
+        ],
+        "column_count": [
+          4,
+          "每行4列"
+        ],
+        "string_line": [
+          5,
+          "数据第4条位于物理CSV第5行"
+        ],
+        "mode_changes": [
+          2,
+          "0→1和1→0各一次"
+        ]
+      },
+      "labels": {
+        "q1": "Q01",
+        "q2": "Q02",
+        "q3": "Q03",
+        "q4": "Q04",
+        "q5": "Q05",
+        "q6": "Q06",
+        "q7": "Q07",
+        "q8": "Q08",
+        "q9": "Q09",
+        "q10": "Q10",
+        "row_count": "P1·数据行数",
+        "column_count": "P2·列数",
+        "string_line": "P3·字符串物理行",
+        "mode_changes": "P4·模式变化数"
+      },
+      "needed": [
+        [
+          [
+            0
+          ],
+          "lab0",
+          "S01 · 正常10行日志"
+        ],
+        [
+          [
+            1
+          ],
+          "lab1",
+          "S02 · 车速包含字符串"
+        ],
+        [
+          [
+            2
+          ],
+          "lab2",
+          "S03 · 距离出现缺失值"
+        ],
+        [
+          [
+            3
+          ],
+          "lab3",
+          "S04 · 模式超出允许范围"
+        ],
+        [
+          [
+            4
+          ],
+          "lab4",
+          "S05 · 时间戳重复"
+        ],
+        [
+          [
+            5
+          ],
+          "lab5",
+          "S06 · 车速为NaN"
+        ]
+      ]
     }
   },
   "curriculum": [
@@ -11374,5 +12082,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "day14-20261109-week2-checkpoint-v1"
+  "release": "day15-20261109-python-numpy-csv-v1"
 }
