@@ -407,6 +407,25 @@ $('runButton').onclick=async()=>{
       grid.append(item('实验场景',result.scenario),item('执行次数',result.steps),item('已成功发布',result.publish_count),item('状态码',result.statuses.join(',')),item('发布标志',result.published.join(',')));
       explanation='status、published、valid含义不同。写失败没有新输出；无效输出即使写成功也不能当作有效距离判断。仅JavaScript模拟，不是C程序运行。';
       summaryText='D12 statuses='+result.statuses.join(',')+' published='+result.published.join(',');
+    }else if(lesson.runner==='vehicle_requirements_day13'){
+      // D13原先漏掉自己的显示分支，错误落入D01模式/valid展示逻辑。
+      grid.append(item('实验场景',result.scenario),item('执行次数',result.steps),
+        item('成功发布总数',result.publish_count),
+        item('逐帧应用status',result.statuses.join('、')),
+        item('逐帧published',result.published.join('、')));
+      explanation='D13按帧展示：应用status与published分开；只有本轮确实发布，valid和fault才代表本轮新输出。写失败应展示“—”，不显示旧g_last。浏览器仅运行JS模拟。';
+      summaryText='D13场景'+result.scenario+' status='+result.statuses.join('/')+
+        ' published='+result.published.join('/')+' valid='+result.valids.map(x=>x===null?'—':x).join('/');
+    }else if(lesson.runner==='acc_monitor_day14'){
+      const stateNames=['OFF','READY','ACTIVE','FAULT'];
+      grid.append(item('综合场景',result.scenario),item('帧数',result.frame_count),
+        item('最后一帧状态',stateNames[result.states.at(-1)]),
+        item('逐帧status',result.statuses.join('、')),
+        item('逐帧valid',result.valids.join('、')),
+        item('逐帧alert',result.alerts.join('、')));
+      explanation='D14综合时间戳年龄age、到场间隔dt、两源周期及35/41m滞环。无效帧必须valid=0、alert=0；本页面仅模拟离散输入，不执行实际C。';
+      summaryText='D14场景'+result.scenario+' status='+result.statuses.join('/')+
+        ' valid='+result.valids.join('/')+' alert='+result.alerts.join('/');
     }else if(lesson.runner==='sensor_queue_day11'){
       grid.append(item('容量（格）',result.capacity),item('动作数量',result.actions_count),
         item('最终head',result.head),item('最终tail',result.tail),item('剩余count',result.count),
@@ -479,6 +498,29 @@ $('runButton').onclick=async()=>{
         result.rows.map(x=>[x.step,x.read_status,x.app_status,x.published,
           x.valid===null?'—':x.valid,x.warning===null?'—':x.warning,
           x.cycle===null?'—':x.cycle,x.distance_m===null?'—':x.distance_m,x.explanation])));
+    }
+    if(lesson.runner==='vehicle_requirements_day13'){
+      const desc=document.createElement('p');
+      desc.textContent='逐帧真实字段（浏览器模拟）：status=应用函数返回值；published=1才有本轮的新valid、warning和fault。';
+      $('output').append(desc,makeTable(
+        ['帧下标','Read码','应用status','published','valid','warning','cycle','fault','数据年龄ms','解释'],
+        result.rows.map(x=>[
+          x.step,x.read_status,x.app_status,x.published,
+          x.valid===null?'—':x.valid,x.warning===null?'—':x.warning,
+          x.cycle===null?'—':x.cycle,x.fault===null?'—':x.fault,
+          x.age_ms===null?'—':x.age_ms,x.explanation
+        ])));
+    }
+    if(lesson.runner==='acc_monitor_day14'){
+      const names=['OFF关闭','READY等待','ACTIVE有效监视','FAULT无效'];
+      const help=document.createElement('p');
+      help.textContent='逐帧输入与输出（JS模拟）：age=当前时刻-采样时间，dt=距上次到场间隔。status=0不必然意味着valid=1（如enable=0）。';
+      $('output').append(help,makeTable(
+        ['帧','now ms','距离m','速度m/s','age ms','dt ms','status','state','valid','alert','说明'],
+        result.rows.map(x=>[
+          x.frame,x.now_ms,x.distance_m,x.speed_mps,x.age_ms,x.dt_ms,
+          x.status,names[x.state],x.valid,x.alert,x.explanation
+        ])));
     }
     if(lesson.runner==='sensor_queue_day11')renderDay11Trace(result);
     if(lesson.runner==='acc_state_day10'){
