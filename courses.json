@@ -8068,6 +8068,636 @@
         }
       ],
       "code": "#include \"app.h\"   /* 应用函数声明。 */\n#include \"mock.h\"  /* main选择模拟场景，应用app.c不碰mock。 */\n#include <stdio.h> /* scanf和printf的声明。 */\n#include <stddef.h>/* size_t与%zu。 */\n\nint main(void)\n{\n    int scenario = 0; /* 0～8；第1帧是故障注入位置（下标1）。 */\n    if (scanf(\"%d\", &scenario) != 1 || Mock_Select(scenario) != 0) {\n        printf(\"input_error=1\\n\"); /* 不执行任何车辆业务逻辑。 */\n        return 1;\n    }\n\n    printf(\"scenario=%d steps=3\\n\", scenario);\n    /* 【完整执行链】main→App_RunOnce→mock.Read→app校验→mock.Write→main。 */\n    for (size_t i = 0U; i < 3U; ++i) {\n        size_t before = Mock_PublishedCount(); /* 本轮前成功发布次数。 */\n        int status = App_RunOnce();            /* 函数调用期间main暂停。 */\n        size_t after = Mock_PublishedCount();  /* 本轮后成功发布次数。 */\n        int published = after > before ? 1 : 0;\n        printf(\"step=%zu status=%d published=%d\", i, status, published);\n        if (published != 0) {\n            VehicleResult last = {0}; /* 命名对象，不是复合字面量表达式。 */\n            if (Mock_Last(&last) == 0) {\n                /* 点号访问对象成员，故障码是enum数值。 */\n                printf(\" valid=%d warning=%d cycle=%u fault=%d\",\n                       last.valid, last.warning,\n                       (unsigned int)last.cycle, (int)last.fault_code);\n            }\n        }\n        /* 写失败时不打印旧g_last，让“本轮没有发布”一目了然。 */\n        printf(\"\\n\");\n    }\n    return 0;\n}\n"
+    },
+    "14": {
+      "day": 14,
+      "revision": "2026-11-09-week2-checkpoint-v1",
+      "title": "第2周闯关：带时间戳的周期ACC监视器",
+      "source": "demo.c",
+      "runner": "acc_monitor_day14",
+      "project_name": "day14_acc_monitor",
+      "time": "建议3～4小时：执行链20分钟、组合逻辑60分钟、九场景40分钟、本地真实C与故障修复60～90分钟。",
+      "summary": "按原84天路线，D14综合时间戳、20ms周期、双阈值滞环、跨帧状态、速度单位和多源周期一致性，做可单独GCC测试的简化ACC监视器。不是实际ACC制动或AUTOSAR。",
+      "goals": [
+        "画出main→Mock_GetFrame→Monitor_Step→main执行链，能解释monitor.c与demo.c职责。",
+        "从m/s与km/h识别单位约定，遇到单位错、NaN、负数必须拒绝。",
+        "能逐帧计算dt和age，区分100ms数据年龄阈值与20ms周期约定。",
+        "通过ctx跨7帧保持滞环状态：35m开启、41m关闭，不因36/39/40m抖动。",
+        "一致周期号和雷达有效标志必须共同通过才允许valid=1。",
+        "掌握九场景的status、state、valid、alert和故障恢复，能够排查单位错、过期、状态抖动三类故障。",
+        "本地用GCC与CTest运行参考C项目，亲自记录错误注入和修复前后结果。"
+      ],
+      "flow_text": "【构建】monitor.h定义输入/输出/上下文及函数原型→monitor.c实现周期ACC监视→mock.c按scenario和frame模拟输入→demo.c与test_monitor.c各自拥有一个独立main。【执行】demo.c main→Monitor_Init(&ctx)仅一次→for七轮：Mock_GetFrame(scenario,i,&input)→Monitor_Step(&ctx,&input)→先检测单位/范围/时间戳/双周期/雷达/故障/20ms到场间隔→invalid时清除alert，否则按enable与35/41m滞环更新ctx→返回MonitorResult→main逐帧打印。",
+      "remediation_title": "本课先读：D09–D13已掌握模块怎样组成一个完整监视器",
+      "project_intro": {
+        "title": "第2周综合闯关：数据新鲜、单位正确和状态稳定需要同时成立",
+        "paragraphs": [
+          "本课不是继续围绕D13的复合字面量复习，而是把前面几天分别练过的能力合起来：D09的dt与时间戳、D10的告警滞环、D11的多信号同周期、D12的应用/模拟职责分离、D13的故障验证。",
+          "假设每20ms收到一帧车辆数据，速度接口约定为m/s；来自不同周期的速度和距离不能组合，时间戳比当前时刻晚或年龄大于100ms时应视为无效。有效且启用的监视器按距离<=35m打开告警、>=41m关闭；告警不是实际制动请求。",
+          "本课保留完整中文多文件C工程及代码旁解释；浏览器九种场景提供逐帧结果，真实C必须自己在WSL独立构建和验证。"
+        ]
+      },
+      "architecture": {
+        "headers": [
+          "角色/文件",
+          "职责",
+          "谁调用/什么数据"
+        ],
+        "rows": [
+          [
+            "demo.c / main",
+            "选择场景，创建并只初始化一次ctx，循环七帧，输出日志",
+            "调用Mock_GetFrame/Monitor_Step；不负责业务判断"
+          ],
+          [
+            "mock.c / Mock_GetFrame",
+            "提供基准七帧并注入单位、超时、故障、失效、周期漏执行等情景",
+            "每次给demo的MonitorInput赋值"
+          ],
+          [
+            "monitor.h",
+            "输入、上下文、输出的类型与函数原型",
+            "MonitorContext持有跨帧state/alert/last_tick_ms"
+          ],
+          [
+            "monitor.c / Monitor_Init",
+            "重置初始OFF状态",
+            "for循环外调用一次"
+          ],
+          [
+            "monitor.c / Monitor_Step",
+            "验证输入与时序；更新状态机和滞环告警",
+            "读取input，修改ctx，并按值返回MonitorResult"
+          ],
+          [
+            "test_monitor.c",
+            "独立测试main，核对9场景×7帧和100ms边界",
+            "不能与demo.c的main一起链接"
+          ],
+          [
+            "CMakeLists.txt",
+            "分别编译monitor/mock库及两个可执行程序",
+            "CTest运行acc_tests"
+          ]
+        ]
+      },
+      "symbols": [
+        {
+          "name": "ctx",
+          "file": "demo.c",
+          "match": "MonitorContext ctx;",
+          "what": "跨帧状态在main的for外定义；如果每帧重建则滞环失败",
+          "lifetime": "整个main场景"
+        },
+        {
+          "name": "Monitor_Init",
+          "file": "monitor.c",
+          "match": "void Monitor_Init(MonitorContext *ctx)",
+          "what": "清零并初始state=OFF；只运行一次",
+          "lifetime": "场景开始"
+        },
+        {
+          "name": "Monitor_Step",
+          "file": "monitor.c",
+          "match": "MonitorResult Monitor_Step(",
+          "what": "每帧调用；返回状态、有效性和告警",
+          "lifetime": "每帧"
+        },
+        {
+          "name": "MonitorInput",
+          "file": "monitor.h",
+          "match": "float speed_mps;",
+          "what": "车速统一m/s，单位错必须拒绝",
+          "lifetime": "每帧输入对象"
+        },
+        {
+          "name": "age_ms",
+          "file": "monitor.c",
+          "match": "out.age_ms = input->now_ms - input->stamp_ms;",
+          "what": "检查时间戳非未来、且数据年龄<=100ms",
+          "lifetime": "每帧计算"
+        },
+        {
+          "name": "dt_ms",
+          "file": "monitor.c",
+          "match": "out.dt_ms = input->now_ms - ctx->last_tick_ms;",
+          "what": "检测到场间隔是否20ms，首帧dt=0",
+          "lifetime": "每帧计算"
+        },
+        {
+          "name": "双周期",
+          "file": "monitor.c",
+          "match": "input->speed_cycle != input->distance_cycle",
+          "what": "车速/距离周期不一致时拒绝组合",
+          "lifetime": "每帧校验"
+        },
+        {
+          "name": "告警滞环",
+          "file": "monitor.c",
+          "match": "input->distance_m <= 35.0f",
+          "what": "告警关时<=35开启，告警开时>=41关闭",
+          "lifetime": "跨帧保留ctx->alert"
+        },
+        {
+          "name": "故障码",
+          "file": "monitor.h",
+          "match": "int status;",
+          "what": "0成功/-2单位范围/-3时间戳/-4双周期/-5雷达/-6设备/-7调度",
+          "lifetime": "每帧输出"
+        }
+      ],
+      "run_fields": [
+        {
+          "id": "scenario",
+          "label": "选择第2周综合场景（0–8）",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "S01 · 正常七帧"
+            ],
+            [
+              "1",
+              "S02 · 单位误用km/h"
+            ],
+            [
+              "2",
+              "S03 · 数据过期101ms"
+            ],
+            [
+              "3",
+              "S04 · 35/41m滞环防抖"
+            ],
+            [
+              "4",
+              "S05 · 速度/距离周期错配"
+            ],
+            [
+              "5",
+              "S06 · 设备故障"
+            ],
+            [
+              "6",
+              "S07 · 雷达无效"
+            ],
+            [
+              "7",
+              "S08 · 驾驶员未启用"
+            ],
+            [
+              "8",
+              "S09 · 20ms任务漏执行（间隔40ms）"
+            ]
+          ]
+        }
+      ],
+      "reading": [
+        {
+          "title": "01 · 先看目标和工程角色",
+          "text": "按第2周原计划完成带时间戳的周期ACC监视器。demo.c是程序入口，不负责判断；mock.c提供测试数据；monitor.c是真正处理输入和状态的业务代码；monitor.h保存接口定义；test_monitor.c进行独立C测试。整个程序不产生实际纵向加速度、油门或制动指令。"
+        },
+        {
+          "title": "02 · 从main开始：ctx为什么在循环之外",
+          "text": "main只初始化一次MonitorContext ctx，然后在for循环中按帧依次创建input、调用Mock_GetFrame填值，再把&ctx和&input交给Monitor_Step。ctx保存上一帧的状态、告警与到场时间。假如把Monitor_Init放到for内部，每次都会把alert重置为0，38m的保持逻辑就错了。"
+        },
+        {
+          "title": "03 · 单位和时间戳：先明确字段含义",
+          "text": "D13使用speed_kmh，而D14接口明确使用speed_mps（m/s）；两个量的数值不能直接互换。若mock将speed_unit标为1（误用km/h），Monitor_Step返回status=-2、valid=0。now_ms是应用当前时刻，stamp_ms是采样时刻，age=now-stamp；先拒绝未来时间，再判断age>100ms。"
+        },
+        {
+          "title": "04 · 20ms周期与100ms数据年龄是两件事",
+          "text": "同一帧同时有dt（本次到场与上一帧到场之差）和age（本次到场与传感器采样时间之差）。正常第二次dt=20ms，age=20ms；场景8的第2帧dt=40ms但age仍20ms，因此status=-7（到场周期违约），并非数据本身超时。场景2第2帧dt=20ms却age=101ms，所以status=-3。"
+        },
+        {
+          "title": "05 · 跨周期混帧：为什么单个有效标志不够",
+          "text": "即便两项值分别看起来都正常，speed_cycle与distance_cycle不一致时也不能把它们拼成同一个有效输入。场景4第2帧返回status=-4，valid=0且alert=0；这是上一课一致快照问题在实际综合工程中的应用。"
+        },
+        {
+          "title": "06 · 滞环：记住上一次告警而不是每帧独立比较",
+          "text": "告警关时distance<=35m才开启；开启以后，只有distance>=41m才关闭。场景3距离依次36/34/36/39/40/41/42m，所以alert应为0/1/1/1/1/0/0。这是避免接近阈值时反复切换的一个教学示例，阈值并非实际ACC标定数据。"
+        },
+        {
+          "title": "07 · 输入失效时的输出约束",
+          "text": "单位错、过期、混周期、雷达无效、设备故障或漏调度时，status非零、state=FAULT、valid=0、alert=0。enable=0时status=0但state=OFF、valid=0、alert=0；正常返回码并不表示有效告警。这一差异需要在逐帧结果中明确展示。"
+        },
+        {
+          "title": "08 · 状态恢复与安全输出",
+          "text": "一个异常帧不意味着整个测试场景后续都无效。进入FAULT后，下一帧若重新有效且启用，可返回ACTIVE；本教学模型会从alert=0重新判断35/41m，避免沿用失效前的旧告警。这是一个简化教学状态机，不代表实际量产状态机复位策略。"
+        },
+        {
+          "title": "09 · 故障注入：单位、过期和抖动",
+          "text": "先分别运行S02单位错、S03过期、S04滞环、S09漏调度，手算状态与结果。在自己下载的本地源码中，把monitor.c内<=35.0f暂改为<=40.0f，test_monitor.c对滞环场景将检测出不合预期；恢复<=35.0f后重新编译记录PASS。这种“先失败再修复”的证据用于验证测试覆盖，而不是在网页中假装执行GCC。"
+        },
+        {
+          "title": "10 · 验收与第3周衔接",
+          "text": "完成九场景、十道选择题及四个整数问题后，网页只记在线练习成绩。再在WSL/Linux独立编译demo和test，核对7帧状态、100ms边界及故障注入前后输出。第3周接着学习Python和NumPy处理这些日志，不用在D14引入新的AUTOSAR业务。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "S01 · main启动并只初始化一次ctx",
+          "file": "demo.c",
+          "start": "int main(void)",
+          "end": "    for (int i = 0;",
+          "pattern": "ctx的生命周期跨七次Monitor_Step调用。",
+          "text": "main为入口、模拟数据与业务函数分离；不在main里计算alert。",
+          "trace": "Monitor_Init(&ctx)在for外，只调用一次。"
+        },
+        {
+          "title": "S02 · Mock_GetFrame构造七帧输入",
+          "file": "mock.c",
+          "start": "int Mock_GetFrame(int scenario",
+          "end": "    /* 场景3",
+          "pattern": "*out=(MonitorInput){...}是整体赋值；不是新的main。",
+          "text": "模拟输入可以每轮变化；业务逻辑monitor.c不包含mock.h。",
+          "trace": "第一帧now1000、stamp980、distance45、速度20m/s。"
+        },
+        {
+          "title": "S03 · monitor.h的类型与指针参数",
+          "file": "monitor.h",
+          "start": "typedef enum {",
+          "end": "#endif",
+          "pattern": "MonitorContext*为跨帧可写指针；const MonitorInput*为只读输入。",
+          "text": "明确状态、数据单位、采样周期号和告警有效性。",
+          "trace": "status为0也可能valid=0（未启用）。"
+        },
+        {
+          "title": "S04 · monitor.c初始化context",
+          "file": "monitor.c",
+          "start": "void Monitor_Init(",
+          "end": "MonitorResult Monitor_Step(",
+          "pattern": "*ctx=(MonitorContext){0}对已有对象整体赋零值。",
+          "text": "本课不以复合字面量为学习主题；重点在ctx保留跨帧信息。",
+          "trace": "进入第一次Monitor_Step前state=OFF、alert=0。"
+        },
+        {
+          "title": "S05 · 每帧计算dt与初始无效输出",
+          "file": "monitor.c",
+          "start": "MonitorResult Monitor_Step(",
+          "end": "    /* 先排除非法数据",
+          "pattern": "首帧dt=0，其他帧dt=now-last_tick；创建out={0}。",
+          "text": "不要把dt和数据年龄age混为同一时间。",
+          "trace": "正常第2帧dt20；S09第2帧dt40。"
+        },
+        {
+          "title": "S06 · 从单位和数值到时间戳的逐层校验",
+          "file": "monitor.c",
+          "start": "    /* 先排除非法数据",
+          "end": "    /* 失效：直接",
+          "pattern": "先isfinite、单位，再时间戳年龄、双周期和有效标志。",
+          "text": "每种异常有独立status，便于对照实际日志。",
+          "trace": "S02=-2，S03=-3，S05=-4，S07=-5，S06=-6，S09=-7。"
+        },
+        {
+          "title": "S07 · 失效与未启用的输出差别",
+          "file": "monitor.c",
+          "start": "    /* 失效：直接",
+          "end": "    /* 正常帧：ACTIVE",
+          "pattern": "失效status非零；未启用status0但valid0。",
+          "text": "两者均alert=0；任何invalid都不允许当作有效告警。",
+          "trace": "S08第2帧state=OFF，status0，valid0。"
+        },
+        {
+          "title": "S08 · 双阈值滞环及按值返回",
+          "file": "monitor.c",
+          "start": "    /* 正常帧：ACTIVE",
+          "end": "    return out;",
+          "pattern": "保留ctx->alert；valid=1才有有效提示。",
+          "text": "当alert=1且距离在35–41m间时，保持告警开启。",
+          "trace": "S04第4帧distance40m仍alert1。"
+        },
+        {
+          "title": "S09 · main打印7帧状态",
+          "file": "demo.c",
+          "start": "    for (int i = 0;",
+          "end": "    return 0;",
+          "pattern": "按值返回MonitorResult，main只读其成员并输出，不改业务状态。",
+          "text": "逐行打印frame/now/speed/distance/dt/status/state/valid/alert/age。",
+          "trace": "第2帧注入的异常不污染第3帧的valid。"
+        },
+        {
+          "title": "S10 · 独立C测试验证九个场景",
+          "file": "test_monitor.c",
+          "start": "int main(void)",
+          "end": "    printf(\"PASS: 9 scenarios",
+          "pattern": "expect二维数组对应场景×帧；两个main单独编译。",
+          "text": "比较status/valid/alert与100ms边界，用一次测试覆盖九组故障。",
+          "trace": "预期S04 alert=0/1/1/1/1/0/0。"
+        },
+        {
+          "title": "S11 · 构建关系与真实GCC/CTest",
+          "file": "CMakeLists.txt",
+          "start": "cmake_minimum_required",
+          "end": "endif()",
+          "pattern": "add_library静态库构建；不等于C语言的static关键字。",
+          "text": "浏览器JS仅预测输出；本地GCC执行下载的真实C源码。",
+          "trace": "gcc编译两个独立main；ctest运行acc_tests。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "S01 · 七帧正常滞环",
+          "values": [
+            0
+          ],
+          "optional": false,
+          "hint": "0/1/1/1/0/1/0",
+          "steps": [
+            "先预测第2帧的dt与age、status、state、valid、alert。",
+            "执行模拟，核对全部七帧，而不是只看最后一帧。",
+            "定位源代码判断发生在Monitor_Step中的哪一个if分支。"
+          ]
+        },
+        {
+          "name": "S02 · 错误单位",
+          "values": [
+            1
+          ],
+          "optional": false,
+          "hint": "第2帧status=-2,valid=0",
+          "steps": [
+            "先预测第2帧的dt与age、status、state、valid、alert。",
+            "执行模拟，核对全部七帧，而不是只看最后一帧。",
+            "定位源代码判断发生在Monitor_Step中的哪一个if分支。"
+          ]
+        },
+        {
+          "name": "S03 · 超时101ms",
+          "values": [
+            2
+          ],
+          "optional": false,
+          "hint": "第2帧status=-3,valid=0",
+          "steps": [
+            "先预测第2帧的dt与age、status、state、valid、alert。",
+            "执行模拟，核对全部七帧，而不是只看最后一帧。",
+            "定位源代码判断发生在Monitor_Step中的哪一个if分支。"
+          ]
+        },
+        {
+          "name": "S04 · 抖动与滞环",
+          "values": [
+            3
+          ],
+          "optional": false,
+          "hint": "0/1/1/1/1/0/0",
+          "steps": [
+            "先预测第2帧的dt与age、status、state、valid、alert。",
+            "执行模拟，核对全部七帧，而不是只看最后一帧。",
+            "定位源代码判断发生在Monitor_Step中的哪一个if分支。"
+          ]
+        },
+        {
+          "name": "S05 · 双周期不一致",
+          "values": [
+            4
+          ],
+          "optional": false,
+          "hint": "第2帧status=-4,valid=0",
+          "steps": [
+            "先预测第2帧的dt与age、status、state、valid、alert。",
+            "执行模拟，核对全部七帧，而不是只看最后一帧。",
+            "定位源代码判断发生在Monitor_Step中的哪一个if分支。"
+          ]
+        },
+        {
+          "name": "S06 · 设备故障",
+          "values": [
+            5
+          ],
+          "optional": false,
+          "hint": "第2帧status=-6,valid=0",
+          "steps": [
+            "先预测第2帧的dt与age、status、state、valid、alert。",
+            "执行模拟，核对全部七帧，而不是只看最后一帧。",
+            "定位源代码判断发生在Monitor_Step中的哪一个if分支。"
+          ]
+        },
+        {
+          "name": "S07 · 雷达失效",
+          "values": [
+            6
+          ],
+          "optional": false,
+          "hint": "第2帧status=-5,valid=0",
+          "steps": [
+            "先预测第2帧的dt与age、status、state、valid、alert。",
+            "执行模拟，核对全部七帧，而不是只看最后一帧。",
+            "定位源代码判断发生在Monitor_Step中的哪一个if分支。"
+          ]
+        },
+        {
+          "name": "S08 · 使能关闭",
+          "values": [
+            7
+          ],
+          "optional": false,
+          "hint": "第2帧status=0,valid=0,state=OFF",
+          "steps": [
+            "先预测第2帧的dt与age、status、state、valid、alert。",
+            "执行模拟，核对全部七帧，而不是只看最后一帧。",
+            "定位源代码判断发生在Monitor_Step中的哪一个if分支。"
+          ]
+        },
+        {
+          "name": "S09 · 周期漏执行",
+          "values": [
+            8
+          ],
+          "optional": false,
+          "hint": "第2帧dt=40,status=-7",
+          "steps": [
+            "先预测第2帧的dt与age、status、state、valid、alert。",
+            "执行模拟，核对全部七帧，而不是只看最后一帧。",
+            "定位源代码判断发生在Monitor_Step中的哪一个if分支。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "L01：画完整执行链，说明demo.c、mock.c、monitor.c、monitor.h、test_monitor.c的职责与main的位置。",
+        "L02：只运行S01，写出七帧距离与alert；用35/41m规则分析38m和40m为何保留上一帧结果。",
+        "L03：对照S02与S03，写清速度单位错误和数据过期的差异；再把S09的dt=40与S03的age=101区别开。",
+        "L04：运行S04–S08并记录每帧status/state/valid/alert，验证混周期、故障、失效、使能处理与异常恢复。",
+        "L05：在个人本地副本里把35阈值暂改为40，记录test失败，再恢复正确阈值后记录通过。务必保留源码和测试日志两份证据。",
+        "L06：在本地WSL执行GCC严格编译、9场景的demo和test、CMake/CTest；真实C通关与浏览器记录分开。",
+        "L07：在线问答Q01–Q10/P1–P4，带着自己写的状态表核对，不靠记住预期数字。"
+      ],
+      "test_steps": [
+        "九个场景必须运行，每个场景有七帧明细；不能只看最后一帧。",
+        "Q01–Q10知识题与P1–P4计算题保留题号，检查单位、滞环、快照、年龄和dt。",
+        "本地GCC和CTest由用户亲自运行；故障注入前后保留失败→修复通过的原始证据。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "D14的程序从哪个函数进入？",
+          "options": [
+            "monitor.c自动运行",
+            "demo.c中的main()",
+            "mock.c里的静态数组"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "MonitorContext ctx为什么在for循环外初始化一次？",
+          "options": [
+            "为了保留跨帧的状态、告警及上一帧时间",
+            "为了减少头文件体积",
+            "因为结构体不能放入循环"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "接口约定speed_mps为m/s，误把km/h送来应该怎样？",
+          "options": [
+            "直接使用20当20m/s",
+            "通过单位标记拒绝、status=-2",
+            "自动视为相同数值"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "age=101ms但dt=20ms时，哪种错误？",
+          "options": [
+            "数据超时status=-3",
+            "任务漏调度status=-7",
+            "正常"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "age=20ms但dt=40ms时，哪种错误？",
+          "options": [
+            "数据超时status=-3",
+            "任务到场周期违约status=-7",
+            "正常"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "告警已开启，距离39m时应怎样？",
+          "options": [
+            "立刻关闭",
+            "保持开启，直到>=41m",
+            "始终保持开启不允许关闭"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "speed_cycle=102，distance_cycle=103，数值都正常，应该？",
+          "options": [
+            "仍valid=1",
+            "status=-4，禁止作为同周期输入",
+            "只要距离小就有效"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "状态status=0、enable=0时能否把alert视为有效判断？",
+          "options": [
+            "可以",
+            "不可以，OFF且valid=0",
+            "可以，因为status0就是valid1"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "某帧无效后，下一帧完全合法时，本课简化监视器如何处理？",
+          "options": [
+            "沿用旧告警1",
+            "重新进入ACTIVE，从清零告警开始按阈值判断",
+            "停止程序，不能恢复"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "网页模拟检测全通过说明了什么？",
+          "options": [
+            "已在用户WSL真实C通关",
+            "JS场景与在线测验通过，本地C要独立验证",
+            "已验证真实量产ACC功能"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "根据D14的单位/时间/滞环规则，填写整数。",
+        "values": [
+          0
+        ],
+        "fields": [
+          {
+            "id": "age",
+            "label": "P1 · 1060ms-959ms的数据年龄（ms）",
+            "kind": "number"
+          },
+          {
+            "id": "timeout_status",
+            "label": "P2 · age=101ms的status",
+            "kind": "number"
+          },
+          {
+            "id": "alert_hold",
+            "label": "P3 · 旧alert=1、距离39m的新alert",
+            "kind": "number"
+          },
+          {
+            "id": "skip_status",
+            "label": "P4 · dt=40ms、age=20ms的status",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "1060-959=101ms。",
+          "age>100ms返回-3。",
+          "旧告警1在39m保持1。",
+          "dt!=20ms且有效数据返回-7。"
+        ]
+      },
+      "pass_rule": "在线：9场景完整运行、Q01–Q10与P1–P4全对；本地真实C需用户本人WSL运行GCC/CTest及故障注入修复测试。",
+      "assets": [
+        {
+          "name": "monitor.h",
+          "group": "main",
+          "text": "#ifndef MONITOR_H\n#define MONITOR_H\n#include <stdint.h> /* uint32_t：周期号和毫秒时间。 */\n\n/* 本项目是ACC监视逻辑教学模拟，不产生油门或制动控制命令。 */\ntypedef enum {\n    ACC_OFF = 0,    /* 未启用时关闭。 */\n    ACC_READY = 1,  /* 尚无有效雷达输入时等待。 */\n    ACC_ACTIVE = 2, /* 输入有效时监视前车距离。 */\n    ACC_FAULT = 3   /* 输入不符合约定，禁止有效告警输出。 */\n} AccState;\n\n/* 本次输入。速度统一使用m/s：这是与D13的km/h不同的明确接口约定。 */\ntypedef struct {\n    float speed_mps;         /* 车辆速度，单位m/s；范围0～50。 */\n    float distance_m;        /* 前车距离，单位m；范围0～500。 */\n    int speed_unit;          /* 0代表m/s；1代表误将km/h数据送进m/s接口。 */\n    uint32_t now_ms;         /* 本轮到达时间，毫秒，教学中不发生回绕。 */\n    uint32_t stamp_ms;       /* 数据采集时间戳，毫秒。 */\n    uint32_t speed_cycle;    /* 车速采样周期号。 */\n    uint32_t distance_cycle; /* 距离采样周期号。 */\n    int radar_valid;         /* 1有效，0无效。 */\n    int enable;              /* 驾驶员启用标志。 */\n    int fault_present;       /* 模拟故障信号。 */\n} MonitorInput;\n\n/* 上下文必须跨调用保留，不能在每个Monitor_Step内部重新清零。 */\ntypedef struct {\n    AccState state;           /* 上次状态。 */\n    int alert;                /* 上次有效告警；失效时清除。 */\n    uint32_t last_tick_ms;    /* 上次处理到达时刻。 */\n    int has_last_tick;        /* 0表示本次是第一帧，无前一次dt。 */\n} MonitorContext;\n\n/* 输出的status与valid独立：status!=0时valid必须为0。 */\ntypedef struct {\n    AccState state;      /* 本轮结束的状态。 */\n    int alert;           /* 仅valid=1时有意义。 */\n    int valid;           /* 1：当前监视判断有效；0：不可消费。 */\n    int status;          /* 0正常；-2单位/范围；-3过期；-4周期不一致； */\n                         /* -5雷达无效；-6故障；-7周期漏调度。 */\n    uint32_t age_ms;     /* 已计算的输入数据年龄（无效时仍仅供诊断）。 */\n    uint32_t dt_ms;      /* 本次与上次调用间隔（首帧为0）。 */\n} MonitorResult;\n\nvoid Monitor_Init(MonitorContext *ctx); /* 初始化跨帧上下文。 */\nMonitorResult Monitor_Step(MonitorContext *ctx, const MonitorInput *input);\n#endif\n"
+        },
+        {
+          "name": "monitor.c",
+          "group": "main",
+          "text": "#include \"monitor.h\" /* 输入、状态、上下文和结果类型定义。 */\n#include <math.h>     /* isfinite排除NaN和无穷大。 */\n#include <stddef.h>   /* NULL指针常量。 */\n\n/* 初始化只做一次：由demo.c在开始一个场景时调用。 */\nvoid Monitor_Init(MonitorContext *ctx)\n{\n    if (ctx == NULL) return;\n    *ctx = (MonitorContext){0}; /* C99复合字面量：将已有对象整体置零。 */\n    ctx->state = ACC_OFF;\n}\n\n/* 业务入口：读取本帧，检查单位、时间、周期、有效标志及距离。 */\nMonitorResult Monitor_Step(MonitorContext *ctx, const MonitorInput *input)\n{\n    /* 输出先清零，意味着失败分支绝不会沿用旧alert=1。 */\n    MonitorResult out = {0};\n    out.state = ACC_FAULT; /* 默认故障状态，成功路径再覆盖。 */\n    out.status = -2;       /* 空指针/非法数值默认返回-2。 */\n    if (ctx == NULL || input == NULL) return out;\n\n    /* 第一帧没有上轮dt；此后依靠本轮now减上轮now计算到达间隔。 */\n    if (ctx->has_last_tick != 0 && input->now_ms >= ctx->last_tick_ms)\n        out.dt_ms = input->now_ms - ctx->last_tick_ms;\n    ctx->last_tick_ms = input->now_ms;\n    int first = (ctx->has_last_tick == 0);\n    ctx->has_last_tick = 1;\n\n    /* 先排除非法数据与单位错误，再做距离告警和状态转移。 */\n    if (!isfinite(input->speed_mps) || !isfinite(input->distance_m) ||\n        input->speed_mps < 0.0f || input->speed_mps > 50.0f ||\n        input->distance_m < 0.0f || input->distance_m > 500.0f ||\n        input->speed_unit != 0) {\n        out.status = -2;\n    } else if (input->stamp_ms > input->now_ms) {\n        out.status = -3;\n    } else if (input->now_ms - input->stamp_ms > 100U) {\n        out.age_ms = input->now_ms - input->stamp_ms;\n        out.status = -3;\n    } else if (input->speed_cycle != input->distance_cycle) {\n        out.status = -4;\n    } else if (input->radar_valid != 1) {\n        out.status = -5;\n    } else if (input->fault_present != 0) {\n        out.status = -6;\n    } else if (!first && out.dt_ms != 20U) {\n        out.status = -7;\n    } else {\n        out.age_ms = input->now_ms - input->stamp_ms;\n        out.status = 0;\n    }\n\n    /* 失效：直接进入FAULT、清除旧告警，不发布有效输出。 */\n    if (out.status != 0) {\n        ctx->state = ACC_FAULT;\n        ctx->alert = 0;\n        out.valid = 0;\n        out.alert = 0;\n        out.state = ctx->state;\n        return out;\n    }\n\n    /* 未启用时保持OFF，输出不构成有效距离判断。 */\n    if (input->enable != 1) {\n        ctx->state = ACC_OFF;\n        ctx->alert = 0;\n        out.state = ACC_OFF;\n        out.valid = 0;\n        out.alert = 0;\n        return out;\n    }\n\n    /* 正常帧：ACTIVE中只在35m开启、41m关闭告警；区间内保留前值。 */\n    if (ctx->state != ACC_ACTIVE) ctx->alert = 0;\n    ctx->state = ACC_ACTIVE;\n    if (ctx->alert == 0 && input->distance_m <= 35.0f) ctx->alert = 1;\n    else if (ctx->alert == 1 && input->distance_m >= 41.0f) ctx->alert = 0;\n\n    out.state = ctx->state;\n    out.valid = 1;\n    out.alert = ctx->alert;\n    return out;\n}\n"
+        },
+        {
+          "name": "mock.h",
+          "group": "main",
+          "text": "#ifndef MOCK_H\n#define MOCK_H\n#include \"monitor.h\"\n/* demo/test使用场景模拟，monitor.c不包含该头文件。 */\n#define SCENARIO_COUNT 9\n#define FRAME_COUNT 7\nint Mock_GetFrame(int scenario, int frame_index, MonitorInput *out);\n#endif\n"
+        },
+        {
+          "name": "mock.c",
+          "group": "main",
+          "text": "#include \"mock.h\"\n#include <stddef.h>\n\n/* 七帧基础输入：20ms一次；首帧1000ms，全部有效且已启用。 */\n/* 速度固定20m/s，不是20km/h；距离覆盖35/41m双阈值。 */\nstatic const float DISTANCE_M[FRAME_COUNT] = {\n    45.0f, 34.0f, 38.0f, 40.0f, 42.0f, 34.0f, 42.0f\n};\n\n/* 9场景均从同一组基准帧复制，并在目标帧注入指定故障。 */\nint Mock_GetFrame(int scenario, int frame_index, MonitorInput *out)\n{\n    if (out == NULL || scenario < 0 || scenario >= SCENARIO_COUNT ||\n        frame_index < 0 || frame_index >= FRAME_COUNT) return -1;\n    uint32_t now = 1000U + (uint32_t)frame_index * 20U;\n    *out = (MonitorInput){\n        .speed_mps = 20.0f,\n        .distance_m = DISTANCE_M[frame_index],\n        .speed_unit = 0,\n        .now_ms = now,\n        .stamp_ms = now - 20U,\n        .speed_cycle = 100U + (uint32_t)frame_index,\n        .distance_cycle = 100U + (uint32_t)frame_index,\n        .radar_valid = 1,\n        .enable = 1,\n        .fault_present = 0\n    }; /* 复合字面量整体赋值，供调用者读取这帧数据。 */\n\n    /* 场景3：正常滞环测试，距离在两个阈值间晃动但不抖动输出。 */\n    if (scenario == 3) {\n        static const float JITTER_M[FRAME_COUNT] = {\n            36.0f, 34.0f, 36.0f, 39.0f, 40.0f, 41.0f, 42.0f\n        };\n        out->distance_m = JITTER_M[frame_index];\n    }\n\n    if (frame_index == 2) {\n        if (scenario == 1) out->speed_unit = 1;           /* km/h错误标记。 */\n        if (scenario == 2) out->stamp_ms = now - 101U;    /* 101ms过期。 */\n        if (scenario == 4) out->distance_cycle += 1U;    /* 不一致快照。 */\n        if (scenario == 5) out->fault_present = 1;       /* 设备报告故障。 */\n        if (scenario == 6) out->radar_valid = 0;         /* 雷达无效。 */\n        if (scenario == 7) out->enable = 0;              /* 未启用：OFF。 */\n    }\n\n    /* 场景8：第2帧迟到20ms，形成40ms到达间隔；后续20ms恢复。 */\n    if (scenario == 8 && frame_index >= 2) {\n        out->now_ms += 20U;\n        out->stamp_ms += 20U;\n    }\n    return 0;\n}\n"
+        },
+        {
+          "name": "demo.c",
+          "group": "main",
+          "text": "#include \"monitor.h\" /* Monitor_Init与Monitor_Step声明。 */\n#include \"mock.h\"    /* 预设场景输入和场景数量。 */\n#include <stdio.h>   /* scanf和printf。 */\n\nint main(void)\n{\n    int scenario = 0; /* 用户输入0～8，代表一次完整7帧测试。 */\n    if (scanf(\"%d\", &scenario) != 1 || scenario < 0 ||\n        scenario >= SCENARIO_COUNT) {\n        printf(\"input_error=1\\n\");\n        return 1;\n    }\n\n    MonitorContext ctx;   /* 同一个ctx必须保留七次调用后的状态。 */\n    Monitor_Init(&ctx);   /* 初始化发生在for循环之前，只有一次。 */\n    printf(\"scenario=%d frames=%d\\n\", scenario, FRAME_COUNT);\n\n    for (int i = 0; i < FRAME_COUNT; ++i) {\n        MonitorInput input = {0}; /* 每一帧新建输入对象。 */\n        if (Mock_GetFrame(scenario, i, &input) != 0) return 2;\n        /* main→Mock_GetFrame→Monitor_Step→main，真实执行顺序。 */\n        MonitorResult result = Monitor_Step(&ctx, &input);\n        printf(\"frame=%d now=%u speed=%.1f distance=%.1f dt=%u \"\n               \"status=%d state=%d valid=%d alert=%d age=%u\\n\",\n               i, (unsigned)input.now_ms, (double)input.speed_mps,\n               (double)input.distance_m, (unsigned)result.dt_ms,\n               result.status, (int)result.state, result.valid, result.alert,\n               (unsigned)result.age_ms);\n    }\n    return 0;\n}\n"
+        },
+        {
+          "name": "test_monitor.c",
+          "group": "main",
+          "text": "#include \"monitor.h\"\n#include \"mock.h\"\n#include <stdio.h>\n\n/* 这些测试会实际执行C函数，和网页的JS预测不是同一套执行引擎。 */\nint main(void)\n{\n    const int expected_status[SCENARIO_COUNT][FRAME_COUNT] = {\n        {0,0,0,0,0,0,0}, /* 正常 */\n        {0,0,-2,0,0,0,0},/* 单位错 */\n        {0,0,-3,0,0,0,0},/* 过期 */\n        {0,0,0,0,0,0,0}, /* 滞环 */\n        {0,0,-4,0,0,0,0},/* 两源周期不一致 */\n        {0,0,-6,0,0,0,0},/* 故障 */\n        {0,0,-5,0,0,0,0},/* 雷达无效 */\n        {0,0,0,0,0,0,0}, /* 未启用：status0，但valid0 */\n        {0,0,-7,0,0,0,0} /* 20ms周期漏执行 */\n    };\n    const int expected_valid[SCENARIO_COUNT][FRAME_COUNT] = {\n        {1,1,1,1,1,1,1},\n        {1,1,0,1,1,1,1},\n        {1,1,0,1,1,1,1},\n        {1,1,1,1,1,1,1},\n        {1,1,0,1,1,1,1},\n        {1,1,0,1,1,1,1},\n        {1,1,0,1,1,1,1},\n        {1,1,0,1,1,1,1},\n        {1,1,0,1,1,1,1}\n    };\n    const int expected_alert[SCENARIO_COUNT][FRAME_COUNT] = {\n        {0,1,1,1,0,1,0},\n        {0,1,0,0,0,1,0},\n        {0,1,0,0,0,1,0},\n        {0,1,1,1,1,0,0},\n        {0,1,0,0,0,1,0},\n        {0,1,0,0,0,1,0},\n        {0,1,0,0,0,1,0},\n        {0,1,0,0,0,1,0},\n        {0,1,0,0,0,1,0}\n    };\n    for (int sc = 0; sc < SCENARIO_COUNT; ++sc) {\n        MonitorContext ctx;\n        Monitor_Init(&ctx);\n        for (int frame = 0; frame < FRAME_COUNT; ++frame) {\n            MonitorInput input = {0};\n            if (Mock_GetFrame(sc, frame, &input) != 0) return 1;\n            MonitorResult got = Monitor_Step(&ctx, &input);\n            if (got.status != expected_status[sc][frame] ||\n                got.valid != expected_valid[sc][frame] ||\n                got.alert != expected_alert[sc][frame]) {\n                printf(\"FAIL scenario=%d frame=%d status=%d valid=%d alert=%d\\n\",\n                       sc,frame,got.status,got.valid,got.alert);\n                return 2;\n            }\n            if (got.valid == 0 && got.alert != 0) return 3;\n        }\n    }\n    /* 独立检验100ms边界：等于100有效，大于100无效。 */\n    MonitorContext ctx; Monitor_Init(&ctx);\n    MonitorInput boundary = {20.0f,34.0f,0,1000U,900U,100U,100U,1,1,0};\n    MonitorResult result = Monitor_Step(&ctx,&boundary);\n    if (result.status != 0 || result.valid != 1 || result.alert != 1) return 4;\n    printf(\"PASS: 9 scenarios x 7 frames; timeout boundary; no invalid alert\\n\");\n    return 0;\n}\n"
+        },
+        {
+          "name": "CMakeLists.txt",
+          "group": "main",
+          "text": "cmake_minimum_required(VERSION 3.16)\nproject(day14_acc_monitor LANGUAGES C)\nset(CMAKE_C_STANDARD 17)\nset(CMAKE_C_STANDARD_REQUIRED ON)\n\nadd_library(monitor STATIC monitor.c)\ntarget_include_directories(monitor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\ntarget_link_libraries(monitor PUBLIC m)\nadd_library(mock STATIC mock.c)\ntarget_include_directories(mock PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})\n\nadd_executable(acc_demo demo.c)\ntarget_link_libraries(acc_demo PRIVATE monitor mock)\ninclude(CTest)\nif(BUILD_TESTING)\n    add_executable(acc_tests test_monitor.c)\n    target_link_libraries(acc_tests PRIVATE monitor mock)\n    add_test(NAME d14_acc_monitor COMMAND acc_tests)\nendif()\n"
+        },
+        {
+          "name": "README.md",
+          "group": "main",
+          "text": "# D14 第2周闯关：带时间戳的周期ACC监视器\n\n按照原84天课程规划，本课综合D09时间间隔/年龄、D10状态机与滞环、D11一致快照、D12接口分层、D13需求测试，不把D13的批注当成D14的主课主题。\n\n**注意**：本项目只是单线程离线教学模拟，35m/41m阈值与20ms周期是课程约定，输出是距离提示alert，不发送真实油门或制动命令；不是量产ACC。\n\n## 文件\n- `monitor.h`：输入/上下文/输出类型与入口声明\n- `monitor.c`：状态与数据质量规则（实际业务）\n- `mock.h/mock.c`：构造9个场景各7帧输入\n- `demo.c`：入口main，逐帧调用并打印结果\n- `test_monitor.c`：另一独立main，逐帧断言\n- `CMakeLists.txt`：两个独立可执行程序\n\n## 验收标准\n1. 能说清main→Mock_GetFrame→Monitor_Step→main；上下文ctx为什么在for外。\n2. 基础7帧的alert为0、1、1、1、0、1、0；滞环场景alert为0、1、1、1、1、0、0。\n3. 单位错误-2、数据过期-3、采样周期错-4、雷达无效-5、设备故障-6、漏调度-7均不得发布valid=1、alert=1。\n4. 第2帧发生异常以后，后续帧恢复有效；不要沿用上一帧警告。\n5. 101ms数据过期；100ms边界在本例有效；20ms调用间隔严格检查，40ms迟到在本例拒绝。\n6. 排错演练：本地私有副本故意把`<=35.0f`改成`<=40.0f`，运行T03滞环用例记录失败，再恢复原条件，保留前后GCC/CTest输出。\n\n## WSL实际C编译与运行\n```bash\ngcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g demo.c monitor.c mock.c -lm -o acc_demo\ngcc -std=c17 -Wall -Wextra -Wpedantic -Werror -g test_monitor.c monitor.c mock.c -lm -o acc_tests\n./acc_tests\nfor i in 0 1 2 3 4 5 6 7 8; do printf '%s\\n' \"$i\" | ./acc_demo; done\ncmake -S . -B build -DCMAKE_BUILD_TYPE=Debug\ncmake --build build\nctest --test-dir build --output-on-failure\n```\n\n网页模拟的“在线通过”不等于你的WSL实际C通关。请另行保存终端原始日志；不要将本地故障注入版本推送到公开Pages源码。\n"
+        }
+      ],
+      "code": "#include \"monitor.h\" /* Monitor_Init与Monitor_Step声明。 */\n#include \"mock.h\"    /* 预设场景输入和场景数量。 */\n#include <stdio.h>   /* scanf和printf。 */\n\nint main(void)\n{\n    int scenario = 0; /* 用户输入0～8，代表一次完整7帧测试。 */\n    if (scanf(\"%d\", &scenario) != 1 || scenario < 0 ||\n        scenario >= SCENARIO_COUNT) {\n        printf(\"input_error=1\\n\");\n        return 1;\n    }\n\n    MonitorContext ctx;   /* 同一个ctx必须保留七次调用后的状态。 */\n    Monitor_Init(&ctx);   /* 初始化发生在for循环之前，只有一次。 */\n    printf(\"scenario=%d frames=%d\\n\", scenario, FRAME_COUNT);\n\n    for (int i = 0; i < FRAME_COUNT; ++i) {\n        MonitorInput input = {0}; /* 每一帧新建输入对象。 */\n        if (Mock_GetFrame(scenario, i, &input) != 0) return 2;\n        /* main→Mock_GetFrame→Monitor_Step→main，真实执行顺序。 */\n        MonitorResult result = Monitor_Step(&ctx, &input);\n        printf(\"frame=%d now=%u speed=%.1f distance=%.1f dt=%u \"\n               \"status=%d state=%d valid=%d alert=%d age=%u\\n\",\n               i, (unsigned)input.now_ms, (double)input.speed_mps,\n               (double)input.distance_m, (unsigned)result.dt_ms,\n               result.status, (int)result.state, result.valid, result.alert,\n               (unsigned)result.age_ms);\n    }\n    return 0;\n}\n"
     }
   },
   "rules": {
@@ -9775,6 +10405,131 @@
           "S09 · 设备故障"
         ]
       ]
+    },
+    "14": {
+      "correct": {
+        "q1": 1,
+        "q2": 0,
+        "q3": 1,
+        "q4": 0,
+        "q5": 1,
+        "q6": 1,
+        "q7": 1,
+        "q8": 1,
+        "q9": 1,
+        "q10": 1
+      },
+      "explanations": {
+        "q1": "程序从demo.c的main启动，再调用模拟与业务函数。",
+        "q2": "ctx在for外且只初始化一次才能保存上次状态和最后到场时刻。",
+        "q3": "本课接口明确m/s，不接受无转换的km/h数值；返回-2。",
+        "q4": "age=101ms>100ms是数据过期，status=-3，与dt无关。",
+        "q5": "dt=40ms说明20ms周期约定被破坏，status=-7，即便数据age=20ms。",
+        "q6": "旧alert=1时35—41之间保留告警，只有>=41m关闭。",
+        "q7": "速度和距离的周期号不同，不可混成有效快照，status=-4。",
+        "q8": "enable=0时虽然status=0，valid仍为0且状态OFF。",
+        "q9": "本课异常清除旧告警；下一帧合法重新按阈值判断。",
+        "q10": "在线模拟通过不能替代自己的WSL实际C测试。"
+      },
+      "numeric": {
+        "age": [
+          101,
+          "1060-959=101ms"
+        ],
+        "timeout_status": [
+          -3,
+          "数据年龄超过100ms返回-3"
+        ],
+        "alert_hold": [
+          1,
+          "已开启告警，39m在保持区间"
+        ],
+        "skip_status": [
+          -7,
+          "40ms到场间隔不满足20ms要求"
+        ]
+      },
+      "labels": {
+        "q1": "Q01",
+        "q2": "Q02",
+        "q3": "Q03",
+        "q4": "Q04",
+        "q5": "Q05",
+        "q6": "Q06",
+        "q7": "Q07",
+        "q8": "Q08",
+        "q9": "Q09",
+        "q10": "Q10",
+        "age": "P1·年龄",
+        "timeout_status": "P2·超时状态",
+        "alert_hold": "P3·滞环保持",
+        "skip_status": "P4·漏调度状态"
+      },
+      "needed": [
+        [
+          [
+            0
+          ],
+          "lab0",
+          "S01 · 七帧正常滞环"
+        ],
+        [
+          [
+            1
+          ],
+          "lab1",
+          "S02 · 错误单位"
+        ],
+        [
+          [
+            2
+          ],
+          "lab2",
+          "S03 · 超时101ms"
+        ],
+        [
+          [
+            3
+          ],
+          "lab3",
+          "S04 · 抖动与滞环"
+        ],
+        [
+          [
+            4
+          ],
+          "lab4",
+          "S05 · 双周期不一致"
+        ],
+        [
+          [
+            5
+          ],
+          "lab5",
+          "S06 · 设备故障"
+        ],
+        [
+          [
+            6
+          ],
+          "lab6",
+          "S07 · 雷达失效"
+        ],
+        [
+          [
+            7
+          ],
+          "lab7",
+          "S08 · 使能关闭"
+        ],
+        [
+          [
+            8
+          ],
+          "lab8",
+          "S09 · 周期漏执行"
+        ]
+      ]
     }
   },
   "curriculum": [
@@ -10619,5 +11374,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "day13-20261104-requirements-v1"
+  "release": "day14-20261109-week2-checkpoint-v1"
 }
