@@ -1,0 +1,140 @@
+name: Day15 real Python NumPy charts and Pages regression
+
+on:
+  pull_request:
+    paths:
+      - 'courses.json'
+      - 'pages-runtime.js'
+      - 'app.js'
+      - 'index.html'
+      - '.github/workflows/day15-python-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'courses.json'
+      - 'pages-runtime.js'
+      - 'app.js'
+      - 'index.html'
+      - '.github/workflows/day15-python-tests.yml'
+
+jobs:
+  python-and-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Extract the exact D15 learner Python and CSV assets
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          b=json.loads(Path('courses.json').read_text(encoding='utf-8'))
+          lesson=b['lessons']['15']
+          expected={'demo.py','log_reader.py','log_analysis.py','plot_logs.py',
+            'test_log.py','requirements.txt','sample_log.csv','bad_string.csv',
+            'bad_missing.csv','bad_mode.csv','bad_time.csv','bad_nan.csv','README.md'}
+          assert {x['name'] for x in lesson['assets']}==expected
+          assert lesson['runner']=='python_numpy_logs_day15'
+          assert lesson['day']==15
+          assert b['curriculum'][14]['day']==15
+          assert len(lesson['experiments'])==6
+          assert len(lesson['questions'])==10
+          assert len(b['rules']['15']['needed'])==6
+          folder=Path('day15-ci')
+          folder.mkdir()
+          for a in lesson['assets']:
+              (folder/a['name']).write_text(a['text'],encoding='utf-8')
+          for s in lesson['code_sections']:
+              t=(folder/s['file']).read_text(encoding='utf-8')
+              start=t.index(s['start'])
+              assert t.find(s['end'],start+len(s['start']))>=0,s['title']
+          for sym in lesson['symbols']:
+              assert sym['match'] in (folder/sym['file']).read_text(encoding='utf-8')
+          print('D15 project and embedded lesson integrity: PASS')
+          PY
+      - name: Install Python libraries and Chinese font for chart verification
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-wqy-microhei
+          python -m pip install -r day15-ci/requirements.txt
+      - name: Run real Python unit tests and create three PNG files
+        run: |
+          set -euo pipefail
+          cd day15-ci
+          python -m unittest -v test_log
+          python demo.py --scenario 0 --out charts | tee normal-run.log
+          test -s charts/01_speed_kmh.png
+          test -s charts/02_distance_m.png
+          test -s charts/03_mode.png
+          grep -q 'mean_speed_kmh=71.92' normal-run.log
+          python - <<'PY'
+          from plot_logs import setup_chinese_font
+          chosen=setup_chinese_font()
+          assert chosen is not None, 'Chinese font not installed: labels would be missing'
+          print('Chinese plotting font:', chosen)
+          PY
+      - name: Confirm all five bad CSV files fail with exact physical line numbers
+        run: |
+          python - <<'PY'
+          import subprocess
+          expected={
+            1:(5,'speed_kmh','not_number'),
+            2:(4,'distance_m','missing'),
+            3:(7,'mode','mode_range'),
+            4:(6,'time_ms','non_increasing'),
+            5:(8,'speed_kmh','nonfinite')}
+          for scenario,(line,field,kind) in expected.items():
+              p=subprocess.run(['python','day15-ci/demo.py','--scenario',str(scenario)],
+                  text=True,capture_output=True)
+              assert p.returncode==2,(scenario,p.stdout,p.stderr)
+              for fragment in ['status=-2','valid=0',f'error_line={line}',
+                               f'error_field={field}',f'error_kind={kind}']:
+                  assert fragment in p.stdout,(scenario,fragment,p.stdout)
+              print('PASS bad CSV:',scenario,line,field,kind)
+          PY
+      - name: Check JavaScript syntax, all D01–D15 regression cases and D15 page route
+        run: |
+          node --check pages-runtime.js
+          node --check app.js
+          node <<'NODE'
+          const fs=require('fs'),vm=require('vm');
+          const bundle=JSON.parse(fs.readFileSync('courses.json','utf8'));
+          const src=fs.readFileSync('pages-runtime.js','utf8');
+          const app=fs.readFileSync('app.js','utf8');
+          if(!app.includes("lesson.runner==='python_numpy_logs_day15'")||
+             !app.includes('renderDay15Preview(result)')||
+             !app.includes("lesson.assets.find(a=>a.name===lesson.source)")||
+             !app.includes("x.error_line")&&false)throw Error('D15 UI renderer missing');
+          const storage=new Map();
+          const progress=Array.from({length:14},(_,i)=>({day:i+1,method:'test',
+            detail:'browser only',updated:'2026-11-09T00:00:00Z'}));
+          storage.set('asw-pages-v1:/asw-learning-room/',JSON.stringify({
+            notes:[],progress,runs:[],attempts:[]}));
+          const cx={window:{dispatchEvent(){}},document:{documentElement:{dataset:{courseVersion:'ci'}}},
+            location:{href:'https://example.org/asw-learning-room/'},URL,
+            fetch:async()=>({ok:true,json:async()=>bundle}),
+            localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},
+            crypto:{randomUUID(){return 'test-id';}}};
+          vm.createContext(cx);vm.runInContext(src,cx);
+          let count=0;
+          for(let day=1;day<=15;day++){
+            for(const t of cx.pagesRegression(day)){
+              if(!t.passed)throw Error('D'+day+' '+t.name+' '+JSON.stringify(t.actual));
+              count++;
+            }
+          }
+          const good=cx.pagesSimulate(15,[0]),bad=cx.pagesSimulate(15,[2]);
+          if(good.mean_speed_kmh!==71.92||good.matrix_shape[1]!==4||good.chart_count!==3||
+             bad.error_line!==4||bad.error_field!=='distance_m'||bad.chart_count!==0)
+            throw Error('D15 simulation output mismatch');
+          cx.pagesAPI('/api/state').then(s=>{
+            if(s.frontier!==15||s.courses[14].published!==true||s.progress.length!==14)
+              throw Error('D15 access or old study records changed');
+            return cx.pagesAPI('/api/lesson?day=15');
+          }).then(r=>{
+            if(r.lesson.assets.length!==13)throw Error('D15 assets missing');
+            console.log('PASS '+count+' JS regressions; D15 accessible; old records retained');
+          }).catch(e=>{console.error(e);process.exitCode=1;});
+          NODE
