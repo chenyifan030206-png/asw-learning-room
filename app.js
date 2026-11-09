@@ -508,7 +508,7 @@ $('runButton').onclick=async()=>{
           x.step,x.read_status,x.app_status,x.published,
           x.valid===null?'—':x.valid,x.warning===null?'—':x.warning,
           x.cycle===null?'—':x.cycle,x.fault===null?'—':x.fault,
-          x.age_ms===null?'—':x.age_ms,x.explanation
+          x.age_ms==null?'—':x.age_ms,x.explanation
         ])));
     }
     if(lesson.runner==='acc_monitor_day14'){
