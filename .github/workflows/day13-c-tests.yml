@@ -26,7 +26,7 @@ jobs:
           import json
           from pathlib import Path
           b=json.loads(Path('courses.json').read_text(encoding='utf-8'))
-          assert b['release'].startswith('day13-')
+          assert '13' in b['lessons'], 'D13 must remain published across future course releases'
           lesson=b['lessons']['13']
           assert lesson['day']==13
           folder=Path('day13-ci')
