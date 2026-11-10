@@ -390,6 +390,134 @@
             "把->理解为“指针解引用”是把C语法误套到Python；这里表示注解。"
           ],
           "practice": "改为def speed_mps(x:float)->float: return x/3.6，解释两个:的用途。"
+        },
+        {
+          "name": "分号与换行：一条语句何时结束",
+          "grammar": "print(1); print(2) / 每行一条语句",
+          "explanation": "在C中分号通常结束语句；在Python中通常换行就表示一条简单语句结束。Python也允许分号把两个简单语句写在一行，但它让调试、定位行号变困难，因此教材和ASW日志工程都推荐每行只放一条。冒号用于开启if、for、while、def等缩进块，不是C语句的结束符。",
+          "parts": [
+            [
+              "换行",
+              "结束一条普通语句并进入下一条"
+            ],
+            [
+              ";",
+              "允许同一物理行分隔多个简单语句，不建议滥用"
+            ],
+            [
+              ":",
+              "复合语句头部的结尾，下一行需要缩进"
+            ]
+          ],
+          "example": "print(1)\nprint(2)\nprint(3); print(4)",
+          "trace": [
+            "执行第一行输出1。",
+            "第二行输出2。",
+            "第三行自左向右执行两条简单语句，输出3和4。"
+          ],
+          "expected": "1\n2\n3\n4",
+          "errors": [
+            "不要在每个Python语句后照搬C的分号写法。",
+            "把if条件后写成分号而非冒号会出现语法错误。"
+          ],
+          "practice": "将第三行拆成两行，验证输出不变。"
+        },
+        {
+          "name": "数字里的下划线与名字里的下划线",
+          "grammar": "1_000 / speed_kmh",
+          "explanation": "当下划线位于speed_kmh中，它是这个变量名的一部分，用于分隔英文单词；当它写在1_000中，则是数值字面量的可读性分隔符，不改变数值大小，和数字中的逗号不同。Python允许适当在整数、浮点数中使用下划线以便阅读，但1__000等不符合数字规则。名字里的下划线也不会自动进行km/h到m/s的转换。",
+          "parts": [
+            [
+              "speed_kmh",
+              "一个整体变量名，_不是减法运算"
+            ],
+            [
+              "1_000",
+              "合法的数值字面量，实际等于1000"
+            ],
+            [
+              "1__000",
+              "不合法数字示例，应避免"
+            ]
+          ],
+          "example": "frames = 1_000\nspeed_kmh = 72.0\nprint(frames == 1000)\nprint(speed_kmh / 3.6)",
+          "trace": [
+            "将1_000解析为整数1000。",
+            "frames==1000返回True。",
+            "speed_kmh/3.6进行数值运算并输出20.0。"
+          ],
+          "expected": "True\n20.0",
+          "errors": [
+            "不要把speed_kmh拆成两个变量。",
+            "把_写成减号会变成另外一种表达式。"
+          ],
+          "practice": "分别比较100_000、10_0000、100000的数值结果。"
+        },
+        {
+          "name": "pass、...与占位代码",
+          "grammar": "if condition: pass / def f(): ...",
+          "explanation": "Python复合语句后必须有合法的缩进代码块。没有业务动作时可以暂时写pass，它执行时不做任何事。三个点...在Python中是Ellipsis常量，将它独立放在函数体里也只是一条表达式，不会完成预期的函数逻辑。语法能够正常运行与业务功能已经实现是两回事，编写ASW工具时要为未实现的功能建立清晰的测试。",
+          "parts": [
+            [
+              "pass",
+              "合法空语句，不计算并返回业务数据"
+            ],
+            [
+              "...",
+              "Ellipsis对象，单独使用不代表已实现功能"
+            ],
+            [
+              "缩进",
+              "函数体必须比def头部多一层缩进"
+            ]
+          ],
+          "example": "def a():\n    pass\n\ndef b():\n    ...\nprint(a())\nprint(b())",
+          "trace": [
+            "定义a和b时只创建函数，不立即调用。",
+            "调用a执行pass后自然结束，返回None。",
+            "调用b执行Ellipsis表达式后自然结束，也返回None。"
+          ],
+          "expected": "None\nNone",
+          "errors": [
+            "不要以为pass可以替代真正的日志处理实现。",
+            "写出...也不会自动抛出“尚未实现”异常；如需明确失败可抛NotImplementedError。"
+          ],
+          "practice": "把a()改成return 'OK'，比较返回值的变化。"
+        },
+        {
+          "name": "同一个点号：小数点、属性、方法的区别",
+          "grammar": "72.5 / obj.attribute / obj.method()",
+          "explanation": "在72.5里点号只是数字的小数点；在frame.speed_kmh里，frame表示一个对象，点号是读取其名为speed_kmh的属性；在items.append(3)里点号先找到列表的方法append，后面的括号传入参数3，方法才真正执行。import math之后math.isfinite(72.0)也是通过点号找到模块里的函数。第一次读代码时先判断左边是数字、模块还是对象，避免直接按C中的结构体点号推断Python调用行为。",
+          "parts": [
+            [
+              "72.5",
+              "小数点，和成员访问无关"
+            ],
+            [
+              "items.append",
+              "获得列表的append方法，尚未调用"
+            ],
+            [
+              "(3)",
+              "向取得的方法传入3并调用"
+            ],
+            [
+              "math.isfinite",
+              "从math模块取得isfinite函数"
+            ]
+          ],
+          "example": "import math\nitems = [1, 2]\nitems.append(3)\nprint(items)\nprint(math.isfinite(72.5))",
+          "trace": [
+            "import math使模块名math可用。",
+            "items.append(3)把3追加到原列表。",
+            "math.isfinite(72.5)返回True。"
+          ],
+          "expected": "[1, 2, 3]\nTrue",
+          "errors": [
+            "只写items.append不会改变列表。",
+            "不要将dict['speed']写成dict.speed，因为字典键读取需要方括号。"
+          ],
+          "practice": "分别写items.append和items.append(4)，查看哪一个改变列表。"
         }
       ],
       "code": "speed_kmh = 72\nvalues = [speed_kmh, 73]\nif values[0] == 72:\n    print('满足条件')",
@@ -4509,5 +4637,199 @@
     ]
   ],
   "notesMigration": "沿用现有v2_01..v2_21章节ID供既有批注恢复；新增v3_iteration_tools和v3_comprehensions；对更早V1章节仍保留既有旧笔记查看功能。",
-  "teachingAudit": "参照开源GitHub Python-100-Days真实Day03/06/08章节排序，先讲变量命名、if、for与while，再系统引入enumerate/zip，所有代码和ASW案例原创。"
+  "teachingAudit": "参照开源GitHub Python-100-Days真实Day03/06/08章节排序，先讲变量命名、if、for与while，再系统引入enumerate/zip，所有代码和ASW案例原创。",
+  "symbolGuide": [
+    {
+      "token": "_",
+      "meaning": "名字连接符、临时变量、数字分组符，用在不同位置含义不同",
+      "example": "speed_kmh / for _ in range(3) / 1_000",
+      "pitfall": "不要误认为减号；它不是Python关键字"
+    },
+    {
+      "token": ".",
+      "meaning": "对象或模块成员访问，也可能是数字的小数点",
+      "example": "rows.append(3) / math.isfinite(72.0) / 72.5",
+      "pitfall": "rows.append仅取到方法，后面()才会调用"
+    },
+    {
+      "token": "()",
+      "meaning": "函数调用、运算分组、元组写法、形参声明",
+      "example": "print(x) / (2+3)*4 / def f(x):",
+      "pitfall": "定义def f(x)的括号，与调用f(3)的括号作用不同"
+    },
+    {
+      "token": "[]",
+      "meaning": "列表字面量或下标/切片访问",
+      "example": "[1,2] / values[0] / values[1:3]",
+      "pitfall": "切片末端不包含；下标通常从0开始"
+    },
+    {
+      "token": "{}",
+      "meaning": "创建字典或集合",
+      "example": "{'speed':72} / {1,2} / set()",
+      "pitfall": "{}表示空字典，空集合写set()"
+    },
+    {
+      "token": ":",
+      "meaning": "复合语句代码块、键值对、切片、类型注解等",
+      "example": "if ok: / {'x':1} / values[1:3] / x:float",
+      "pitfall": "同一个符号不同位置，不可一概而论"
+    },
+    {
+      "token": ",",
+      "meaning": "分隔多个值、形参、实参或解包对象",
+      "example": "print(1,2) / (1,) / a,b=(1,2)",
+      "pitfall": "单元素元组必须注意逗号"
+    },
+    {
+      "token": "=",
+      "meaning": "赋值绑定",
+      "example": "speed=72",
+      "pitfall": "不是判断相等"
+    },
+    {
+      "token": "==",
+      "meaning": "值相等比较",
+      "example": "speed==72",
+      "pitfall": "if speed=72:是语法错误"
+    },
+    {
+      "token": "!=",
+      "meaning": "值不相等比较",
+      "example": "speed!=0",
+      "pitfall": "Python取反关键字是not"
+    },
+    {
+      "token": "is",
+      "meaning": "对象身份判断，常用于None",
+      "example": "value is None",
+      "pitfall": "不要用is代替普通数字或字符串的=="
+    },
+    {
+      "token": "in",
+      "meaning": "for遍历的语法关键字或成员关系检查",
+      "example": "for x in values: / 'a' in text",
+      "pitfall": "含义取决于位置"
+    },
+    {
+      "token": "#",
+      "meaning": "字符串外的注释标记",
+      "example": "speed=72 # km/h",
+      "pitfall": "引号中的'#'不是注释"
+    },
+    {
+      "token": "'",
+      "meaning": "字符串定界符，与双引号作用相近",
+      "example": "'radar' / \"radar\"",
+      "pitfall": "'72'是文本，不是72数值"
+    },
+    {
+      "token": "\\",
+      "meaning": "转义字符起始符，有些语境可续行",
+      "example": "'a\\nb' / r'C:\\logs'",
+      "pitfall": "Windows路径容易误把\\n当成换行"
+    },
+    {
+      "token": ";",
+      "meaning": "分隔同一行的多条简单语句（不推荐）",
+      "example": "print(1);print(2)",
+      "pitfall": "Python大部分情况下用换行结束语句"
+    },
+    {
+      "token": "@",
+      "meaning": "装饰器语法，如@dataclass",
+      "example": "@dataclass",
+      "pitfall": "不要当C的地址运算"
+    },
+    {
+      "token": "->",
+      "meaning": "函数返回类型注解",
+      "example": "def f(x:int)->bool:",
+      "pitfall": "不是C里的指针成员访问"
+    },
+    {
+      "token": "*",
+      "meaning": "乘法，也可用于可变位置参数的打包与解包",
+      "example": "2*3 / def f(*args): / f(*items)",
+      "pitfall": "同一符号要根据上下文判断"
+    },
+    {
+      "token": "**",
+      "meaning": "乘方，也用于关键字参数打包/展开",
+      "example": "2**3 / def f(**kwargs):",
+      "pitfall": "不是二级指针"
+    },
+    {
+      "token": "/",
+      "meaning": "普通除法",
+      "example": "7/2",
+      "pitfall": "得到3.5，与C的整型除法不同"
+    },
+    {
+      "token": "//",
+      "meaning": "向下取整除法",
+      "example": "7//2 / -7//2",
+      "pitfall": "负数向负无穷方向取整：-7//2=-4"
+    },
+    {
+      "token": "%",
+      "meaning": "取模运算",
+      "example": "7%2",
+      "pitfall": "负数取模可能不同于C的余数规则"
+    },
+    {
+      "token": "+= / -=",
+      "meaning": "复合赋值",
+      "example": "count+=1",
+      "pitfall": "必须先有可计算的变量"
+    },
+    {
+      "token": "for",
+      "meaning": "从右侧可迭代对象依次取得元素",
+      "example": "for distance in distances:",
+      "pitfall": "for并不自动给循环变量赋数字下标"
+    },
+    {
+      "token": "while",
+      "meaning": "每轮先判断条件为True再执行",
+      "example": "while index<3:",
+      "pitfall": "条件不变可能无限循环"
+    },
+    {
+      "token": "缩进",
+      "meaning": "决定Python代码块范围",
+      "example": "if ok: 后面四空格缩进",
+      "pitfall": "不是只为了好看，缩进改变执行路径"
+    },
+    {
+      "token": "换行",
+      "meaning": "通常结束一条简单语句",
+      "example": "x=1 然后下一行print(x)",
+      "pitfall": "与C分号结束语句的习惯不同"
+    },
+    {
+      "token": "__name__",
+      "meaning": "特殊模块名称，直接运行时常是__main__",
+      "example": "if __name__=='__main__':",
+      "pitfall": "前后各两条下划线"
+    },
+    {
+      "token": "self",
+      "meaning": "表示当前实例的约定参数名",
+      "example": "def step(self, frame):",
+      "pitfall": "不是C指针类型，也不是Python保留关键字"
+    },
+    {
+      "token": "None",
+      "meaning": "表示“没有值”的单例",
+      "example": "value is None",
+      "pitfall": "不同于0、False和空字符串"
+    },
+    {
+      "token": "True / False",
+      "meaning": "布尔真/假常量",
+      "example": "radar_valid=True",
+      "pitfall": "首字母大写"
+    }
+  ]
 }
