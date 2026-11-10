@@ -127,7 +127,7 @@ function openChapter(id){
     state.notes[activeChapter]=$('chapterNote').value;
     saveState();
   }
-  activeChapter=id;state.lastChapter=id;showPanel('chapter');
+  activeChapter=id;state.lastChapter=id;saveState();showPanel('chapter');
   const target=$('chapterPanel');target.replaceChildren();
   const card=node('div',undefined,'chapter');
   card.append(node('div',chapter.phase+' · 建议'+chapter.minutes+'分钟','phaseTag'));
