@@ -1996,8 +1996,8 @@
     {
       "id": "dataclass",
       "phase": "工程对象",
-      "title": "16 · class、__init__、self、@dataclass和C结构体比较",
-      "minutes": 45,
+      "title": "16 · 类与对象：从属性点号到__init__/self/结构体返回",
+      "minutes": 96,
       "goal": "理解Python对象、方法与存储状态，连接D14的MonitorContext/MonitorResult。",
       "story": [
         "C的struct主要组织数据；Python的class能把数据和操作封装在一个对象中。class Monitor定义一个类型，monitor=Monitor()创建实例，__init__在创建时执行初始化，self表示当前这个实例。",
@@ -2026,16 +2026,138 @@
         "answer": 1,
         "why": "对象保留跨帧状态；每轮新建会重置previous_alert。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "class到底定义了什么，实例到底是什么",
+          "syntax": "class Monitor: ... / monitor = Monitor()",
+          "explain": "class定义一个可用于创建对象的类；它可以组织数据和方法。写class Monitor:只创建类型定义，不会自动处理一帧数据；写monitor=Monitor()才会创建一个实例。与C结构体都能把相关信息组合起来，但Python的类还可以定义行为；它不是按C语言结构体原样摆放字节的替代。使用实例属性时写monitor.previous_alert，点号是取这个对象的成员。",
+          "code": "class Monitor:\n    pass\n\nmonitor = Monitor()\nprint(type(monitor).__name__)",
+          "output": "Monitor",
+          "trace": [
+            "执行class定义，创建Monitor类对象。",
+            "Monitor()调用类创建实例。",
+            "type查看这个实例的类型名称Monitor。"
+          ],
+          "mistake": "C里的MonitorResult只是结构体类型，Python的class对象更灵活；不要把两个内存模型强行等同。",
+          "exercise": "定义class Sensor: pass并创建两个不同实例，比较它们的id。"
+        },
+        {
+          "title": "__init__在什么时候运行：实例创建时初始化",
+          "syntax": "def __init__(self): self.alert = False",
+          "explain": "__init__两端各有两个下划线，叫做对象初始化方法。执行Monitor()时先创建实例，然后通常调用__init__来初始化属性；每一个新实例都有自己的self.alert。通常不手动调用__init__，创建一次对象就初始化一次。连续处理7帧需要将实例创建放在循环外，否则前帧状态总会被重置。",
+          "code": "class Monitor:\n    def __init__(self):\n        print('初始化一次')\n        self.alert = False\n\nm = Monitor()\nprint(m.alert)",
+          "output": "初始化一次\nFalse",
+          "trace": [
+            "定义类和__init__方法，暂不执行初始化打印。",
+            "m=Monitor()创建实例，自动调用__init__。",
+            "self.alert赋False。",
+            "返回外层后读取m.alert并打印。"
+          ],
+          "mistake": "把m=Monitor()放进for循环内，会重复初始化并丢失上一帧状态。",
+          "exercise": "先创建两个Monitor实例m1,m2，将m1.alert设True，观察m2.alert是否变化。"
+        },
+        {
+          "title": "self到底是什么：实例方法的第一个参数",
+          "syntax": "monitor.step(34) → Monitor.step(monitor,34)",
+          "explain": "self是实例方法中对当前实例的常见第一个形参名称，它不是保留关键字，但社区规范几乎都这样写。调用m.step(34)时，Python把实例m绑定给self，把34绑定给distance。方法体通过self.alert读取/修改该实例的状态。不要把self与C的指针运算符*或->直接划等号；理解“当前对象是谁”更重要。",
+          "code": "class Monitor:\n    def __init__(self):\n        self.alert = False\n    def step(self, distance):\n        self.alert = distance <= 35\n        return self.alert\n\nm = Monitor()\nprint(m.step(34))\nprint(m.alert)",
+          "output": "True\nTrue",
+          "trace": [
+            "创建实例m，初始alert=False。",
+            "m.step(34)让self绑定m，distance绑定34。",
+            "self.alert设True并返回True。",
+            "外部再次读取m.alert仍为True。"
+          ],
+          "mistake": "定义def step(distance):会导致实例绑定和参数数量不匹配（默认实例方法约定需要self）。",
+          "exercise": "写出m.step(34)的显式类调用形式Monitor.step(m,34)。"
+        },
+        {
+          "title": "属性和方法：.后没有括号与有括号有什么区别",
+          "syntax": "monitor.alert / monitor.step(34)",
+          "explain": "monitor.alert是从实例读取名为alert的属性值；monitor.step是取得绑定到该实例的方法对象；monitor.step(34)才真正调用它。不要以为点号右侧的任何名称都会自动执行。Python对象上也可动态设置普通属性，例如m.count=3，但工程中的正式类型应清楚声明属性和用途。",
+          "code": "class Counter:\n    def __init__(self):\n        self.count = 0\n    def add(self):\n        self.count += 1\n\nc = Counter()\nprint(c.count)\nc.add()\nprint(c.count)",
+          "output": "0\n1",
+          "trace": [
+            "初始化count=0。",
+            "第一次读取c.count得到0。",
+            "c.add()调用方法并把count加1。",
+            "第二次读取count得到1。"
+          ],
+          "mistake": "c.add不会调用方法；仅取得方法对象。",
+          "exercise": "在c.add()之后再执行c.add一次，记录count变化。"
+        },
+        {
+          "title": "@dataclass：为什么Frame和Decision能写得很短",
+          "syntax": "@dataclass\\nclass Frame:\\n    speed_kmh: float",
+          "explain": "dataclasses是Python标准库。@dataclass写在class前，表示对后续类定义应用一个装饰器，自动生成如__init__、__repr__、__eq__等常见方法（细节受参数影响）。因此可以写Frame(speed_kmh=72.0,valid=True)创建数据实例，而无需手写初始化方法。这里的speed_kmh: float依然是类型注解，不自动验证CSV文本或范围。数据类适合承载Frame、Decision等结构化对象。",
+          "code": "from dataclasses import dataclass\n@dataclass\nclass Frame:\n    speed_kmh: float\n    valid: bool\n\nf = Frame(speed_kmh=72.0, valid=True)\nprint(f.speed_kmh)\nprint(f)",
+          "output": "72.0\nFrame(speed_kmh=72.0, valid=True)",
+          "trace": [
+            "导入dataclass装饰器。",
+            "执行类定义时装饰器生成初始化等方法。",
+            "Frame(...)创建实例，属性获得传入值。",
+            "f.speed_kmh读取成员。"
+          ],
+          "mistake": "不能认为@dataclass自动检查0–250速度范围或拒绝字符串；工程仍需自行验证。",
+          "exercise": "创建Result数据类，包含status、valid、alert三个属性并实例化。"
+        },
+        {
+          "title": "函数返回对象：对比C结构体返回值",
+          "syntax": "def step(...) -> Decision: return Decision(...)",
+          "explain": "在C里MonitorResult Monitor_Step(...)的返回类型是结构体；Python可以写def step(...) -> Decision:，其中-> Decision是类型提示，真正返回值由return Decision(...)创建并返回。调用者decision=monitor.step(frame)后可以decision.status取得成员。Python返回对象的引用并由自动内存管理负责其生命周期，不等于C的结构体按值复制；现阶段关注相同的数据流：业务计算多个字段→组合为结构化结果→调用者按字段使用。",
+          "code": "from dataclasses import dataclass\n@dataclass\nclass Decision:\n    status: str\n    valid: bool\n\ndef check(x) -> Decision:\n    return Decision('ACTIVE', x > 0)\n\nresult = check(34)\nprint(result.status, result.valid)",
+          "output": "ACTIVE True",
+          "trace": [
+            "定义Decision数据类型，包含两个字段。",
+            "check(34)进入函数，创建Decision('ACTIVE',True)。",
+            "return交还对象，调用者将其绑定给result。",
+            "按result.status与result.valid读取字段。"
+          ],
+          "mistake": "-> Decision不意味着Python自动创建Decision，只有return里的构造才创建对象。",
+          "exercise": "改成return Decision('INVALID',False)并解释调用者读取结果如何改变。"
+        },
+        {
+          "title": "实例状态如何跨帧保存：滞环为什么需要它",
+          "syntax": "self.previous_alert",
+          "explain": "一个Monitor实例中的previous_alert会在连续调用step()之间保留；这相当于C中MonitorContext跨帧保存状态。35m及以下开启，41m及以上关闭，35～41间保持原值（教学标定而非真实ACC控制规则）。如果每帧都创建一个新Monitor实例，38m时会忘记之前34m触发的告警。",
+          "code": "class Monitor:\n    def __init__(self):\n        self.alert = False\n    def step(self, d):\n        if not self.alert and d <= 35:\n            self.alert = True\n        elif self.alert and d >= 41:\n            self.alert = False\n        return self.alert\nm = Monitor()\nfor distance in [45,34,38,42]:\n    print(m.step(distance))",
+          "output": "False\nTrue\nTrue\nFalse",
+          "trace": [
+            "初始alert=False，距离45不触发。",
+            "距离34设置True。",
+            "距离38保留True。",
+            "距离42达到关闭阈值，设False。"
+          ],
+          "mistake": "把m=Monitor()移进for循环后38m不会保持告警；这是状态对象生命周期问题。",
+          "exercise": "实际交换创建位置，记录两组结果并解释。"
+        },
+        {
+          "title": "类属性、实例属性及对象别名",
+          "syntax": "self.x vs Class.x",
+          "explain": "self.x通常是实例属性，每个实例有自己的存储关系；类定义体中的Class.x是类属性，多个实例在没有同名实例属性遮蔽时可读取共享的类属性。初学者不要把跨帧状态放在可变类属性上，否则多个测试实例可能相互影响。两个名字m2=m1仍指向同一实例，并不会复制对象。",
+          "code": "class Sensor:\n    unit = 'km/h'\n    def __init__(self):\n        self.value = 0\n\na = Sensor()\nb = Sensor()\na.value = 72\nprint(b.value)\nprint(a.unit)",
+          "output": "0\nkm/h",
+          "trace": [
+            "Sensor.unit在类上定义。",
+            "a、b分别是两个实例，各自初始化value=0。",
+            "修改a.value不改变b.value。",
+            "a.unit访问类属性unit。"
+          ],
+          "mistake": "不要把可变列表作为类属性共享给所有实例，除非这是明确的设计。",
+          "exercise": "写出a is b结果；再令c=a，写出a is c结果并解释。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02：点号和双下划线；13：函数调用与return；15：跨模块"
+      ],
+      "chapterSummary": "能准确区分class定义、对象创建、__init__初始化、self方法调用、@dataclass及结构化对象返回值。"
     },
     {
       "id": "files",
       "phase": "工程输入输出",
-      "title": "17 · pathlib、with open、CSV、JSON和数据边界",
-      "minutes": 45,
+      "title": "17 · 文件、路径、with、CSV与JSON：从数据到结果",
+      "minutes": 84,
       "goal": "读懂本项目为什么把CSV读取、业务处理、JSON输出分成模块。",
       "story": [
         "Python可以直接读文件，但应清楚文本与数值之间的边界。reader.py用csv.DictReader读取每一行的字典，再用int/float转换成Frame对象。DictReader让字段名明确，但原CSV仍可能有缺列、空值、NaN、非法模式等情况。",
@@ -2063,16 +2185,119 @@
         "answer": 1,
         "why": "CSV是文本格式，必须显式转换并校验。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "路径是什么：Path与工作目录的关系",
+          "syntax": "Path('sample.csv') / Path(__file__).resolve().parent",
+          "explain": "文件名不是自动指向某个磁盘位置。相对路径通常相对于当前工作目录；Path.cwd()显示工作目录，Path(__file__).resolve().parent得到脚本所在文件夹（脚本环境）。使用pathlib.Path组合路径、检查exists与读取文件较跨平台。C里的相对文件路径也受运行目录影响，所以这个概念可以迁移。",
+          "code": "from pathlib import Path\npath = Path('sample.csv')\nprint(path.name)\nprint(path.suffix)",
+          "output": "sample.csv\n.csv",
+          "trace": [
+            "Path创建一个路径对象，不代表文件已经存在。",
+            ".name得到文件名。",
+            ".suffix得到扩展名。"
+          ],
+          "mistake": "Path('sample.csv')创建对象不会自动打开文件；必须显式调用open/read_text等。",
+          "exercise": "创建Path('data')/'sample.csv'，解释/在两个Path间表示路径拼接而非数值除法。"
+        },
+        {
+          "title": "with...as：为什么文件要在块里打开",
+          "syntax": "with open('file.txt') as f: ...",
+          "explain": "with是上下文管理语法。open返回文件对象，with会在进入和退出代码块时管理资源；as f绑定文件对象到名字f。即使在with块内发生异常，通常也会正确关闭文件。建议文本模式明确encoding='utf-8'，CSV使用newline=''让csv处理换行。",
+          "code": "from pathlib import Path\npath = Path('demo.txt')\nwith path.open('w', encoding='utf-8') as f:\n    f.write('radar')\nwith path.open('r', encoding='utf-8') as f:\n    print(f.read())",
+          "output": "radar",
+          "trace": [
+            "第一次with以写入方式打开，f.write写入radar。",
+            "离开块后文件关闭。",
+            "第二次with读取文本，并打印内容。"
+          ],
+          "mistake": "打开文件使用'w'会覆盖现有内容；不想丢文件必须选对模式、备份原始日志。",
+          "exercise": "把写入模式改成'a'追加，运行两次，解释为什么文件内容变化。"
+        },
+        {
+          "title": "read、readline、for line in file与内存占用",
+          "syntax": "f.read() / for line in f:",
+          "explain": "read()通常读取文件剩余全部文本；readline()读取一行；for line in f逐行遍历，对于很大日志更节省内存。文件每行末尾通常含换行符，常用rstrip('\\n')去除，但不应随意strip所有空白导致字段内容失真。遍历文件一次后文件指针位于末尾，再想读取需要重新打开或seek。",
+          "code": "from pathlib import Path\nPath('demo.txt').write_text('A\\nB\\n', encoding='utf-8')\nwith open('demo.txt', encoding='utf-8') as f:\n    for line in f:\n        print(line.rstrip('\\n'))",
+          "output": "A\nB",
+          "trace": [
+            "先写入两行文本。",
+            "for在文件对象中逐行取得'A\\n'与'B\\n'。",
+            "rstrip去掉结尾换行后再打印。"
+          ],
+          "mistake": "遍历文件对象不等于把它自动转换成所有数值；数据仍是str。",
+          "exercise": "把文件改成三行时间戳文本，逐行输出并计数。"
+        },
+        {
+          "title": "为什么真实CSV不能只用split(',')",
+          "syntax": "csv.reader / csv.DictReader",
+          "explain": "CSV可能包含被引号包围的逗号字段，例如\"radar,front\"是一个字段而非两个；字符串split(',')不能正确处理完整CSV规则。标准库csv.reader返回按列排列的字符串列表；csv.DictReader使用首行列名映射为每行字典。读取到的是文本，即使速度列写72.0，仍需要float转换并校验。",
+          "code": "import csv\nfrom io import StringIO\nraw = 'name,speed\\n\"radar,front\",72.0\\n'\nrows = list(csv.DictReader(StringIO(raw)))\nprint(rows[0]['name'])\nprint(type(rows[0]['speed']).__name__)",
+          "output": "radar,front\nstr",
+          "trace": [
+            "StringIO构造供csv读取的文本文件对象。",
+            "DictReader用name/speed作为键。",
+            "正确把引号包住的逗号保留在name字段内。",
+            "speed仍然是str。"
+          ],
+          "mistake": "直接split(',')会把radar,front错误拆成两列，破坏字段位置。",
+          "exercise": "将速度字段改成oops，设计解析失败时打印字段名和CSV行号。"
+        },
+        {
+          "title": "字符串→Frame对象的校验顺序",
+          "syntax": "int(row['time_ms']); float(row['speed_kmh'])",
+          "explain": "解析顺序建议先核对表头/列数/空值，再进行类型转换，之后检查是否有限、单位和范围，最后才创建结构化Frame对象。如果某一行非法，应报告文件原物理行、字段和原因，而不是静默跳过它导致后续时间对齐错误。csv.DictReader.line_num反映读取到的物理行位置，在多行引号字段时可能大于记录条数。",
+          "code": "raw = {'time_ms':'20','speed_kmh':'72.0'}\ntime_ms = int(raw['time_ms'])\nspeed_kmh = float(raw['speed_kmh'])\nprint(time_ms + 20, speed_kmh / 3.6)",
+          "output": "40 20.0",
+          "trace": [
+            "字典中存储的是字符串。",
+            "int、float分别解析文本。",
+            "数值运算得到40和20.0。"
+          ],
+          "mistake": "float('nan')转换可能成功，随后仍要用math.isfinite()检查。",
+          "exercise": "为两个字段加入不为空检查、异常捕获和有限数检查。"
+        },
+        {
+          "title": "JSON：数据字典怎样保存，不等于Python源码",
+          "syntax": "json.dump(data,file) / json.loads(text)",
+          "explain": "JSON是跨语言文本数据格式，常用来保存测试输出。Python中的dict可由json.dump写为JSON；json.load从文件解析，json.loads从字符串解析。Python布尔True/False写入JSON会成为true/false，Python None成为null。不要将JSON中的true当作可直接复制到Python脚本里的布尔常量，二者语法不同。",
+          "code": "import json\nresult = {'status':'ACTIVE','valid':True,'alert':False}\ntext = json.dumps(result, ensure_ascii=False)\nprint(text)\nprint(json.loads(text)['valid'])",
+          "output": "{\"status\": \"ACTIVE\", \"valid\": true, \"alert\": false}\nTrue",
+          "trace": [
+            "json.dumps把Python字典序列化为JSON字符串。",
+            "True/False写成JSON小写true/false。",
+            "json.loads解析后恢复Python布尔值。"
+          ],
+          "mistake": "JSON格式不允许任意Python表达式，不能用eval替代json.loads解析外部输入。",
+          "exercise": "将结果字典保存到results.json并读回，核对valid字段类型。"
+        },
+        {
+          "title": "数据来源、输出目录与文件异常",
+          "syntax": "FileNotFoundError / PermissionError / OSError",
+          "explain": "真实工程里文件可能不存在、路径错误、权限不足或编码不匹配。try/except捕获明确的OSError或ValueError可以向用户报告位置和原因，但不应在错误时虚构一份有效结果。输出目录可能还没创建，Path(...).parent.mkdir(parents=True,exist_ok=True)创建父目录；保存正式实验日志时应避免不经确认覆盖原始文件。",
+          "code": "from pathlib import Path\npath = Path('reports') / 'result.json'\npath.parent.mkdir(parents=True, exist_ok=True)\nprint(path.parent.name)",
+          "output": "reports",
+          "trace": [
+            "Path用/把目录reports和文件result.json组合。",
+            "parent取得父目录reports。",
+            "mkdir创建目录（已存在则不报错）。",
+            "打印父目录名称。"
+          ],
+          "mistake": "mkdir创建目录并不创建result.json文件；写入操作必须另行执行。",
+          "exercise": "写一个不存在的文件路径，捕获FileNotFoundError并解释。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02：点号/括号；06：字符串；11：dict；13–16：函数与对象"
+      ],
+      "chapterSummary": "能把CSV文本逐行解析并校验为Frame，使用with管理资源、JSON保存结果，并区分路径与实际文件。"
     },
     {
       "id": "exceptions",
       "phase": "工程输入输出",
-      "title": "18 · try / except / raise：异常与返回状态",
-      "minutes": 40,
+      "title": "18 · 异常处理与程序状态：try、except、raise逐层解释",
+      "minutes": 72,
       "goal": "处理损坏数据和程序错误，学会区分异常、状态返回和退出码。",
       "story": [
         "当float('oops')转换失败时会抛ValueError；当文件不存在时会抛FileNotFoundError（属于OSError的子类）；当索引越界时会抛IndexError。异常不是说整个Python语言坏了，而是正在执行的操作无法按约定完成。",
@@ -2100,16 +2325,106 @@
         "answer": 1,
         "why": "应保留可定位的错误信息，禁止无声掩盖异常。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "错误有不同种类：SyntaxError、ValueError、TypeError等",
+          "syntax": "try: ... except ValueError: ...",
+          "explain": "SyntaxError通常来自语法错误，很多时候代码无法进入正常执行；ValueError表示类型合法但值不适合某操作，例如float('abc')；TypeError常见于不兼容参数类型；FileNotFoundError表示文件不存在。这些都是异常类型，Python会向调用栈上传播，直到找到合适的except或程序失败退出。不能把业务status='INVALID'简单等同于抛出的异常。",
+          "code": "try:\n    speed = float('oops')\nexcept ValueError:\n    print('输入不是数字')",
+          "output": "输入不是数字",
+          "trace": [
+            "float转换抛ValueError。",
+            "控制流跳到匹配的except ValueError。",
+            "执行打印，try里失败语句之后的正常语句不执行。"
+          ],
+          "mistake": "不应写except: pass来吞掉所有错误，无法定位实际故障。",
+          "exercise": "改成float('72.0')，看except为什么不会运行。"
+        },
+        {
+          "title": "try/except/else/finally四部分各负责什么",
+          "syntax": "try: A / except: B / else: C / finally: D",
+          "explain": "try放可能失败的操作；匹配异常时except处理；若try块未抛异常，else可执行成功后逻辑；finally在离开这个try语句时通常执行清理动作，无论是否发生异常。不同于if/else，这是异常控制流。若在finally中又抛异常或return，可能影响之前的异常/返回，初学时应保持简单。",
+          "code": "try:\n    value = float('72.0')\nexcept ValueError:\n    print('失败')\nelse:\n    print('成功', value)\nfinally:\n    print('处理结束')",
+          "output": "成功 72.0\n处理结束",
+          "trace": [
+            "float成功不抛ValueError。",
+            "except跳过。",
+            "else执行成功分支。",
+            "finally执行收尾打印。"
+          ],
+          "mistake": "finally不等于程序永远不可能中断；例如进程被强制终止等情形不能指望它一定执行。",
+          "exercise": "把'72.0'改成'oops'，预测输出顺序。"
+        },
+        {
+          "title": "raise主动拒绝非法字段",
+          "syntax": "raise ValueError('解释')",
+          "explain": "发现速度超范围时，Python不会自动知道工程合同，因此应由你主动判断并raise ValueError说明原因。异常对象包含错误消息，可以被调用者捕获。异常在调用栈向上传播，谁最适合决定错误是否终止整个文件解析，谁就在对应层捕获；reader里抛出带行号异常，main里打印并返回退出码是常见分层。",
+          "code": "def parse_speed(x):\n    speed = float(x)\n    if not 0 <= speed <= 250:\n        raise ValueError('速度超范围')\n    return speed\n\ntry:\n    parse_speed('300')\nexcept ValueError as exc:\n    print(exc)",
+          "output": "速度超范围",
+          "trace": [
+            "调用parse_speed('300')。",
+            "float成功得到300。",
+            "范围检查失败，raise ValueError。",
+            "外层except绑定异常对象exc并打印。"
+          ],
+          "mistake": "try/except不应该绕过范围检查；遇到超范围绝不能只return0假装有效。",
+          "exercise": "为parse_speed增加math.isfinite，以拒绝NaN和inf。"
+        },
+        {
+          "title": "异常链：from exc告诉你原始原因",
+          "syntax": "raise ValueError('第4行车速不合法') from exc",
+          "explain": "当底层float转换抛异常，较上层知道行号和列名时，可以捕获并用raise新的ValueError from exc保留原始异常链。这样终端Traceback既有底层原因，也有工程层解释；在日志解析中很实用。若只写raise新异常没有from，原始上下文仍可能显示，但明确的异常链更利于理解因果。",
+          "code": "try:\n    try:\n        float('bad')\n    except ValueError as exc:\n        raise ValueError('第4行speed_kmh无法解析') from exc\nexcept ValueError as exc:\n    print(exc)",
+          "output": "第4行speed_kmh无法解析",
+          "trace": [
+            "最内层float抛ValueError。",
+            "中间except捕获原始错误。",
+            "raise ... from exc产生带原因链的新异常。",
+            "外层捕获并输出工程信息。"
+          ],
+          "mistake": "不要直接吞掉原始异常而只输出“失败”；行号和字段是定位日志错误的关键。",
+          "exercise": "在本地故意取消外层except，阅读完整Traceback中的两个异常。"
+        },
+        {
+          "title": "什么时候return invalid、什么时候raise错误",
+          "syntax": "return Decision(valid=False) vs raise ValueError",
+          "explain": "两种都可能有用，但角色不同。雷达标志为False是一条数据在业务上可预期的失效状态，可以返回Decision(status='INVALID',valid=False)供主程序显示/统计；CSV列数缺失或文本不能转换成数字，意味着输入格式破坏，通常应raise并拒绝对整份日志生成有效结论。不能用异常处理代替所有业务状态机分支，也不能把格式损坏变成正常的业务invalid从而丢失诊断。",
+          "code": "def check_flag(valid):\n    if not valid:\n        return {'status':'INVALID','valid':False}\n    return {'status':'ACTIVE','valid':True}\nprint(check_flag(False))",
+          "output": "{'status': 'INVALID', 'valid': False}",
+          "trace": [
+            "flag False属于预期业务输入。",
+            "函数返回结构化无效结果，不抛异常。"
+          ],
+          "mistake": "“status=0”不自动说明“valid=True”；返回状态与有效性字段要独立。",
+          "exercise": "设计两个案例：一个雷达无效，一个CSV字段为空，分别决定return还是raise。"
+        },
+        {
+          "title": "未捕获异常的调用栈：谁调用谁就怎样回溯",
+          "syntax": "main→run→reader→float",
+          "explain": "如果reader内部抛异常、run没有捕获，异常会传回main；main可统一打印文件名、行号。Traceback按照调用栈展示发生的文件/行信息，通常从最后一行看异常类别，再回到上层调用过程。VS Code可打开异常断点、逐步进入函数观察局部变量。不要因为报错发生在reader就只检查reader，传入的路径和字段可能由main决定。",
+          "code": "def read():\n    return float('bad')\ndef run():\n    return read()\ntry:\n    run()\nexcept ValueError:\n    print('main处理了read错误')",
+          "output": "main处理了read错误",
+          "trace": [
+            "顶层调用run。",
+            "run再调用read。",
+            "read抛出ValueError，向上经过run。",
+            "顶层except捕获并打印。"
+          ],
+          "mistake": "不等于run执行失败后自动“继续下一帧”；异常未捕获会打断当前调用链。",
+          "exercise": "删掉except并阅读Traceback显示的三个调用位置。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "07：if；13：return；15：函数调用；17：CSV"
+      ],
+      "chapterSummary": "能区分输入解析异常和正常业务无效状态，逐层追踪raise传播、except捕获与程序退出码。"
     },
     {
       "id": "debug",
       "phase": "调试测试",
-      "title": "19 · 打印、断点、Traceback和单元测试",
-      "minutes": 40,
+      "title": "19 · 调试和自动化验证：print、断点、Traceback、unittest",
+      "minutes": 72,
       "goal": "从错误信息找到文件、行号、函数调用栈，能写最小unittest。",
       "story": [
         "Python错误往往显示Traceback，末尾给出异常类型和信息，往上能看到各层函数调用文件及行号。面对异常不要只看最后一行，也要找到它发生在哪个函数、谁调用它。",
@@ -2137,10 +2452,98 @@
         "answer": 1,
         "why": "断言是验证需求的证据，不应为了绿灯随意改变预期。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "从输出定位问题：print不是return，也不是长期日志系统",
+          "syntax": "print(f'frame={i} status={s}')",
+          "explain": "最小调试先在关键边界打印输入、状态和返回值，核对预期与实际。print适合入门，生产工具更常使用logging模块的级别和结构化记录。调试时应输出时刻ms、速度单位、雷达valid和状态，而不是只打印“到这里了”。日志输出不应泄露个人数据和系统秘密。",
+          "code": "distance = 34\nvalid = True\nprint(f'distance_m={distance} valid={valid}')",
+          "output": "distance_m=34 valid=True",
+          "trace": [
+            "读取两个变量。",
+            "f-string把它们格式化成带字段名的文本。"
+          ],
+          "mistake": "只看到print执行并不能证明算法正确；仍需对照预期断言。",
+          "exercise": "增加frame_index和status，让一行日志包含输入、输出、时间。"
+        },
+        {
+          "title": "Traceback逐层定位和断点调试",
+          "syntax": "文件行号→函数名→异常类型",
+          "explain": "Traceback把异常传播过程中相关函数调用位置列出来。VS Code断点允许程序暂停在某行，逐步进入step into、逐步跳过step over和跳出step out，用变量面板看当前frame对象和previous_alert。学习多文件执行链时，比反复猜测更直观。调试器只显示真实执行路径，浏览器教学页并未执行Python，不能代替本地调试。",
+          "code": "def step(x):\n    result = x + 1\n    return result\nprint(step(3))",
+          "output": "4",
+          "trace": [
+            "在step里result=x+1设断点。",
+            "运行到该行观察x=3。",
+            "单步执行result得到4。",
+            "return返回4，恢复外层print。"
+          ],
+          "mistake": "程序运行到断点才会暂停；不能以为在函数定义行加断点意味着函数创建时就进入业务体。",
+          "exercise": "在本地VS Code给monitor.step里条件判断加断点，观察一帧的输入/状态。"
+        },
+        {
+          "title": "assert、unittest与测试预期的来源",
+          "syntax": "self.assertEqual(actual,expected)",
+          "explain": "assert用于表达断言，unittest框架提供assertEqual、assertAlmostEqual、assertRaises等常用方法。测试预期应该从明确需求或人工推导得到，不应等程序输出后把错误值照抄为预期。浮点结果可能有舍入差，通常用assertAlmostEqual而不是完全等于。独立测试文件可以import业务函数而不启动demo入口。",
+          "code": "import unittest\n\ndef kmh_to_mps(x):\n    return x / 3.6\n\nclass TestUnits(unittest.TestCase):\n    def test_72(self):\n        self.assertAlmostEqual(kmh_to_mps(72),20.0)\n\nif __name__ == '__main__':\n    unittest.main()",
+          "output": "运行测试时显示1项测试通过（格式随版本而异）。",
+          "trace": [
+            "运行脚本满足__main__条件。",
+            "unittest发现test_72测试方法。",
+            "调用kmh_to_mps(72)得到20并与预期比较。"
+          ],
+          "mistake": "在优化模式-O下普通assert可能被移除，工程测试优先使用测试框架而不是把assert当输入验证。",
+          "exercise": "增加0km/h和90km/h两个测试，验证0与25m/s。"
+        },
+        {
+          "title": "测试用例怎样覆盖边界而不是只测正常值",
+          "syntax": "35、41、100、101四个边界",
+          "explain": "对35/41m滞环和100ms数据年龄，应检查阈值恰好等于时的行为以及刚超过时的行为，避免只跑正常样例。检查有效性、错误注入、恢复帧和时间戳边界。对于离线教学监视器，业务阈值由课程定义，不代表真实ACC量产安全需求。",
+          "code": "distances = [34.9,35.0,35.1,40.9,41.0]\nprint([d <= 35.0 for d in distances])",
+          "output": "[True, True, False, False, False]",
+          "trace": [
+            "对每个距离执行<=35判断。",
+            "35.0包含在触发边界。",
+            "35.1不触发新告警；已触发告警的保持与关闭需要跨帧状态机测试。"
+          ],
+          "mistake": "这个列表推导式只说明首次触发条件，不能代替滞环状态测试，因为缺少历史alert。",
+          "exercise": "编写test_hysteresis用一个Monitor实例连续处理[45,34,38,41]。"
+        },
+        {
+          "title": "故障注入→测试失败→修复通过",
+          "syntax": "baseline PASS → injected FAIL → fix PASS",
+          "explain": "先记录基线PASS，再在个人工程副本中故意把<=35改成<=40，用已有unittest发现差异，最后恢复阈值并再次通过。三份日志构成明确的回归证据；改测试预期让测试绿灯不算修复。其他可注入的错误包括跨帧状态重置、错误单位换算、跳过CSV非法行及把bool('0')当False等。",
+          "code": "## 本节是操作清单，不是Python可直接执行的片段。\n# 1. python3 -m unittest -v test_pipeline\n# 2. 将monitor.py中的 <= 35.0 改成 <= 40.0\n# 3. 重新执行test_pipeline，观察FAIL\n# 4. 恢复 <= 35.0，复测PASS",
+          "output": "期望：基线PASS → 故障注入FAIL → 恢复PASS",
+          "trace": [
+            "运行原始测试保存日志。",
+            "临时修改业务代码。",
+            "观察原测试检测出错误。",
+            "恢复代码并复测。"
+          ],
+          "mistake": "不要将“GitHub Actions参考源码通过”写成“学员本地已经通过”。",
+          "exercise": "在自己本地复制工程完成流程，保留测试命令和原始终端输出。"
+        },
+        {
+          "title": "unittest的发现规则与测试隔离",
+          "syntax": "python -m unittest -v test_pipeline",
+          "explain": "unittest通过命令行模块方式运行，test_pipeline.py里的TestCase类和test_前缀方法会被发现。本地测试不应依赖此前网页选择了哪个场景，也不应修改私有学习记录。每个测试尽量创建独立Monitor对象和临时输出目录，避免测试顺序相互污染。",
+          "code": "import unittest\nclass TestCalc(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(2+3,5)\n\nif __name__ == '__main__':\n    unittest.main()",
+          "output": "运行显示1项测试通过。",
+          "trace": [
+            "TestCase类被测试运行器发现。",
+            "执行test_add，断言2+3等于5。",
+            "全部测试完成后打印结果。"
+          ],
+          "mistake": "单元测试不是只在页面用JavaScript模拟运算；需在Python解释器里真实执行。",
+          "exercise": "把预期5暂改成6，观察失败说明，再恢复5。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "13–18：函数、类、文件和异常"
+      ],
+      "chapterSummary": "会使用打印、调试器、测试框架和故障注入定位错误，并能明确什么证据才算真正本地Python运行。"
     },
     {
       "id": "fullflow",
