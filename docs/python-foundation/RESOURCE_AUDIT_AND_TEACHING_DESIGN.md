@@ -78,7 +78,7 @@
 
 ### V2具体交付与验收
 
-- 独立新版`python-foundation-v2-content.json`：21章、102个`details`语法小节，每节包含写法、解说、符号表、可复制代码、执行追踪、预期输出、常见错误与修改任务。第03章11种标点/特殊符号，第08章12种完整循环语法。
+- 独立新版`python-foundation-v2-content.json`：21章、102个`details`语法小节，每节包含写法、解说、符号表、可复制代码、执行追踪、预期输出、常见错误与修改任务。第02章11种标点/特殊符号，第08章12种完整循环语法。
 - 原教材文件不删除；新的v2章节key独立分配，不将旧笔记错误挂到改变顺序的章节。
 - `python-foundation.html`的知识点结构直接渲染在正文中；保留现有C→Python对照、个人笔记、逐文件代码注释、划线批注、下载项目ZIP及后续原D15链接。
 - `tests/python_foundation_v2_examples.py`在GitHub Actions中以真实Python实际执行教材例子，核对输出；`tests/python_foundation_browser.py`在浏览器里验证章节跳转、旧笔记可见、新笔记保存/刷新后保留、完整源码及ZIP。
