@@ -55,9 +55,9 @@
       "minutes": 25,
       "goal": "理解脚本入口、解释器、文件路径与执行次序，不把import和调用混在一起。",
       "story": [
-        "假设你要检查车速传感器日志。先不要接触NumPy：Python可以直接运行一个.py文件，让计算机按顺序执行顶部语句。与C工程先编译再运行不同，常见的Python使用方式是让Python解释器执行脚本；导入模块时也会执行模块的顶层语句一次。",
-        "打开终端并进入保存脚本的目录，输入python3 main.py（Windows常用py -3 main.py）。如果提示找不到文件，检查当前目录；提示找不到Python，先检查解释器安装与PATH。真正执行的是本地Python，网页里的示例只是静态讲解。",
-        "完整工程中，main.py从if __name__ == '__main__'进入main()，然后调用run()，run()再调用其他模块；与C的main→App_RunOnce思路相通，但不是所有.py都独立运行自己的main。"
+        "现在先解决两件事：能启动解释器、能判断哪一行真正执行。对于已经学过C的你，可以把Python脚本看成源文件，但不要假设必须先编译、链接或存在自动执行的main函数。",
+        "打开Windows Terminal或WSL，输入python3 --version（Windows也可尝试py -3 --version）。使用VS Code新建hello.py并保存在你知道的目录，然后进入该目录运行。文件不存在、命令找不到和Python语法错误是三类不同问题。",
+        "学习时先运行一个两三行的完整程序，看到输出后改动一个数再运行。后面的ASW工程全部建立在这项能力之上。"
       ],
       "code": "# 文件 hello.py，先学习直接运行一份最小脚本。\nprint(\"程序开始\")           # 第一条语句打印一句话。\nspeed_kmh = 72.0           # 变量speed_kmh保存数值72.0。\nprint(\"车速是\", speed_kmh)  # print传多个参数，自动以空格分隔。\nprint(\"程序结束\")",
       "trace": [
@@ -81,7 +81,137 @@
         "why": "Python解释器按程序规则执行脚本；CSV只是数据。"
       },
       "original_id": "start",
-      "details": []
+      "details": [
+        {
+          "name": "脚本是什么，Python从哪里开始读",
+          "grammar": "终端：python3 hello.py",
+          "explanation": "把代码保存为hello.py后，在终端输入python3 hello.py：Python解释器会运行脚本中位于模块顶层的语句，通常从第一条开始。没有任何所谓“自动找main()”的机制：Python只执行你显式写的调用。后面工程使用if __name__ == '__main__'，但这里先理解顶层。",
+          "parts": [
+            [
+              "python3",
+              "终端命令中调用的Python解释器"
+            ],
+            [
+              "hello.py",
+              "交给解释器的源文件"
+            ],
+            [
+              "文件顶层语句",
+              "执行文件时依次执行，遇到if/函数调用才转入相应路径"
+            ]
+          ],
+          "example": "print(\"第一行\")\nprint(\"第二行\")",
+          "trace": [
+            "解释器读取脚本后执行第一条print。",
+            "第一条结束后再执行第二条。",
+            "执行到文件末尾，程序正常结束。"
+          ],
+          "expected": "第一行\n第二行",
+          "errors": [
+            "不要把python3 hello.py写进Python源码，它是终端命令。",
+            "不要将>>>交互提示符复制到.py脚本。"
+          ],
+          "practice": "创建hello.py并调换两行顺序，观察输出如何变化。"
+        },
+        {
+          "name": "REPL和.py文件的区别",
+          "grammar": ">>> 2+3  与  print(2+3)",
+          "explanation": "终端只输入python3进入Python交互解释器，看到>>>提示符，这叫REPL。交互模式通常自动显示输入表达式的结果；在.py脚本里，单独写2+3只是计算，不会自动显示。脚本必须使用print或日志输出才能观察这个值。退出REPL一般可输入exit()。",
+          "parts": [
+            [
+              "REPL",
+              "Read-Eval-Print Loop：读取、计算、显示、重复"
+            ],
+            [
+              ">>>",
+              "交互模式提示符，不能写进程序"
+            ],
+            [
+              "print(...)",
+              "用于把结果写到标准输出"
+            ]
+          ],
+          "example": "2 + 3\nprint(2 + 3)",
+          "trace": [
+            "在脚本中第一行计算2+3但没有显示。",
+            "第二行真正调用print展示结果。",
+            "文件结束。"
+          ],
+          "expected": "5",
+          "errors": [
+            "从网上复制的>>>不应出现在.py文件中。"
+          ],
+          "practice": "分别在REPL和脚本中执行2+3，记录区别。"
+        },
+        {
+          "name": "print()圆括号中的参数，sep和end",
+          "grammar": "print(value1, value2, sep=' ', end='\\n')",
+          "explanation": "print是内置函数。多个参数用逗号分隔，默认分隔符是一个空格、结尾是换行；sep=和end=是按名称传入的关键字参数，当前只需理解它们控制显示，不影响变量值。print函数通常返回None，不是你在屏幕上看到的字符串。",
+          "parts": [
+            [
+              "print",
+              "内置函数名"
+            ],
+            [
+              "()",
+              "调用函数"
+            ],
+            [
+              ",",
+              "隔开多个参数"
+            ],
+            [
+              "sep",
+              "输出元素之间的分隔符"
+            ],
+            [
+              "end",
+              "每次输出结束时追加什么字符"
+            ]
+          ],
+          "example": "print(\"a\", \"b\", sep=\"|\")\nprint(\"c\", end=\"!\")\nprint(\"d\")",
+          "trace": [
+            "第一行sep=|，打印a|b并换行。",
+            "第二行end=!，打印c!但不换行。",
+            "第三行接着在同一行打印d并换行。"
+          ],
+          "expected": "a|b\nc!d",
+          "errors": [
+            "print与return绝对不是一个意思，后续函数章会详讲。"
+          ],
+          "practice": "用sep=' / '打印三条车辆信号名。"
+        },
+        {
+          "name": "注释、空行与缩进初步",
+          "grammar": "# 后面是注释；4空格缩进表示代码块",
+          "explanation": "Python中从#到行尾（引号字符串外）是注释，解释器不会执行注释文本。空行一般不改变程序逻辑。普通顶层语句没有缩进；if/for/def等复合语句冒号后必须正确缩进代码块。缩进不是“让排版好看”，它在Python里有语法含义。",
+          "parts": [
+            [
+              "#",
+              "开始注释"
+            ],
+            [
+              "空行",
+              "便于分段"
+            ],
+            [
+              "    ",
+              "通常4个空格作为一层代码块"
+            ]
+          ],
+          "example": "# 第一条输出\nprint(\"A\")\n\nprint(\"B\")",
+          "trace": [
+            "整行注释不执行。",
+            "print A输出A。",
+            "跳过空行，print B输出B。"
+          ],
+          "expected": "A\nB",
+          "errors": [
+            "Tab与空格混合缩进可能产生错误。"
+          ],
+          "practice": "删掉注释并运行，确认结果不变。"
+        }
+      ]
     },
     {
       "id": "v2_02",
@@ -116,7 +246,145 @@
         "why": "标准库csv、json、dataclasses等随Python提供；NumPy是第三方库。"
       },
       "original_id": "environment",
-      "details": []
+      "details": [
+        {
+          "name": "查看解释器与工作目录",
+          "grammar": "python3 --version / python -c '...'",
+          "explanation": "查看Python版本是检查解释器是否可执行；运行时工作目录决定相对路径如sample.csv在哪里查找。脚本路径和工作目录可能不同，想让程序稳定地找到同目录文件可以使用Path(__file__).resolve().parent。文件路径首先是操作系统概念，不是Python会自动搜索全盘。",
+          "parts": [
+            [
+              "python3 --version",
+              "在终端运行，打印解释器版本"
+            ],
+            [
+              "Path.cwd()",
+              "当前工作目录"
+            ],
+            [
+              "__file__",
+              "Python通常给脚本模块设置的文件路径变量（交互环境可能没有）"
+            ],
+            [
+              "resolve().parent",
+              "转换为路径对象的绝对父目录"
+            ]
+          ],
+          "example": "from pathlib import Path\nprint(Path.cwd().is_dir())\nprint(Path(__file__).name)",
+          "trace": [
+            "导入pathlib里的Path类。",
+            "Path.cwd()返回当前目录，is_dir()判断确实是目录。",
+            "__file__是当前脚本的文件名或路径；Path(...).name取末尾文件名。"
+          ],
+          "expected": "True\n（第二行是你保存的.py文件名，例如env.py）",
+          "errors": [
+            "这段代码在直接输入的REPL不适合使用__file__，应保存成文件运行。"
+          ],
+          "practice": "将文件保存为env.py，记录工作目录与脚本目录。"
+        },
+        {
+          "name": "py、python、python3和解释器选择",
+          "grammar": "python3 script.py / py -3 script.py",
+          "explanation": "Windows、WSL和macOS的命令名字不一定相同。Windows常用py -3，WSL/Linux通常用python3，venv激活后常用python。重要的是用python --version和python -m pip --version确认两者指向同一个环境；不要盲目依赖电脑上同时安装的多个解释器版本。",
+          "parts": [
+            [
+              "py -3",
+              "Windows Python启动器的一种调用形式"
+            ],
+            [
+              "python3",
+              "常见Unix-like系统的解释器命令"
+            ],
+            [
+              "-m",
+              "作为模块运行，如python -m pip"
+            ],
+            [
+              "--version",
+              "查看工具版本"
+            ]
+          ],
+          "example": "import sys\nprint(sys.version_info.major)\nprint(sys.executable != \"\")",
+          "trace": [
+            "导入标准库sys。",
+            "打印主版本号，Python3应是3。",
+            "解释器路径非空，输出True。"
+          ],
+          "expected": "3\nTrue",
+          "errors": [
+            "终端命令不应直接放到.py文件中。"
+          ],
+          "practice": "在自己的本地环境找到实际解释器路径并记录。"
+        },
+        {
+          "name": "venv隔离依赖，为什么不是每份代码都要装NumPy",
+          "grammar": "python3 -m venv .venv",
+          "explanation": "venv创建项目自己的虚拟环境目录。激活后python/pip指向该环境，安装第三方包不会与系统解释器混在一起。零基础导学的ASW工程只用csv、json、pathlib、dataclasses这些Python标准库；D15 NumPy和Matplotlib才需要另外安装第三方依赖。",
+          "parts": [
+            [
+              "venv",
+              "标准库中的虚拟环境模块"
+            ],
+            [
+              "-m",
+              "运行指定模块"
+            ],
+            [
+              ".venv",
+              "常用的本地虚拟环境目录名"
+            ],
+            [
+              "pip",
+              "Python包安装工具"
+            ]
+          ],
+          "example": "import sys\nprint(sys.version_info.major >= 3)\nprint(\"环境检查完成\")",
+          "trace": [
+            "导入sys。",
+            "检查主版本不低于3。",
+            "打印提示，说明脚本已执行。"
+          ],
+          "expected": "True\n环境检查完成",
+          "errors": [
+            "虚拟环境命令需在终端执行。",
+            "建立venv不会自动安装NumPy等第三方库。"
+          ],
+          "practice": "在终端执行python3 -m venv .venv，再激活并查看python -m pip --version。"
+        },
+        {
+          "name": "运行错误：找不到文件、无法导入模块、代码有语法错",
+          "grammar": "FileNotFoundError / ModuleNotFoundError / SyntaxError",
+          "explanation": "三类错误有不同位置：python3 cannot open file说明启动时没找到脚本；脚本内open('missing.csv')可能导致FileNotFoundError；import缺少模块时是ModuleNotFoundError；写成if True却没有冒号则是SyntaxError。先从报错末尾的类型和最先定位到的文件、行号下手。",
+          "parts": [
+            [
+              "FileNotFoundError",
+              "某次文件打开/访问未找到路径"
+            ],
+            [
+              "ModuleNotFoundError",
+              "import未能找到目标模块"
+            ],
+            [
+              "SyntaxError",
+              "代码不符合Python语法"
+            ],
+            [
+              "Traceback",
+              "记录由哪些代码路径进入错误位置"
+            ]
+          ],
+          "example": "from pathlib import Path\np = Path(\"missing.csv\")\nprint(p.exists())",
+          "trace": [
+            "构造相对路径对象missing.csv，并不立即读取文件。",
+            "exists()检查文件是否存在。",
+            "如果目录里确实没有该文件，输出False而不抛出文件读取异常。"
+          ],
+          "expected": "False（前提：当前目录没有missing.csv）",
+          "errors": [
+            "不要为了绕过报错随意创建同名标准库文件csv.py。"
+          ],
+          "practice": "在本地分别制造一个文件名打错与语法冒号丢失错误。"
+        }
+      ]
     },
     {
       "id": "v2_03",
@@ -583,7 +851,144 @@
         "why": "类型注解是给开发者与检查工具看的，不是通用运行时验证机制。"
       },
       "original_id": "types",
-      "details": []
+      "details": [
+        {
+          "name": "变量名snake_case和下划线命名规范",
+          "grammar": "speed_kmh / sample_time_ms / _internal",
+          "explanation": "Python变量和函数名通常用小写单词加下划线的snake_case。完整的speed_kmh是一个名字，Python不会把它拆成speed与kmh。首位不可以是数字，大小写不同就是不同名字，不能用for等关键字作变量名。单前导_是风格上表示内部使用，非访问权限；__init__等双端双下划线由语言协议定义。",
+          "parts": [
+            [
+              "snake_case",
+              "多词小写名字用_分开"
+            ],
+            [
+              "_internal",
+              "约定表示非公开，不强制权限"
+            ],
+            [
+              "__init__",
+              "有特殊意义的双端下划线名字"
+            ],
+            [
+              "speed-kmh",
+              "不是一个合法名字，而是减法表达式"
+            ]
+          ],
+          "example": "speed_kmh=72.0\nspeed_Kmh=90.0\nprint(speed_kmh)\nprint(speed_Kmh)",
+          "trace": [
+            "创建speed_kmh名字绑定72.0。",
+            "另一个名字speed_Kmh大小写不同。",
+            "分别读取两个名字并打印。"
+          ],
+          "expected": "72.0\n90.0",
+          "errors": [
+            "不要定义print=72覆盖常用内置函数名。"
+          ],
+          "practice": "写出三个包含明确单位的合法变量名。"
+        },
+        {
+          "name": "变量赋值与重新绑定",
+          "grammar": "x=72; x='ok'",
+          "explanation": "Python名字是对象的引用。x=72把x绑定到整数对象；x='ok'让x改为指向字符串对象，普通运行时不会被前一次整数值限制。不同于C里的int x=72，再给x写字符串是类型不兼容。x: float只是类型注解，不是强制类型校验。",
+          "parts": [
+            [
+              "=",
+              "绑定名字到右侧对象"
+            ],
+            [
+              "x:float",
+              "类型注解，不自动拒绝赋错类型"
+            ],
+            [
+              "x='ok'",
+              "重新绑定为字符串对象"
+            ]
+          ],
+          "example": "x=72\ny=x\nx=\"ok\"\nprint(y)\nprint(x)",
+          "trace": [
+            "x先绑定整数72，y得到同一个整数值对应的对象。",
+            "x重新绑定字符串ok。",
+            "y不跟随改变，所以先输出72，再输出ok。"
+          ],
+          "expected": "72\nok",
+          "errors": [
+            "可变列表和不可变整数的别名效应不同，列表章节再展开。"
+          ],
+          "practice": "将x再改为True，打印type(x)。"
+        },
+        {
+          "name": "常见类型完整区分",
+          "grammar": "int float str bool None",
+          "explanation": "int整数，float浮点，str字符串，bool布尔，NoneType对应None这个特殊值。字符串'72'和整数72不同。bool('False')会返回True，因为非空字符串在真值判断中为真；不要这样解析CSV里表示0/1的有效位。",
+          "parts": [
+            [
+              "int",
+              "整数类型"
+            ],
+            [
+              "float",
+              "浮点类型"
+            ],
+            [
+              "str",
+              "文本类型"
+            ],
+            [
+              "bool",
+              "True/False两个布尔值"
+            ],
+            [
+              "None",
+              "单例空值，通常用is None判断"
+            ]
+          ],
+          "example": "a=72\nb=72.0\nc=\"72\"\nd=True\ne=None\nprint(type(a).__name__,type(b).__name__,type(c).__name__)\nprint(d, e)",
+          "trace": [
+            "定义五种不同值。",
+            "type()返回实际类型对象，.__name__取其名字。",
+            "打印布尔与空值。"
+          ],
+          "expected": "int float str\nTrue None",
+          "errors": [
+            "字符串'False'不是布尔False。"
+          ],
+          "practice": "用type检查72、72.0、'72'、False和None。"
+        },
+        {
+          "name": "转换内置函数与失败情况",
+          "grammar": "int(text) / float(text) / str(number)",
+          "explanation": "转换函数接收输入并返回目标类型的新值。int('72')成功，int('72.5')直接失败，需先明确合法格式；float('72.5')成功，float('bad')抛ValueError。float('nan')是特殊非有限值，类型上仍是float，所以工程必须进一步用math.isfinite检查。",
+          "parts": [
+            [
+              "int('72')",
+              "解析整数字符串"
+            ],
+            [
+              "float('72.5')",
+              "解析合法浮点文本"
+            ],
+            [
+              "str(72)",
+              "转成文本"
+            ],
+            [
+              "ValueError",
+              "值不满足转换要求时抛出异常"
+            ]
+          ],
+          "example": "print(int(\"72\"))\nprint(float(\"72.5\"))\nprint(str(72)+\"km/h\")",
+          "trace": [
+            "int解析72。",
+            "float解析72.5。",
+            "str转成'72'后可与另一个字符串相连。"
+          ],
+          "expected": "72\n72.5\n72km/h",
+          "errors": [
+            "不能用bool('0')解释CSV有效位0，它返回True。"
+          ],
+          "practice": "在自己文件里调用float('bad')观察完整错误信息。"
+        }
+      ]
     },
     {
       "id": "v2_05",
@@ -618,7 +1023,148 @@
         "why": "Python支持链式比较和and逻辑运算。"
       },
       "original_id": "operators",
-      "details": []
+      "details": [
+        {
+          "name": "四则运算、整除、取余与幂",
+          "grammar": "+, -, *, /, //, %, **",
+          "explanation": "/是普通除法，Python中7/2得到3.5；//向负无穷取整，-7//2是-4；%是余数，与//的定义协调；**表示乘方，^是按位异或不是乘方。单位计算必须先保证速度与时间、距离的单位对应。",
+          "parts": [
+            [
+              "/",
+              "浮点除法"
+            ],
+            [
+              "//",
+              "向负无穷取整的除法"
+            ],
+            [
+              "%",
+              "余数"
+            ],
+            [
+              "**",
+              "乘方"
+            ],
+            [
+              "^",
+              "按位异或，不是幂"
+            ]
+          ],
+          "example": "print(7/2)\nprint(7//2)\nprint(-7//2)\nprint(7%2)\nprint(2**3)",
+          "trace": [
+            "依次计算普通除法、整数结果的向下取整、负数向下取整。",
+            "余数为1。",
+            "2的3次方为8。"
+          ],
+          "expected": "3.5\n3\n-4\n1\n8",
+          "errors": [
+            "Python //和C两个int相除对负数的舍入方向不同。"
+          ],
+          "practice": "预测-7%2与-7//2，再本地运行。"
+        },
+        {
+          "name": "赋值、增量赋值与比较",
+          "grammar": "=、+=、==、!=、<、<=、>、>=",
+          "explanation": "=用来赋值；+=可在累计器中增加当前值；==与!=比较相等/不等，返回布尔值。Python没有C语言的count++语法；写count += 1。Python支持0 <= speed <= 250这样的连续范围比较，注意含左右端点。",
+          "parts": [
+            [
+              "=",
+              "赋值"
+            ],
+            [
+              "+=",
+              "原值上加并重新赋值"
+            ],
+            [
+              "==",
+              "比较相等"
+            ],
+            [
+              "!=",
+              "比较不等"
+            ],
+            [
+              "0<=x<=250",
+              "x同时满足两边条件"
+            ]
+          ],
+          "example": "count=0\ncount+=1\nspeed=72\nprint(count)\nprint(speed==72)\nprint(0<=speed<=250)",
+          "trace": [
+            "count从0增加到1。",
+            "速度等于72，所以为True。",
+            "72满足范围条件，True。"
+          ],
+          "expected": "1\nTrue\nTrue",
+          "errors": [
+            "if speed=72不是合法条件语法。"
+          ],
+          "practice": "写一个0~250范围检查，输入-1、0、250、251逐一验证。"
+        },
+        {
+          "name": "and、or、not和短路判断",
+          "grammar": "condition_a and condition_b",
+          "explanation": "and两边都为真时返回真；or至少一边为真时返回真；not取反。Python和C一样存在短路求值，但Python的and/or一般返回其操作数之一，不一定是bool；在输入校验里优先写返回明确bool的表达式。",
+          "parts": [
+            [
+              "and",
+              "逻辑与，左侧假可以短路"
+            ],
+            [
+              "or",
+              "逻辑或，左侧真可以短路"
+            ],
+            [
+              "not",
+              "逻辑非"
+            ],
+            [
+              "is None",
+              "检查值是否缺失的常见写法"
+            ]
+          ],
+          "example": "speed=72\nradar_valid=True\nprint(radar_valid and speed>0)\nprint(not radar_valid)\nprint(None is None)",
+          "trace": [
+            "radar_valid和speed>0都真，结果True。",
+            "not True为False。",
+            "None与None身份相同，输出True。"
+          ],
+          "expected": "True\nFalse\nTrue",
+          "errors": [
+            "不建议把==None作为首选写法，应使用is None。"
+          ],
+          "practice": "把radar_valid改为False，看组合条件如何变化。"
+        },
+        {
+          "name": "单位换算与math.isfinite",
+          "grammar": "speed_mps=speed_kmh/3.6",
+          "explanation": "72km/h等于20m/s，Python不理解单位，必须写换算公式。math是标准库模块，import math后math.isfinite(value)检查浮点是否有限，拒绝nan、inf。不能只因为类型为float就假设数值可信。",
+          "parts": [
+            [
+              "/3.6",
+              "km/h转m/s"
+            ],
+            [
+              "math.isfinite",
+              "检查有限数值"
+            ],
+            [
+              "float('nan')",
+              "非有限值的一个例子"
+            ]
+          ],
+          "example": "import math\nspeed_kmh=72.0\nspeed_mps=speed_kmh/3.6\nprint(speed_mps)\nprint(math.isfinite(float(\"nan\")))",
+          "trace": [
+            "导入math。",
+            "将72km/h除以3.6得到20m/s。",
+            "isfinite判断nan，得到False。"
+          ],
+          "expected": "20.0\nFalse",
+          "errors": [
+            "D14可能采用m/s接口，但D15 CSV采用km/h，不能无声混用。"
+          ],
+          "practice": "计算90km/h对应多少m/s，解释每个符号。"
+        }
+      ]
     },
     {
       "id": "v2_06",
@@ -653,7 +1199,138 @@
         "why": "从文本文件读取的是文本，不保证一定可转换为合法数值。"
       },
       "original_id": "strings",
-      "details": []
+      "details": [
+        {
+          "name": "字符串引号、索引、切片与不可变",
+          "grammar": "text='ASW' / text[0] / text[1:3]",
+          "explanation": "单引号与双引号可包住字符串。str是一种按顺序保存字符的不可变对象；索引从0开始，负数索引-1代表最后一个，切片[start:stop]包含start而不包含stop。不能给text[0]重新赋值。",
+          "parts": [
+            [
+              "'ASW'",
+              "字符串值"
+            ],
+            [
+              "text[0]",
+              "第一个字符"
+            ],
+            [
+              "text[-1]",
+              "末字符"
+            ],
+            [
+              "text[1:3]",
+              "取索引1、2的两个字符"
+            ]
+          ],
+          "example": "text=\"ASW\"\nprint(text[0])\nprint(text[-1])\nprint(text[1:3])",
+          "trace": [
+            "索引0是A。",
+            "索引-1是W。",
+            "切片[1:3]为SW。"
+          ],
+          "expected": "A\nW\nSW",
+          "errors": [
+            "text[0]='R'会抛TypeError，因为字符串不可变。"
+          ],
+          "practice": "对'RADAR'取前3个字符和最后一个。"
+        },
+        {
+          "name": "strip、split、replace和点号调用",
+          "grammar": "raw.strip().split(',')",
+          "explanation": "strip去首尾空白，split按分隔符拆分得到列表，replace生成替换内容的新字符串。点号表示访问字符串对象的方法，()负责真正调用。raw.strip().split(',')是先拿到清理后的新字符串，再对这个结果调用split。",
+          "parts": [
+            [
+              "raw.strip()",
+              "调用方法后返回新str"
+            ],
+            [
+              ".split(',')",
+              "返回list[str]"
+            ],
+            [
+              "replace(a,b)",
+              "返回新字符串，不直接改写原对象"
+            ]
+          ],
+          "example": "raw=\" 72.0,34.0 \"\nclean=raw.strip()\nparts=clean.split(\",\")\nprint(parts)\nprint(raw.replace(\"34.0\",\"35.0\"))",
+          "trace": [
+            "strip移除首尾空白。",
+            "split得到字符串'72.0'和'34.0'。",
+            "replace对原raw生成一份新字符串。"
+          ],
+          "expected": "['72.0', '34.0']\n 72.0,35.0 ",
+          "errors": [
+            "CSV可能含引号、逗号，正式解析应使用csv模块而非任意split。"
+          ],
+          "practice": "把两个列表中的字符串分别转成float。"
+        },
+        {
+          "name": "字符串格式化和f-string的冒号",
+          "grammar": "f'速度{speed:.1f}km/h'",
+          "explanation": "f是格式化字符串前缀，{}用于计算并插入表达式。冒号后面的.1f是浮点数格式规范，显示1位小数，而不是改变原浮点值。普通字符串+数字会因类型不同而失败，可以使用f-string或str(number)。",
+          "parts": [
+            [
+              "f",
+              "格式化前缀"
+            ],
+            [
+              "{speed}",
+              "插入表达式值"
+            ],
+            [
+              "{speed:.1f}",
+              "按一位小数显示浮点数"
+            ],
+            [
+              "{{",
+              "输出字面量花括号的一种写法"
+            ]
+          ],
+          "example": "speed=72.45\nprint(f\"速度={speed:.1f} km/h\")\nprint(speed)",
+          "trace": [
+            "第一行使用格式化输出，72.45显示为72.5。",
+            "原变量并没有改变，仍为72.45。"
+          ],
+          "expected": "速度=72.5 km/h\n72.45",
+          "errors": [
+            "f-string里的:与if的:不是同一语法位置。"
+          ],
+          "practice": "用f-string把距离34.567m显示为34.57m。"
+        },
+        {
+          "name": "转义符、换行和文本数值转换",
+          "grammar": "'A\\nB' / float('72.5')",
+          "explanation": "反斜杠可引入转义符：\\n换行、\\t制表、\\\\反斜线。文本转数字应明确调用int或float；非法格式会抛ValueError。float('nan')虽能转换，但属于非有限值，依然需要校验。",
+          "parts": [
+            [
+              "\\n",
+              "字符串中的换行"
+            ],
+            [
+              "\\t",
+              "制表"
+            ],
+            [
+              "float(raw)",
+              "把合法文本转float"
+            ],
+            [
+              "ValueError",
+              "非法文本转换错误"
+            ]
+          ],
+          "example": "print(\"A\\nB\")\nprint(float(\"72.5\")+1)",
+          "trace": [
+            "第一行字符串含换行，因此A和B分两行。",
+            "float把字符串解析为72.5，再加1。"
+          ],
+          "expected": "A\nB\n73.5",
+          "errors": [
+            "不要写float('')或float('oops')当作正常合法数值。"
+          ],
+          "practice": "把' 80.0 '先strip再转float并计算。"
+        }
+      ]
     },
     {
       "id": "v2_07",
@@ -688,7 +1365,145 @@
         "why": "第一个if命中后，其余elif/else不执行。"
       },
       "original_id": "conditions",
-      "details": []
+      "details": [
+        {
+          "name": "布尔条件与真值——True、False、None",
+          "grammar": "bool(x) / if condition:",
+          "explanation": "条件表达式通常产生True/False。0、空字符串、空列表和None在条件判断中是假值，但非空字符串'False'仍是真值。布尔输入字段不能简单用bool(text)转换，而要按接口约定解析0/1。",
+          "parts": [
+            [
+              "True/False",
+              "布尔字面量，首字母大写"
+            ],
+            [
+              "bool(x)",
+              "将对象按真值规则转换"
+            ],
+            [
+              "None",
+              "缺失值，if判断为假"
+            ],
+            [
+              "not",
+              "取反"
+            ]
+          ],
+          "example": "print(bool(0))\nprint(bool(\"\"))\nprint(bool(\"False\"))\nprint(not True)",
+          "trace": [
+            "0是假值，False。",
+            "空字符串是假值。",
+            "非空字符串'False'是真值。",
+            "not True得到False。"
+          ],
+          "expected": "False\nFalse\nTrue\nFalse",
+          "errors": [
+            "'False'和False是不同值，处理外部标志时不要混淆。"
+          ],
+          "practice": "预测bool('0')和bool('')。"
+        },
+        {
+          "name": "if单分支：从冒号到缩进体",
+          "grammar": "if condition:\\n    body",
+          "explanation": "if后是条件表达式，英文冒号结束语句头，下一行统一缩进通常4空格；条件为真时才执行缩进块。与if对齐的语句不在if块里，按正常顺序继续。Python不用C式{}括号包住分支。",
+          "parts": [
+            [
+              "if",
+              "分支关键字"
+            ],
+            [
+              "condition",
+              "决定是否执行的布尔条件"
+            ],
+            [
+              ":",
+              "引入缩进块"
+            ],
+            [
+              "缩进4空格",
+              "本块内语句"
+            ],
+            [
+              "对齐if",
+              "退出本块后的后续语句"
+            ]
+          ],
+          "example": "distance=34\nif distance<=35:\n    print(\"提示\")\nprint(\"结束\")",
+          "trace": [
+            "条件34<=35是真。",
+            "进入缩进print，输出提示。",
+            "回到与if对齐的末行，输出结束。"
+          ],
+          "expected": "提示\n结束",
+          "errors": [
+            "漏写冒号或缩进会报SyntaxError/IndentationError。"
+          ],
+          "practice": "把distance改成40，预测还会出现哪一行。"
+        },
+        {
+          "name": "if/else与elif链：顺序和优先级",
+          "grammar": "if a:\\n    ...\\nelif b:\\n    ...\\nelse:\\n    ...",
+          "explanation": "elif相当于C的else if，但关键字连在一起。多分支链从上到下检查，找到第一条真条件就执行对应一支，跳过其余分支；所有条件都假才进入else。多个单独if则可以执行多支，不能混用。",
+          "parts": [
+            [
+              "if",
+              "第一层条件"
+            ],
+            [
+              "elif",
+              "前面条件未成立才检查"
+            ],
+            [
+              "else",
+              "剩余情况兜底"
+            ],
+            [
+              "分支顺序",
+              "先判断数据有效性通常更合理"
+            ]
+          ],
+          "example": "radar_valid=False\nenable=False\nif not radar_valid:\n    status=\"INVALID\"\nelif not enable:\n    status=\"OFF\"\nelse:\n    status=\"ACTIVE\"\nprint(status)",
+          "trace": [
+            "第一个not radar_valid为True。",
+            "设置INVALID，不再检查elif，即使enable也是False。",
+            "输出INVALID。"
+          ],
+          "expected": "INVALID",
+          "errors": [
+            "不能把elif和第二个独立if等价看待。"
+          ],
+          "practice": "交换两个判断的顺序，分析两个False时状态如何不同。"
+        },
+        {
+          "name": "多层if嵌套与可读性",
+          "grammar": "if valid:\\n    if distance<=35:\\n        ...",
+          "explanation": "缩进每多一层就多一个条件约束，内层只有在外层进入时才会判断。新手可以先用两层if练习，再学习函数早返回来减少嵌套。不能通过错误的缩进制造“看起来分组”的效果。",
+          "parts": [
+            [
+              "第一层缩进",
+              "属于外层分支"
+            ],
+            [
+              "第二层缩进",
+              "属于内层分支"
+            ],
+            [
+              "else",
+              "与相同缩进层级的if配对"
+            ]
+          ],
+          "example": "valid=True\ndistance=34\nif valid:\n    if distance<=35:\n        print(\"有效且接近\")\n    else:\n        print(\"有效且远\")\nelse:\n    print(\"无效\")",
+          "trace": [
+            "外层valid为True。",
+            "内层distance<=35为True。",
+            "输出有效且接近，跳过所有else。"
+          ],
+          "expected": "有效且接近",
+          "errors": [
+            "else必须和它对应的if在同一缩进层。"
+          ],
+          "practice": "分别测试valid=False和distance=40。"
+        }
+      ]
     },
     {
       "id": "v2_08",
