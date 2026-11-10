@@ -456,6 +456,7 @@ async function init(){
     }
     state=loadState();renderChapterNav();
     openChapter(book.chapters.some(x=>x.id===state.lastChapter)?state.lastChapter:'start');
+    document.body.dataset.foundationReady='yes';
   }catch(error){
     $('heroIntro').textContent='页面加载失败：'+error.message+'。请刷新页面或查看GitHub Pages部署状态。';
     $('progressLine').textContent='课程资源加载异常，原D15及其笔记不受影响。';
