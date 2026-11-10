@@ -133,3 +133,9 @@ footer{text-align:center;font-size:13px;color:var(--muted);padding-bottom:38px}
   .topicMenu,.topicMenu button{min-width:0}
   .syntaxTable,.codeTop,pre{max-width:100%}
 }
+
+/* V4符号字典与逐轮变量表：宽表在自身滚动，不让整页横向溢出。 */
+.syntaxTable{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+.syntaxTable table{min-width:530px}
+.syntaxDetail .tip{margin-top:12px}
+@media(max-width:480px){.syntaxTable table{min-width:500px}.topicCode{font-size:12px}}
