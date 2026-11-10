@@ -879,7 +879,7 @@
             "第二个print中的\\t表示水平制表符。",
             "r原始字符串中的反斜线不被作为普通转义序列解析。"
           ],
-          "expected": "a\nb\na\\tb\nC:\\new",
+          "expected": "a\nb\na\tb\nC:\\new",
           "errors": [
             "普通Windows路径中反斜线可能形成未知或已有转义。建议实际文件路径使用pathlib.Path。"
           ],
