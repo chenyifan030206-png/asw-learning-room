@@ -1344,8 +1344,8 @@
     {
       "id": "dict-tuple-set",
       "phase": "数据组织",
-      "title": "11 · dict、tuple、set和可变对象",
-      "minutes": 35,
+      "title": "11 · 字典、元组、集合：三种容器的用法与选择",
+      "minutes": 72,
       "goal": "理解列表按位置取、字典按键取、元组通常作为记录、集合去重。",
       "story": [
         "字典dict保存键→值关系，是日志字段的重要载体。比如row['speed_kmh']找到车速。与list按整数索引不同，字典按字段名称访问更清晰；缺失键row['x']会抛KeyError，row.get('x')可得到None。",
@@ -1374,16 +1374,105 @@
         "answer": 1,
         "why": "赋值没有复制列表对象，a与b引用同一个可变列表。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "元组tuple：有序但不能直接修改长度和成员",
+          "syntax": "pair = (72.0, 34.0)",
+          "explain": "元组和列表一样能按序号读取，通常用于表示一组不打算再改动的值。写(72.0,34.0)会创建两元素tuple；只有一个元素时必须写(72.0,)，否则(72.0)只是带括号的float。空元组是()，索引同样从0开始。元组不能像列表那样append或对其中一项赋新值，但元组若包含一个可变对象，该对象内部仍可能修改。",
+          "code": "pair = (72.0, 34.0)\nprint(type(pair).__name__)\nprint(pair[0])\nprint((72.0,))\nprint(type((72.0)).__name__)",
+          "output": "tuple\n72.0\n(72.0,)\nfloat",
+          "trace": [
+            "两个逗号分隔的值形成tuple。",
+            "pair[0]取得72.0。",
+            "(72.0,)有尾部逗号，所以是单元素tuple。",
+            "(72.0)仅是分组括号，不创建tuple。"
+          ],
+          "mistake": "不要把tuple叫做“完全深度不可变对象”；其元素若为list，内部仍可变。",
+          "exercise": "写一个包含周期号、车速、距离的三元素元组，读取第二项。"
+        },
+        {
+          "title": "打包和解包：左边两个名字如何拿到两个值",
+          "syntax": "speed, distance = (72, 34)",
+          "explain": "元组打包表示把多个值放在一起；解包表示按位置分给多个名字。speed,distance = pair先求值右边的pair，按位置把第一个绑定给speed、第二个给distance。左边变量数与右边元素数不匹配一般会抛ValueError。enumerate()每轮能同时给index/value，原因就是它产生这样的二元组并被for左侧解包。",
+          "code": "sample = (72.0, 34.0)\nspeed, distance = sample\nprint(speed)\nprint(distance)\nx, y = 1, 2\nx, y = y, x\nprint(x, y)",
+          "output": "72.0\n34.0\n2 1",
+          "trace": [
+            "从sample得到两个位置上的值。",
+            "把第一个绑定给speed，第二个绑定给distance。",
+            "x,y=y,x先打包右侧当前值，再分别赋给左侧，实现交换。"
+          ],
+          "mistake": "若sample包含3项而左边只有2个名字会报ValueError；使用星号收集要明确语义。",
+          "exercise": "从('ACTIVE', True, 1)中解包status、valid、alert，打印。"
+        },
+        {
+          "title": "dict字典：键值对不是按第几项取数据",
+          "syntax": "frame = {'speed_kmh':72.0, 'valid':True}",
+          "explain": "字典写在花括号中，冒号分隔键和值，逗号分隔各对。访问字典要写frame['speed_kmh']，引号表示键本身是字符串；它并不会自动变成frame.speed_kmh属性（后者是对象属性访问写法）。字典保留插入顺序，但语义上按键检索，不应把它当成固定列位置的传感器数据数组。键一般要可哈希；str、int、tuple(合适元素)常见，list不能直接作为字典键。",
+          "code": "frame = {'speed_kmh':72.0, 'valid':True}\nprint(frame['speed_kmh'])\nframe['distance_m'] = 35.0\nprint(frame)",
+          "output": "72.0\n{'speed_kmh': 72.0, 'valid': True, 'distance_m': 35.0}",
+          "trace": [
+            "花括号建立两个键值对。",
+            "按字符串键读取72.0。",
+            "向字典增加distance_m键。",
+            "打印整个字典。"
+          ],
+          "mistake": "frame.speed_kmh通常报AttributeError，因为dict键和对象属性不是同一机制。",
+          "exercise": "将cycle_id:100添加到字典，分别用[]和.get读取不存在的键，比较结果。"
+        },
+        {
+          "title": "字典查找、get、遍历键值和缺失字段",
+          "syntax": "row.get('speed_kmh') / for key, value in row.items()",
+          "explain": "row['x']在键不存在时抛KeyError；row.get('x')通常返回None，也可给默认值，但不要因方便就把物理数据缺失强行填0。row.keys()取得键视图，values()取得值视图，items()取得(key,value)二元组视图，for key,value in row.items()可通过解包同时取两者。读取CSV时字段完整性需要显式验证。",
+          "code": "row = {'time_ms':20, 'speed_kmh':72.0}\nprint(row.get('distance_m'))\nfor key, value in row.items():\n    print(key, value)",
+          "output": "None\ntime_ms 20\nspeed_kmh 72.0",
+          "trace": [
+            "get找不到distance_m，返回None。",
+            "items逐次产生('time_ms',20)、('speed_kmh',72.0)。",
+            "for左边key,value解包两项。"
+          ],
+          "mistake": "get返回None不能说明距离为0；不能把缺失和零混为一谈。",
+          "exercise": "用for遍历字典并打印“字段=数值”，另给missing字段报明确错误。"
+        },
+        {
+          "title": "set集合：去重、成员检查与空集合",
+          "syntax": "set([1,1,2]) / {1,2}",
+          "explain": "set是无重复元素的集合，适合判断模式码是否属于允许值、去重故障码。{1,2}创建集合，{}却是空字典，空集合要set()。集合不保证按插入位置索引，不能写modes[0]取得第一项。set支持in、并集|、交集&、差集-等。",
+          "code": "modes = {0, 1, 2}\nprint(1 in modes)\nprint(sorted(set([0, 1, 1, 2])))\nprint(type({}).__name__)\nprint(type(set()).__name__)",
+          "output": "True\n[0, 1, 2]\ndict\nset",
+          "trace": [
+            "{0,1,2}创建集合。",
+            "1 in modes为True。",
+            "set对重复模式去重，sorted把结果排序显示。",
+            "空{}是字典，set()才是空集合。"
+          ],
+          "mistake": "set没有稳定的元素下标，不能靠它保留每帧原始时间顺序。",
+          "exercise": "把多个故障码去重，再判断-2是否在集合内。"
+        },
+        {
+          "title": "引用共享与可变默认值：容器为什么会互相影响",
+          "syntax": "b=a / a.copy() / def f(items=None)",
+          "explain": "字典和列表都是可变对象，b=a会让两个名字引用同一对象；一处修改可影响另一处的观察。tuple不可直接对成员赋新值，但内部包含可变list仍可能变化。函数定义时的默认参数对象只在定义阶段创建一次，如def add(item,items=[])会跨调用共享列表，容易累积旧数据；规范写法是items=None，函数内若为None再创建新列表。",
+          "code": "def append_safe(x, items=None):\n    if items is None:\n        items = []\n    items.append(x)\n    return items\nprint(append_safe(1))\nprint(append_safe(2))",
+          "output": "[1]\n[2]",
+          "trace": [
+            "第一次调用items默认None，函数里创建列表[1]。",
+            "第二次调用再次得到None，再创建全新列表[2]。"
+          ],
+          "mistake": "如果默认写items=[]，两个调用会共享同一列表，导致第二次输出[1,2]。",
+          "exercise": "故意写items=[]版本并复测，解释为什么状态意外延续。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "08–10：for、解包、列表和点号"
+      ],
+      "chapterSummary": "会解释tuple、dict、set如何创建和读取；能区分字段键与属性点号，并理解别名与默认可变对象的后果。"
     },
     {
       "id": "comprehensions",
       "phase": "序列变换",
-      "title": "12 · 从普通for到列表推导式：先展开再缩写",
-      "minutes": 40,
+      "title": "12 · 列表推导式：把普通循环一步步压缩",
+      "minutes": 60,
       "goal": "先用清楚的for逐项构造新列表，再识别[x for x in seq if ...]，不与循环基础混教。",
       "story": [
         "本章先掌握语言符号和基本执行过程，再看汽车数据示例。每一个新写法在下面的详解中拆成独立的语法部件。",
@@ -1409,16 +1498,90 @@
         "answer": 1,
         "why": "先掌握最小语法单位，才能准确阅读组合表达式和工程调用。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "先写普通for：要做的是“构造新列表”",
+          "syntax": "result=[]；for x in source: result.append(...)",
+          "explain": "所谓列表推导式不是一种全新的业务逻辑。它通常把“遍历已有序列、对每项变换、把结果追加到新列表”的操作写成一个表达式。在刚掌握for时，最清楚的写法是先建立result=[]，再循环append，调试时每轮都能print中间值。先真正会写普通for，后面再看简写。",
+          "code": "values = [1, 2, 3]\nsquared = []\nfor x in values:\n    squared.append(x * x)\nprint(squared)",
+          "output": "[1, 4, 9]",
+          "trace": [
+            "建立空列表。",
+            "x依次为1、2、3。",
+            "每轮计算平方并追加。",
+            "循环结束打印新列表。"
+          ],
+          "mistake": "不要把append返回值再赋给squared：append返回None。",
+          "exercise": "改为把速度km/h除3.6，创建mps_values新列表。"
+        },
+        {
+          "title": "推导式最小语法：左边表达式、for、右边序列",
+          "syntax": "[表达式 for 变量 in 可迭代对象]",
+          "explain": "[x*x for x in values]要从for部分开始读：for x in values依次取出原列表里的值；左边x*x决定为每个值生成什么结果；外层方括号把生成的结果收集成新的list。它与上一例的普通for具有相同的输出，但会创建新列表而不是修改原values。新手遇到复杂推导式时可以反向展开成普通for。",
+          "code": "values = [1, 2, 3]\nsquared = [x * x for x in values]\nprint(squared)\nprint(values)",
+          "output": "[1, 4, 9]\n[1, 2, 3]",
+          "trace": [
+            "for x in values依次给x绑定1、2、3。",
+            "对每个x计算x*x。",
+            "收集成新列表[1,4,9]。",
+            "原values不变。"
+          ],
+          "mistake": "不是把Python的for嵌套在[]里“执行三次程序”；推导式只是生成一个列表表达式。",
+          "exercise": "把普通for版本和推导式版分别运行，核对内容相同。"
+        },
+        {
+          "title": "过滤式：if写在右侧代表筛选",
+          "syntax": "[x for x in values if x <= 35]",
+          "explain": "在推导式末尾加if条件表示只有满足该条件的元素才会生成结果。例如距离列表只提取小于等于35m的数值。这个if不是普通分支的if/else结构；它紧跟在for之后，作为筛选条件。若需要二选一变换，写x if cond else y的位置不同；不要把两种if顺序混淆。",
+          "code": "distances = [45, 34, 40, 30]\nnear = [d for d in distances if d <= 35]\nprint(near)",
+          "output": "[34, 30]",
+          "trace": [
+            "for依次产生45、34、40、30。",
+            "条件筛选只保留34和30。",
+            "收集成新列表。"
+          ],
+          "mistake": "不要因为“过滤无效输入”写推导式就默默删除错误行；真实日志数据质量错误应按需求记录。",
+          "exercise": "创建所有超过100ms的age列表，用普通for先写再缩写。"
+        },
+        {
+          "title": "三元条件表达式与末尾if过滤不是同一语法",
+          "syntax": "[A if cond else B for x in values]",
+          "explain": "Python的条件表达式“A if 条件 else B”需要同时出现if和else，用于从两个结果里选一个；如果放在推导式开头，意味着每个元素都将产生一个对应结果。末尾“for ... if 条件”则是过滤，有些元素根本不进入结果。状态序列转成文本标签时用条件表达式更合适。",
+          "code": "distances = [45, 34, 40]\nlabels = ['NEAR' if d <= 35 else 'OK' for d in distances]\nprint(labels)",
+          "output": "['OK', 'NEAR', 'OK']",
+          "trace": [
+            "每轮都取得一个距离值。",
+            "条件表达式根据距离返回NEAR或OK。",
+            "3个输入产生3个结果，长度没有减少。"
+          ],
+          "mistake": "把这条写成['NEAR' for d in distances if d<=35]会过滤掉正常帧，改变输出长度。",
+          "exercise": "自己比较两种写法的列表长度和含义。"
+        },
+        {
+          "title": "字典/集合推导式与生成器表达式：认识但暂不滥用",
+          "syntax": "{x: f(x) for x in seq} / (f(x) for x in seq)",
+          "explain": "类似语法可用花括号创建字典或集合，用圆括号形成生成器表达式。生成器通常逐步产生值，而不是立即生成完整list。对初学者而言，只有当普通for清楚无误、调试便利时才建议用简写。对于多步骤校验、抛异常、按行定位CSV错误，仍应保持普通for显式写法。",
+          "code": "values = [1, 2, 2]\nsquares = {x: x*x for x in values}\nunique = {x for x in values}\nprint(squares)\nprint(sorted(unique))",
+          "output": "{1: 1, 2: 4}\n[1, 2]",
+          "trace": [
+            "字典推导式按数字x构造键和值x*x；重复键2被合并。",
+            "集合推导式去重得到1和2。"
+          ],
+          "mistake": "推导式适合简短纯变换，不应用一行嵌套多层复杂判断替代可读、可测试的工程代码。",
+          "exercise": "把字典推导式改成普通for并验证。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "08–11：for、列表、字典和条件判断"
+      ],
+      "chapterSummary": "能将推导式展开为普通for，解释其变换/过滤/条件表达式的区别，实际工程按可读性选择。"
     },
     {
       "id": "func",
       "phase": "函数与调用",
-      "title": "13 · def、参数、return、None与作用域",
-      "minutes": 40,
+      "title": "13 · 函数def：定义、调用、参数、return与作用域",
+      "minutes": 84,
       "goal": "理解函数并不自动运行，调用者与被调用者之间如何交换数据。",
       "story": [
         "Python的函数用def定义。def只建立函数对象，函数体并不是在定义那一刻就正常执行；当其他代码写函数名(参数)时才调用。函数的返回类型通常不强制声明，但可以使用->类型作注解。",
@@ -1446,16 +1609,121 @@
         "answer": 2,
         "why": "print负责副作用输出，不等于给调用者返回那个字符串。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "def函数定义语法逐部分拆开",
+          "syntax": "def 函数名(参数列表):\\n    函数体",
+          "explain": "def是关键字；函数名如kmh_to_mps是用户定义的名字；()里的speed_kmh是形参，在调用时接收实际对象；冒号后缩进块是函数体。定义函数时会创建函数对象，但正常情况下不会立刻进入函数体；写kmh_to_mps(72)才会调用。与C的float kmh_to_mps(float speed)类似，但Python不强制把参数类型写在声明位置。",
+          "code": "def kmh_to_mps(speed_kmh):\n    result = speed_kmh / 3.6\n    return result\n\nprint('定义完成')\nprint(kmh_to_mps(72.0))",
+          "output": "定义完成\n20.0",
+          "trace": [
+            "def创建函数对象。",
+            "打印定义完成。",
+            "调用kmh_to_mps，形参speed_kmh绑定72。",
+            "函数计算20并return，把结果返回print。"
+          ],
+          "mistake": "函数体缩进写错会导致没有执行/语法错误；不要把def定义误当成函数立即运行。",
+          "exercise": "把函数改名convert_speed，再调用它，观察改名后调用处也必须同步修改。"
+        },
+        {
+          "title": "参数到底怎样进去：形参和实参",
+          "syntax": "def add(a,b): ... / add(2,3)",
+          "explain": "定义时写a,b是形参；调用时写2,3是实参。函数被调用时，形参名字与传入对象建立绑定关系。Python传参可理解为传入对象引用，但不要简化成“完全按C传值”或“完全按C指针”：可变对象的原地修改可能被调用者观察到，而给形参重新赋值通常不改变调用者的变量绑定。",
+          "code": "def add(a, b):\n    print('函数收到', a, b)\n    return a + b\n\nx = 2\ny = 3\nresult = add(x, y)\nprint('返回值', result)",
+          "output": "函数收到 2 3\n返回值 5",
+          "trace": [
+            "定义add时不打印。",
+            "调用add(x,y)，将2、3绑定到形参a、b。",
+            "函数计算5并return。",
+            "调用位置把返回值绑定给result。"
+          ],
+          "mistake": "调用add(2)缺少一个必需参数会抛TypeError，Python不会自动补0。",
+          "exercise": "交换实参顺序并把加法换成减法，分析参数顺序如何影响结果。"
+        },
+        {
+          "title": "return与print、break、None是四件不同的事",
+          "syntax": "return result / print(result)",
+          "explain": "return结束当前函数并把指定对象交还给调用者；print只是向标准输出显示，不会自动把值作为返回值。break用于退出循环，不退出外层函数；如果函数没有显式return表达式，正常到结尾时返回None。要把计算结果送进其他模块，应return，而不仅是print。",
+          "code": "def bad_add(a, b):\n    print(a + b)\n\ndef good_add(a, b):\n    return a + b\nx = bad_add(2, 3)\ny = good_add(2, 3)\nprint(x)\nprint(y)",
+          "output": "5\nNone\n5",
+          "trace": [
+            "bad_add先print 5，但不return，调用者得到None。",
+            "good_add返回5，不在函数内部打印。",
+            "调用者分别打印x=None和y=5。"
+          ],
+          "mistake": "以为print等同return会造成上层程序拿到None，接着参与数值运算时报错。",
+          "exercise": "把D14的MonitorResult返回与Python return Decision(...)比较，写清谁拿到了什么。"
+        },
+        {
+          "title": "一个函数能返回多个数据吗：tuple、dict、对象",
+          "syntax": "return status, valid / return {'status':...}",
+          "explain": "Python的return a,b实际上返回一个包含两项的tuple，调用者可result=...或status,valid=...解包。也能return一个dict或dataclass实例，保存命名成员，便于较大的工程接口追踪。对于ASW处理结果，返回Decision(status,valid,alert,age_ms)比多个位置难辨的数字更易读。",
+          "code": "def check(distance):\n    status = 'NEAR' if distance <= 35 else 'OK'\n    return status, True\n\nresult = check(34)\nprint(result)\nstatus, valid = result\nprint(status, valid)",
+          "output": "('NEAR', True)\nNEAR True",
+          "trace": [
+            "check得到distance=34。",
+            "返回表达式status,True打包为tuple。",
+            "调用者result接收整个tuple。",
+            "解包成status和valid并打印。"
+          ],
+          "mistake": "返回多个值并非真正同时返回两条独立流；它仍返回一个tuple对象。",
+          "exercise": "改写成dict并通过result['status']、result['valid']读取。"
+        },
+        {
+          "title": "局部变量、全局变量、作用域：名字在哪一层有效",
+          "syntax": "def f():\\n    local=...",
+          "explain": "函数里赋值的普通名字通常是局部变量。函数外定义的全局名字可以被读取，但对同名名字赋值会使函数内名字视为局部，不会自动修改外面的名字。尽量把数据作为参数传入，再return结果，减少依赖可变全局状态；ASW单元测试也因此容易隔离。global/nonlocal具有专门语义，但新手先理解普通局部变量即可。",
+          "code": "speed = 72\n\ndef calc(x):\n    speed = x / 3.6\n    return speed\n\nprint(calc(90))\nprint(speed)",
+          "output": "25.0\n72",
+          "trace": [
+            "外层speed=72。",
+            "calc内部局部speed绑定25。",
+            "return得到25；退出函数后外层speed仍是72。"
+          ],
+          "mistake": "把局部变量当成外层变量的自动修改会误判程序数据流。",
+          "exercise": "删掉return，用print(calc(90))，观察为什么得到None。"
+        },
+        {
+          "title": "可变对象参数会怎样改变调用者可见的数据",
+          "syntax": "def f(items): items.append(x)",
+          "explain": "Python把对象引用绑定到形参。若传入list，在函数中调用append会原地修改那个list，外面的名字也能看到新内容；若在函数中写items=[...]重新绑定形参，外面不会自动换到这个新list。工程中应通过明确的函数命名/文档告诉调用者是否修改原对象，必要时使用.copy()。",
+          "code": "def add_frame(frames):\n    frames.append(99)\n\nframes = [1, 2]\nadd_frame(frames)\nprint(frames)",
+          "output": "[1, 2, 99]",
+          "trace": [
+            "frames列表在调用前存在。",
+            "函数形参frames引用同一列表。",
+            "append原地增加99。",
+            "外部print能看到变化。"
+          ],
+          "mistake": "这不是“所有参数都按指针传递”的简单结论，重新赋值和原地改变要区分。",
+          "exercise": "在函数内写frames=[0]，运行对照外层frames是否变化。"
+        },
+        {
+          "title": "递归、docstring与函数拆分原则",
+          "syntax": "def f(...):\\n    '''说明'''",
+          "explain": "函数开头的三引号字符串通常作为docstring说明函数用途、参数、返回和异常。help(f)可以读取相关文档。函数如果在内部调用自身称递归，要有可靠终止条件；本日重点是普通调用链，不要求把所有循环改成递归。工程拆分时，一个函数最好承担清晰职责，例如读取CSV、校验数值、更新告警、写结果各自分层。",
+          "code": "def square(x):\n    '''计算一个数的平方，返回数值而非直接打印。'''\n    return x*x\n\nprint(square(3))\nprint(square.__doc__)",
+          "output": "9\n计算一个数的平方，返回数值而非直接打印。",
+          "trace": [
+            "定义square并保存docstring。",
+            "调用square(3)得到9。",
+            ".__doc__是函数对象的文档属性。"
+          ],
+          "mistake": "三引号常用于文档字符串，但单独的三引号文本不应被滥用来替代正式注释。",
+          "exercise": "给你写的kmh_to_mps函数增加一段描述参数与返回单位的docstring。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02：括号和点号；04：变量；07：if；08：循环；11：tuple"
+      ],
+      "chapterSummary": "会逐层描述函数定义→调用→形参绑定→执行→return→恢复调用者；明确print不是return。"
     },
     {
       "id": "params",
       "phase": "函数与调用",
-      "title": "14 · 默认参数、关键字参数、*args、**kwargs与返回多个值",
-      "minutes": 30,
+      "title": "14 · 函数参数扩展：默认值、关键字、星号和类型提示",
+      "minutes": 96,
       "goal": "学会阅读未来项目常见的函数签名，知道可变默认参数陷阱。",
       "story": [
         "函数的调用除了按位置传参，还能按名称传参，例如make_threshold(limit_m=35.0)。有默认值的参数可以省略；关键字参数便于在多个相似浮点参数中表明单位与含义。",
@@ -1483,16 +1751,129 @@
         "answer": 0,
         "why": "关键字参数允许指定unit名称，默认值也可以覆盖。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "位置参数：按顺序匹配名字",
+          "syntax": "def f(a,b): ... / f(1,2)",
+          "explain": "位置参数按照实参出现的顺序匹配形参。若两个参数都是数字，填反之后Python可能仍能执行但业务结果错误，因此ASW接口适当采用关键字参数或数据对象可以降低混淆。函数签名里的逗号分隔多个形参，而调用圆括号里的逗号分隔多个实参。",
+          "code": "def describe(speed, distance):\n    print('speed=',speed,'distance=',distance)\ndescribe(72,34)",
+          "output": "speed= 72 distance= 34",
+          "trace": [
+            "定义describe(speed,distance)。",
+            "调用时72绑定speed，34绑定distance。",
+            "函数体print两组值。"
+          ],
+          "mistake": "describe(34,72)语法合法，但工程上把速度和距离颠倒，必须有单位和范围校验。",
+          "exercise": "把参数名称改为speed_kmh/distance_m，说明为什么更有意义。"
+        },
+        {
+          "title": "关键字参数：名字指定实参对应哪个形参",
+          "syntax": "describe(distance=34, speed=72)",
+          "explain": "调用时可以写形参名=值，明确指出每个实参绑定目标，关键字参数的顺序可与定义时不同。不能把同一个形参同时用位置参数和关键字参数传两次；未知形参名称也会报TypeError。对于单位相近但不相同的参数，关键字调用通常更清楚。",
+          "code": "def describe(speed, distance):\n    return speed, distance\nprint(describe(distance=34, speed=72))",
+          "output": "(72, 34)",
+          "trace": [
+            "Python先识别每个关键字名称。",
+            "把72传给speed、34传给distance。",
+            "函数返回tuple(72,34)。"
+          ],
+          "mistake": "describe(72,speed=80)会对speed重复赋值，导致TypeError。",
+          "exercise": "用关键字调用一个函数f(speed_kmh,radar_valid,age_ms)。"
+        },
+        {
+          "title": "默认参数：为什么可以省略一部分值",
+          "syntax": "def f(limit=35): ...",
+          "explain": "在函数定义时，limit=35是默认参数定义，不是调用函数内部的赋值语句；调用时若没有为limit提供值，就使用定义时保存的默认对象。调用f(40)或f(limit=40)可以覆盖。一般应把具有默认值的参数放在普通必需位置参数之后，以避免语法限制。默认值的对象通常在定义阶段计算，尤其不要用可变列表作为默认值。",
+          "code": "def is_near(distance, limit=35):\n    return distance <= limit\nprint(is_near(34))\nprint(is_near(38, limit=40))",
+          "output": "True\nTrue",
+          "trace": [
+            "首次调用只传distance=34，limit用默认35。",
+            "第二次显式指定limit=40。",
+            "两个距离都在各自阈值内。"
+          ],
+          "mistake": "默认值35不是实际ACC阈值的通用安全标准，本课程仅用于模拟。",
+          "exercise": "把默认阈值改成36，比较两次调用结果。"
+        },
+        {
+          "title": "类型注解与->：哪部分是提示，哪部分才是返回",
+          "syntax": "def f(x: float) -> bool: return ...",
+          "explain": "形参名后“: float”是类型注解；函数签名中“-> bool”是返回类型注解；最后的冒号开始函数体。这三处符号职责不同。Python本身通常不会强制阻止错误类型传入，代码仍须明确检查，或利用mypy/pyright等工具做静态检查。最终实际返回的对象由return表达式决定，不由->注解自动构造。",
+          "code": "def is_near(distance: float) -> bool:\n    return distance <= 35.0\nprint(is_near(34.0))",
+          "output": "True",
+          "trace": [
+            "Python定义带注解的函数。",
+            "调用传入34.0。",
+            "return比较结果True。"
+          ],
+          "mistake": "-> bool不会自动把所有返回值转换成bool。",
+          "exercise": "故意return 'YES'并观察运行时并非自动转成True。"
+        },
+        {
+          "title": "星号*args：收集额外的位置实参",
+          "syntax": "def f(*values): ...",
+          "explain": "在形参列表中，*values表示把剩余位置实参收集成tuple，函数内部values是一个序列，可以for遍历或sum求和。它与乘法符号*在表达式中的用法不同，语境是函数定义的参数列表。若函数接口有固定数据字段，优先显式列出参数，不能因为*args方便就让单位不明的实参随意传入。",
+          "code": "def total(*values):\n    print(type(values).__name__)\n    return sum(values)\nprint(total(1, 2, 3))",
+          "output": "tuple\n6",
+          "trace": [
+            "调用提供三个位置实参。",
+            "*values收集成(1,2,3)。",
+            "sum得到6并return。"
+          ],
+          "mistake": "不能把*args理解为“指针解引用”；Python里的星号可表示不同语法。",
+          "exercise": "把total()无参调用，解释得到什么结果。"
+        },
+        {
+          "title": "双星号**kwargs：收集额外命名实参",
+          "syntax": "def f(**fields): ...",
+          "explain": "**fields在形参位置把多余的关键字参数收集成dict。这个**与数学乘方语法2**3在不同位置具有不同用途：前者是参数打包，后者是运算符。关键字字符串如speed=72会变为字典中的键'speed'。需要固定协议时，不应把字段随意塞进**kwargs而不校验。",
+          "code": "def capture(**fields):\n    return fields\nprint(capture(speed=72,valid=True))",
+          "output": "{'speed': 72, 'valid': True}",
+          "trace": [
+            "调用提供两个关键字参数。",
+            "**fields变成dict。",
+            "return交还字典。"
+          ],
+          "mistake": "capture(speed=72,speed=73)语法重复关键字，会报错。",
+          "exercise": "增加distance=34字段并从返回字典中按键读取它。"
+        },
+        {
+          "title": "调用时的*和**：展开而不是接收",
+          "syntax": "f(*sequence) / f(**mapping)",
+          "explain": "在函数调用位置，*sequence表示把序列元素展开成多个位置实参，**mapping表示把字典键值对展开为命名实参。这与定义处“*args收集、**kwargs收集”是相对的动作。先确认函数需要什么参数，再选择是否展开；常见的read_frame(*values)若字段数量与顺序不正确仍会报错。",
+          "code": "def add(a,b):\n    return a+b\npair=[2,3]\nprint(add(*pair))\noptions={'a':4,'b':5}\nprint(add(**options))",
+          "output": "5\n9",
+          "trace": [
+            "调用add(*pair)将列表元素2、3展开给a、b。",
+            "调用add(**options)把键a,b映射为对应形参。"
+          ],
+          "mistake": "**mapping的键必须与函数签名允许的参数名称匹配；未知名称会报TypeError。",
+          "exercise": "把options键名a改为x，观察错误如何报告。"
+        },
+        {
+          "title": "位置限定/关键字限定参数：/与单独*",
+          "syntax": "def f(a, /, *, b): ...",
+          "explain": "Python还支持参数列表中单独的/和*，分别限定某些参数只能按位置传，或只能按关键字传。很多标准库函数签名会出现这些符号，初学时只需要会读：/前的参数不接受关键字；*后的普通参数必须用名称指定。该符号在函数定义中不是除法或乘法。",
+          "code": "def check(distance, /, *, limit=35):\n    return distance <= limit\nprint(check(34, limit=35))",
+          "output": "True",
+          "trace": [
+            "distance位于/之前，只能位置传入34。",
+            "limit位于单独*之后，调用时通过limit=35指定。"
+          ],
+          "mistake": "check(distance=34,limit=35)会因distance是仅位置参数而报TypeError。",
+          "exercise": "将limit省略使用默认值，再尝试不合法的位置传limit。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "13：形参/实参/return；11：dict与tuple"
+      ],
+      "chapterSummary": "能读懂常见Python函数签名，包括:注解、->返回注解、默认参数、关键字参数、*args/**kwargs及参数展开。"
     },
     {
       "id": "module",
       "phase": "函数与调用",
-      "title": "15 · import模块、__name__与真正的执行顺序",
-      "minutes": 45,
+      "title": "15 · 模块、import、__name__：跨文件调用按顺序展开",
+      "minutes": 72,
       "goal": "完整理解main.py→reader.py→monitor.py→返回main.py，以及导入时究竟发生什么。",
       "story": [
         "一个.py文件就是一个模块。main.py可以from reader import load_frames，再写load_frames(...)调用。导入模块时Python会处理那个模块的顶层代码并创建函数/类定义；不会自动调用这些函数，除非顶层代码自己写了调用语句。",
@@ -1521,10 +1902,96 @@
         "answer": 1,
         "why": "def建立可调用函数，正常函数体在调用时执行。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "一个.py文件就是一个模块，import首先做什么",
+          "syntax": "import math / from math import isfinite",
+          "explain": "Python模块通常对应一个.py文件（也可能是包或扩展模块）。import math导入math模块后要写math.isfinite(...);from math import isfinite把函数名字直接绑定在当前模块，调用isfinite(...)即可。导入过程会执行模块顶层代码来创建函数/类等定义，通常一次加载后会在sys.modules缓存。被导入文件中的普通函数体不会因为函数定义存在就自动调用。",
+          "code": "import math\nfrom math import sqrt\nprint(math.isfinite(72.0))\nprint(sqrt(9))",
+          "output": "True\n3.0",
+          "trace": [
+            "import math让当前模块取得名为math的模块对象。",
+            "from math import sqrt取得函数名sqrt。",
+            "通过math.isfinite以及sqrt(9)调用两个函数。"
+          ],
+          "mistake": "不要写import math后直接isfinite(...)，除非也从math导入该名字。",
+          "exercise": "分别使用import math和from math import sqrt两种形式算平方根。"
+        },
+        {
+          "title": "模块加载与函数调用是两种事件",
+          "syntax": "import logic；logic.check(34)",
+          "explain": "先编写logic.py只包含def check(...):...，然后main.py通过import logic得到模块对象。导入时执行logic顶层的def语句，函数对象存在，但其缩进的函数体尚未执行。main.py真正写logic.check(34)才调用该函数。若logic.py顶层有print，它会在首次导入时输出，这也是为什么建议把演示/业务入口放进__main__保护。",
+          "code": "## logic.py\n# def check(d):\n#     print('真正进入check')\n#     return d <= 35\n## main.py\n# import logic\n# result = logic.check(34)\n# print(result)",
+          "output": "将上述两个文件分别保存后运行main.py：先输出真正进入check，再输出True。",
+          "trace": [
+            "main导入logic，logic定义check。",
+            "main调用logic.check(34)，进入被调用函数。",
+            "函数返回True，恢复main并打印True。"
+          ],
+          "mistake": "代码框中的##只是用于分文件说明，不应把全部注释直接保存成一个脚本就期待看到上述结果。",
+          "exercise": "按说明创建两个真实文件，再把check调用删掉，观察什么内容不再输出。"
+        },
+        {
+          "title": "__name__ == '__main__'逐字符拆解",
+          "syntax": "if __name__ == '__main__': main()",
+          "explain": "if是条件；__name__是系统为模块提供的特殊名字；==判断两个字符串是否相等；'__main__'是代表入口执行上下文的字符串；冒号引出缩进块；main()是实际调用。当脚本直接运行时该判断通常为真；模块被其他脚本导入时，该模块的__name__通常等于自身模块名称。这样测试函数可被单独导入而不触发全套主程序。",
+          "code": "def main():\n    print('入口函数执行')\n\nprint('顶层语句执行')\nif __name__ == '__main__':\n    main()",
+          "output": "直接运行时：顶层语句执行；入口函数执行。被导入时只执行顶层语句执行（首次导入）。",
+          "trace": [
+            "定义main函数对象。",
+            "无论直接运行还是首次导入，顶层print都执行。",
+            "只有直接运行该脚本时，条件为真并调用main。"
+          ],
+          "mistake": "不要误认__main__为内置函数；它只是特殊字符串，真正函数是你自己定义的main()。",
+          "exercise": "在另一个脚本写import main，核对不触发main()。"
+        },
+        {
+          "title": "完整执行链：谁调用谁、返回什么",
+          "syntax": "main()→run()→load_frames()→Monitor.step()→return",
+          "explain": "调用栈是理解跨文件工程的关键：main调用run时main暂停等待；run调用load_frames时run暂停；reader解析完成return list[Frame]后run恢复；run每轮调用monitor.step，得到Decision对象，再继续下一帧。文件名排序或代码物理位置不等于运行顺序，只有从入口沿实际函数调用才能正确解释。",
+          "code": "def read():\n    print('进入read')\n    return [34, 42]\n\ndef run():\n    print('进入run')\n    values = read()\n    print('run收到', values)\n\nrun()",
+          "output": "进入run\n进入read\nrun收到 [34, 42]",
+          "trace": [
+            "执行run()进入run函数，先打印。",
+            "run调用read()，暂停run执行read。",
+            "read返回[34,42]，恢复run并打印收到结果。"
+          ],
+          "mistake": "不要把import模块自动解释成所有函数都执行；明确调用才导致函数体运行。",
+          "exercise": "增加def check(values)函数，构造run→read→check→run调用链。"
+        },
+        {
+          "title": "from、as与导入名称冲突",
+          "syntax": "from pathlib import Path；import numpy as np",
+          "explain": "from module import name取得模块某个名字；import module as alias为模块创建别名；例如numpy常缩写成np，后续np.asarray(...)的点号是访问numpy模块成员。不要把自己的文件命名为csv.py、json.py、typing.py，否则可能遮蔽标准库模块。避免from module import *，它会隐藏名字来源，增加维护成本。",
+          "code": "import math as m\nfrom pathlib import Path\nprint(m.sqrt(16))\nprint(Path('.').name)",
+          "output": "4.0\n.（在当前代码语境中，Path('.')的name通常为空字符串；本示例第二行实际会打印空行）",
+          "trace": [
+            "m是math模块别名。",
+            "m.sqrt(16)返回浮点4.0。",
+            "Path('.')并不代表文件路径的文件名，若要获得当前目录名称，应使用Path('.').resolve().name。"
+          ],
+          "mistake": "不要把点号访问的模块成员与字符串小数点混淆；不要定义同名math.py覆盖标准库。",
+          "exercise": "将Path('.')改成Path('.').resolve()，输出实际所在文件夹名。"
+        },
+        {
+          "title": "如何定位ImportError与ModuleNotFoundError",
+          "syntax": "ModuleNotFoundError / ImportError",
+          "explain": "ModuleNotFoundError通常表示找不到对应模块名（可能没安装、当前路径错误、虚拟环境不一致），ImportError还可能表示模块存在但无法导入指定名字。排查顺序：确认文件名拼写、当前目录、sys.path、当前解释器、依赖是否安装，再检查循环导入问题。不要先在网上随便pip install与文件同名的包。",
+          "code": "import sys\nprint(sys.executable)\nprint(sys.path[0])",
+          "output": "输出解释器路径和导入搜索路径的起始项；取决于本机运行方式。",
+          "trace": [
+            "sys.executable指出哪个解释器正在执行。",
+            "sys.path[0]指明导入搜索路径首项，值因入口运行方式而异。"
+          ],
+          "mistake": "如果你的项目文件叫json.py，import json可能指向你的文件而不是标准库。",
+          "exercise": "在本地把reader.py临时改名观察模块导入失败，再恢复。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02：点号、__name__；13：函数与return；16：对象"
+      ],
+      "chapterSummary": "能画出并逐步口述Python多文件调用链，分清import加载定义、main入口与函数真正调用的时机。"
     },
     {
       "id": "dataclass",
