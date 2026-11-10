@@ -30,6 +30,7 @@ def main() -> None:
         }""")
         page.goto(URL, wait_until="networkidle")
         page.locator("#chapterNav button[data-chapter]").first.wait_for()
+        page.wait_for_function("document.body.dataset.foundationReady === 'yes'")
 
         # 21章与逐点语法内容实际渲染，不能只检查JSON目录。
         assert page.locator("#chapterNav button[data-chapter]").count() == 21
