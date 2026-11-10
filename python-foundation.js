@@ -92,11 +92,13 @@ function showPanel(type){
   $('chapterPanel').hidden=type!=='chapter';
   $('projectPanel').hidden=type!=='project';
   $('atlasPanel').hidden=type!=='atlas';
+  $('bridgePanel').hidden=type!=='bridge';
   $('resourcesPanel').hidden=type!=='resources';
   $('finalPanel').hidden=type!=='final';
   for(const b of $('chapterNav').querySelectorAll('[data-chapter]')){
     b.classList.toggle('selected',type==='chapter' && b.dataset.chapter===activeChapter);
   }
+  if(type==='bridge') renderBridge();
   if(type==='atlas') renderAtlas();
   if(type==='resources') renderResources();
   if(type==='project') renderProject();
@@ -234,9 +236,27 @@ $('chapterNote').addEventListener('input',()=>{
 });
 $('chapterSearch').addEventListener('input',()=>renderChapterNav($('chapterSearch').value));
 $('startFirst').onclick=()=>openChapter(book.chapters[0].id);
+$('openBridge').onclick=()=>{showPanel('bridge');$('bridgePanel').scrollIntoView({block:'start'});};
 $('openAtlas').onclick=()=>{showPanel('atlas');$('atlasPanel').scrollIntoView({block:'start'});};
 $('openProject').onclick=()=>{showPanel('project');$('projectPanel').scrollIntoView({block:'start'});};
 $('openResources').onclick=()=>{showPanel('resources');$('resourcesPanel').scrollIntoView({block:'start'});};
+function renderBridge(){
+  const root=$('bridgeTable');root.replaceChildren();
+  const table=node('table'),thead=node('thead'),tr=node('tr');
+  for(const header of ['对照主题','C语言写法','Python写法','关键差异'])tr.append(node('th',header));
+  thead.append(tr);table.append(thead);
+  const body=node('tbody');
+  for(const row of book.cBridge){
+    const tr=node('tr');
+    for(const value of row){
+      const td=node('td');
+      const code=node('code',value);
+      td.append(code);tr.append(td);
+    }
+    body.append(tr);
+  }
+  table.append(body);root.append(table);
+}
 function renderAtlas(){
   const term=$('atlasSearch').value.trim().toLowerCase();
   const root=$('atlasTable');root.replaceChildren();
