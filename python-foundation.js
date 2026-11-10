@@ -108,7 +108,7 @@ function renderChapterNav(filter=''){
   $('chapterNav').replaceChildren();
   const term=filter.trim().toLowerCase();
   for(const chapter of book.chapters){
-    if(term && !(chapter.title+' '+chapter.phase+' '+chapter.goal).toLowerCase().includes(term))continue;
+    if(term && !(chapter.title+' '+chapter.phase+' '+chapter.goal+' '+(chapter.deepDive||[]).map(x=>x.title+' '+x.syntax).join(' ')).toLowerCase().includes(term))continue;
     const b=node('button',chapter.title);
     b.type='button';b.dataset.chapter=chapter.id;
     b.onclick=()=>openChapter(chapter.id);
@@ -135,7 +135,64 @@ function openChapter(id){
   paragraph(card,'本节要能做到：'+chapter.goal,'goal');
   heading(card,'先把问题和场景讲清楚');
   for(const p of chapter.story)paragraph(card,p,'explain');
-  heading(card,'完整示例 · 先预测再看结果');
+  // V2以依赖知识和逐条语法为主；原章节示例保留作最后的整章复盘。
+  if(Array.isArray(chapter.deepDive) && chapter.deepDive.length){
+    const preface=node('div',undefined,'chapterPrerequisites');
+    const ptitle=node('strong','开始前先确认');
+    preface.append(ptitle);
+    for(const p of chapter.prerequisites||[])paragraph(preface,p);
+    card.append(preface);
+    heading(card,'本章每一项语法怎么读（'+chapter.deepDive.length+'节）');
+    const miniNav=node('nav',undefined,'miniIndex');
+    miniNav.setAttribute('aria-label','本章语法小节');
+    chapter.deepDive.forEach((part,i)=>{
+      const a=node('a',String(i+1).padStart(2,'0')+' · '+part.title);
+      a.href='#grammar-'+chapter.id+'-'+i;
+      miniNav.append(a);
+    });
+    card.append(miniNav);
+    for(const [i,part] of chapter.deepDive.entries()){
+      const section=node('section',undefined,'grammarUnit');
+      section.id='grammar-'+chapter.id+'-'+i;
+      section.append(node('div','语法小节 '+(i+1)+' / '+chapter.deepDive.length,'grammarCounter'));
+      section.append(node('h3',part.title));
+      const syntax=node('div',undefined,'grammarSyntax');
+      syntax.append(node('strong','这一句的语法形式'));
+      syntax.append(node('pre',part.syntax));
+      section.append(syntax);
+      heading(section,'每个部分是什么意思、为什么这样写');
+      paragraph(section,part.explain,'grammarExplain');
+      const body=node('div',undefined,'grammarColumns');
+      const left=node('div',undefined,'grammarCodePanel');
+      const top=node('div',undefined,'codeTop');
+      top.append(node('span','可独立阅读的小程序 · 先预测输出'));
+      const copyBtn=node('button','复制代码');
+      copyBtn.type='button';
+      copyBtn.onclick=()=>copyText(part.code).then(ok=>{if(ok)copyBtn.textContent='已复制';});
+      top.append(copyBtn);
+      left.append(top);
+      const pre=node('pre',part.code,'grammarCode');
+      pre.tabIndex=0;
+      left.append(pre);
+      const right=node('div',undefined,'grammarTracePanel');
+      heading(right,'实际执行时发生了什么');
+      const ol=node('ol',undefined,'trace');
+      for(const step of part.trace)ol.append(node('li',step));
+      right.append(ol);
+      body.append(left,right);
+      section.append(body);
+      heading(section,'预期输出 / 观察到的结果');
+      section.append(node('pre',part.output,'expected'));
+      section.append(node('p','常见误解或错误：'+part.mistake,'tip'));
+      section.append(node('p','请自己动手：'+part.exercise,'task'));
+      card.append(section);
+    }
+    const conclusion=node('div',undefined,'chapterConclusion');
+    heading(conclusion,'学完本章你应该能回答');
+    paragraph(conclusion,chapter.chapterSummary||chapter.goal);
+    card.append(conclusion);
+  }
+  heading(card,'整章复盘示例 · 把已讲语法合起来');
   const toolbar=node('div',undefined,'codeTop');
   toolbar.append(node('span','逐行中文注释 · 复制后到本地Python执行'));
   const copy=node('button','复制本节代码');
@@ -446,8 +503,8 @@ async function init(){
     const response=await fetch('./python-foundation-content.json?v=20261110-v1',{cache:'no-store'});
     if(!response.ok)throw Error('教程教材数据未能加载');
     book=await response.json();
-    if(book.chapters.length!==20)throw Error('教材章节不完整');
-    $('heroIntro').textContent='20章中文逐步讲解、24类语法地图、官方/开源资源、一套可下载的完整多文件ASW工程；每天都能回来查阅，不必一次记住所有高级语法。';
+    if(book.chapters.length!==23 || book.chapters.some(x=>!Array.isArray(x.deepDive)||x.deepDive.length<4))throw Error('23章逐语法教材不完整');
+    $('heroIntro').textContent='23章中文细讲、144个独立语法小节、符号与调用链逐行拆解、26类语法地图和可下载的ASW工程；这是一页可以分次学习的完整参考教材。';
     for(const t of book.principles)$('principles').append(node('p',t));
     for(const item of book.schedule){
       const card=node('div',undefined,'scheduleCard');
