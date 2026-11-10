@@ -1,43 +1,44 @@
 {
-  "release": "2026-11-10-python-zero-foundation-v1",
+  "release": "2026-11-10-python-zero-foundation-v2-syntax-first",
   "title": "Python 零基础工程导学｜ASW应用与日志实作",
   "status": "D15的自愿先修页；不算新的课程天数，不改变D15进度",
   "principles": [
-    "先看输入/结果，再解释为什么要写这段代码。每节都有原始示例、逐步执行、预测输出和小问题。",
-    "一套原创ASW离线日志工程贯穿全日：从数值到Frame，到Monitor.step，到CSV错误诊断和测试。",
-    "主线掌握高频语法；高级语法收进可查索引而非要求一天熟练全部掌握。",
-    "网页代码是阅读与练习素材，不在浏览器中执行Python；本地真实Python验收必须在自己电脑完成。"
+    "先读Python代码中每个标点是什么意思，再学习变量、表达式、分支和循环。所有示例都解释符号，不能假设读者已经知道enunmerate或点号。",
+    "每章按：学习前置→基本语法框→逐符号解释→逐行运行→错误示例→修改任务→自测；先从一个变量、一行print开始，再叠加成ASW日志。",
+    "for与while在同一章讲基本语法、执行过程和使用边界；range/enumerate/zip下一章专项详细拆解，不作为未知技巧插入上一章。",
+    "C是对照工具，不替代Python教学。分清Python对象、模块导入、类型注解及C结构体/指针/编译的真正不同。",
+    "一页为高密度完整索引，可分次学习；网页只用于解释、笔记与自测。本地Python运行结果和故障注入仍需自己记录。"
   ],
   "schedule": [
     {
-      "label": "阶段1：从零启动",
-      "time": "约1.5–2小时",
-      "chapters": "01–06",
-      "outcome": "环境、变量、数值、分支、格式化"
+      "label": "基础A：看懂每个符号",
+      "time": "约2小时",
+      "chapters": "01–04",
+      "outcome": "解释器/文件/标点/命名/变量/类型"
     },
     {
-      "label": "阶段2：数据与循环",
-      "time": "约1.5–2小时",
-      "chapters": "07–09",
-      "outcome": "列表、字典、循环、切片"
+      "label": "基础B：表达式与控制流",
+      "time": "约2.5小时",
+      "chapters": "05–09",
+      "outcome": "运算/字符串/if/for/while/range/enumerate"
     },
     {
-      "label": "阶段3：函数与模块",
-      "time": "约2–2.5小时",
-      "chapters": "10–13",
-      "outcome": "参数/返回值、入口、对象、跨文件调用"
+      "label": "基础C：数据和函数",
+      "time": "约2.5小时",
+      "chapters": "10–14",
+      "outcome": "list/dict/tuple/set/推导式/def/return"
     },
     {
-      "label": "阶段4：文件与测试",
-      "time": "约1.5–2小时",
-      "chapters": "14–16",
-      "outcome": "CSV、异常、JSON、unittest"
+      "label": "工程A：代码组织",
+      "time": "约2小时",
+      "chapters": "15–19",
+      "outcome": "import/class/CSV/异常/unittest"
     },
     {
-      "label": "阶段5：工程与衔接",
-      "time": "约2–2.5小时",
-      "chapters": "17–20",
-      "outcome": "真实工程、故障注入、语法索引、衔接D15"
+      "label": "工程B：ASW综合与衔接",
+      "time": "约2小时",
+      "chapters": "20–23",
+      "outcome": "调用链/故障注入/语法地图/原D15 NumPy"
     }
   ],
   "chapters": [
@@ -72,12 +73,51 @@
         ],
         "answer": 0,
         "why": "Python解释器按程序规则执行脚本；CSV只是数据。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
+    },
+    {
+      "id": "symbols",
+      "phase": "语言符号",
+      "title": "02 · 标点、下划线、点号和代码块：先学会读Python",
+      "minutes": 40,
+      "goal": "读懂每一个重要符号：_、.、:、()、[]、{}、=、==、#、@、->、缩进和换行。",
+      "story": [
+        "本章先掌握语言符号和基本执行过程，再看汽车数据示例。每一个新写法在下面的详解中拆成独立的语法部件。",
+        "先执行能看懂的最小程序，再根据输入和返回结果核对执行过程。"
+      ],
+      "code": "print('start')\nprint('done')",
+      "trace": [
+        "Python解释器执行第一条print。",
+        "随后执行第二条print。",
+        "程序到达末尾退出。"
+      ],
+      "expected": "start\ndone",
+      "compare": "与C一样按入口和函数调用顺序理解，但Python用缩进确定代码块。",
+      "trap": "不能只记住运行结果；必须自己理解每个标点的作用。",
+      "task": "将两个print中间插入一个变量赋值，并解释程序执行顺序。",
+      "check": {
+        "q": "Python代码里的新符号应该怎样学？",
+        "options": [
+          "只背打印结果",
+          "先知道符号作用再通过运行验证",
+          "跳过语法直接写完整工程"
+        ],
+        "answer": 1,
+        "why": "先掌握最小语法单位，才能准确阅读组合表达式和工程调用。"
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "environment",
       "phase": "起步",
-      "title": "02 · 工作目录、VS Code、虚拟环境和包",
+      "title": "03 · 工作目录、VS Code、虚拟环境和包",
       "minutes": 25,
       "goal": "明白解释器、命令行、目录、库安装的关系。",
       "story": [
@@ -105,12 +145,16 @@
         ],
         "answer": 1,
         "why": "标准库csv、json、dataclasses等随Python提供；NumPy是第三方库。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "types",
       "phase": "基础语法",
-      "title": "03 · 变量、类型、动态类型与单位",
+      "title": "04 · 变量、类型、动态类型与单位",
       "minutes": 30,
       "goal": "认识int、float、str、bool、None和type，理解类型提示并非自动校验。",
       "story": [
@@ -138,12 +182,16 @@
         ],
         "answer": 1,
         "why": "类型注解是给开发者与检查工具看的，不是通用运行时验证机制。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "operators",
       "phase": "基础语法",
-      "title": "04 · 运算符、比较、逻辑和数值边界",
+      "title": "05 · 运算符、比较、逻辑和数值边界",
       "minutes": 30,
       "goal": "认识/、//、%、**、==、and/or/not与NaN问题。",
       "story": [
@@ -171,40 +219,11 @@
         ],
         "answer": 0,
         "why": "Python支持链式比较和and逻辑运算。"
-      }
-    },
-    {
-      "id": "conditions",
-      "phase": "基础语法",
-      "title": "05 · if / elif / else：缩进决定程序边界",
-      "minutes": 30,
-      "goal": "分清条件判断、分支优先级及缩进的意义。",
-      "story": [
-        "在C里大括号包住代码块；Python用冒号后面的缩进划分。if条件为真就执行对应缩进块，elif尝试其他条件，else处理剩下的情况。通常一层缩进4个空格。",
-        "工程里检查顺序有含义：先判断输入非法，再检查功能是否启用，最后才计算业务输出。若把范围判断放在最后，非法数据可能先参与计算。",
-        "初学者应在运行前画出决策树：speed是否有限？雷达是否有效？enable是否为True？距离是否触发告警？这比记关键词有效。"
-      ],
-      "code": "speed_kmh = 72.0\ndistance_m = 34.0\nradar_valid = True\nenable = True\n\nif not radar_valid:\n    status = \"INVALID\"          # 只有雷达无效才执行。\nelif not enable:\n    status = \"OFF\"              # 雷达有效但未启用。\nelif distance_m <= 35.0:\n    status = \"ALERT\"            # 有效且距离在触发范围。\nelse:\n    status = \"NORMAL\"           # 剩余情况。\nprint(status)                   # 与if对齐：所有分支之后都执行。",
-      "trace": [
-        "先判断not radar_valid：False，跳过第一个分支。",
-        "再判断not enable：False。",
-        "判断distance<=35：True，status变为ALERT。",
-        "不进入else；从分支结构退出，执行print。"
-      ],
-      "expected": "ALERT",
-      "compare": "C用if (...) {...}，Python用if ...:后加缩进；没有强制括号也没有花括号。",
-      "trap": "缩进混乱会报IndentationError。不要在elif后面再写独立if导致逻辑变成两次判断。",
-      "task": "把radar_valid改为False和enable改为False，分别预测status。观察为什么先检查radar会改变优先级。",
-      "check": {
-        "q": "上例radar_valid=False且enable=False，最终status是什么？",
-        "options": [
-          "OFF",
-          "INVALID",
-          "ALERT"
-        ],
-        "answer": 1,
-        "why": "第一个if命中后，其余elif/else不执行。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "strings",
@@ -237,40 +256,48 @@
         ],
         "answer": 1,
         "why": "从文本文件读取的是文本，不保证一定可转换为合法数值。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
-      "id": "lists",
-      "phase": "数据组织",
-      "title": "07 · list列表、索引、切片和for循环",
-      "minutes": 35,
-      "goal": "把多帧日志变成数据序列，理解0下标和遍历。",
+      "id": "conditions",
+      "phase": "基础语法",
+      "title": "07 · if / elif / else：缩进决定程序边界",
+      "minutes": 30,
+      "goal": "分清条件判断、分支优先级及缩进的意义。",
       "story": [
-        "在C中你学过固定数组STEPS[5][3]。Python的list是可变化长度的有序序列，索引从0开始，可append追加。列表元素可以是数字，也可以是Frame实例。列表可以包含不同类型，但工程中的同一信号列表通常保持一致类型。",
-        "frames[0]取得第一项，frames[-1]取得最后一项，frames[1:3]取得索引1和2，不包含3。for frame in frames表示依次取每个元素，而不是在for里自动启动新程序。",
-        "range(3)生成0、1、2，enumerate(frames)能同时拿到索引和元素。下面开始像真实日志处理一样，用多帧数据循环计算。"
+        "在C里大括号包住代码块；Python用冒号后面的缩进划分。if条件为真就执行对应缩进块，elif尝试其他条件，else处理剩下的情况。通常一层缩进4个空格。",
+        "工程里检查顺序有含义：先判断输入非法，再检查功能是否启用，最后才计算业务输出。若把范围判断放在最后，非法数据可能先参与计算。",
+        "初学者应在运行前画出决策树：speed是否有限？雷达是否有效？enable是否为True？距离是否触发告警？这比记关键词有效。"
       ],
-      "code": "distance_list = [45.0, 34.0, 38.0]\ndistance_list.append(42.0)            # 在末尾增加一个值。\nprint(distance_list[0])               # 第一个元素。\nprint(distance_list[-1])              # 最后一个元素。\nprint(distance_list[1:3])             # 包含下标1、2，不含3。\n\nfor index, distance in enumerate(distance_list):\n    print(index, distance)            # index从0增加，每轮取一项。",
+      "code": "speed_kmh = 72.0\ndistance_m = 34.0\nradar_valid = True\nenable = True\n\nif not radar_valid:\n    status = \"INVALID\"          # 只有雷达无效才执行。\nelif not enable:\n    status = \"OFF\"              # 雷达有效但未启用。\nelif distance_m <= 35.0:\n    status = \"ALERT\"            # 有效且距离在触发范围。\nelse:\n    status = \"NORMAL\"           # 剩余情况。\nprint(status)                   # 与if对齐：所有分支之后都执行。",
       "trace": [
-        "列表初始3项，append之后有4项。",
-        "取下标0得到45.0；-1得到42.0；1:3得到34.0和38.0。",
-        "enumerate第一次给(index=0,distance=45)，逐次迭代到3和42。",
-        "循环结束后退出for，没有任何默认无限循环。"
+        "先判断not radar_valid：False，跳过第一个分支。",
+        "再判断not enable：False。",
+        "判断distance<=35：True，status变为ALERT。",
+        "不进入else；从分支结构退出，执行print。"
       ],
-      "expected": "45.0\n42.0\n[34.0, 38.0]\n0 45.0\n1 34.0\n2 38.0\n3 42.0",
-      "compare": "C数组长度通常固定且需考虑容量/越界；Python列表自动管理容量，但索引超界仍会抛IndexError。",
-      "trap": "切片终点不包含在内；list.append返回None，不能写distance_list = distance_list.append(42)。",
-      "task": "构造五帧距离列表，打印所有小于等于35m的帧下标；不能直接修改原数据来让测试通过。",
+      "expected": "ALERT",
+      "compare": "C用if (...) {...}，Python用if ...:后加缩进；没有强制括号也没有花括号。",
+      "trap": "缩进混乱会报IndentationError。不要在elif后面再写独立if导致逻辑变成两次判断。",
+      "task": "把radar_valid改为False和enable改为False，分别预测status。观察为什么先检查radar会改变优先级。",
       "check": {
-        "q": "a=[10,20,30,40]，a[1:3]是什么？",
+        "q": "上例radar_valid=False且enable=False，最终status是什么？",
         "options": [
-          "[10,20,30]",
-          "[20,30]",
-          "[20,30,40]"
+          "OFF",
+          "INVALID",
+          "ALERT"
         ],
         "answer": 1,
-        "why": "从索引1开始，到索引3之前结束。"
-      }
+        "why": "第一个if命中后，其余elif/else不执行。"
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "loops",
@@ -303,12 +330,88 @@
         ],
         "answer": 1,
         "why": "break退出循环；continue跳过当前迭代的剩余部分。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
+    },
+    {
+      "id": "iteration-tools",
+      "phase": "循环进阶",
+      "title": "09 · range / enumerate / zip：它们究竟返回什么，for又怎样读取",
+      "minutes": 40,
+      "goal": "已会for/while后，再读懂range、enumerate、zip、索引与元素双变量循环以及嵌套循环。",
+      "story": [
+        "本章先掌握语言符号和基本执行过程，再看汽车数据示例。每一个新写法在下面的详解中拆成独立的语法部件。",
+        "先执行能看懂的最小程序，再根据输入和返回结果核对执行过程。"
+      ],
+      "code": "print('start')\nprint('done')",
+      "trace": [
+        "Python解释器执行第一条print。",
+        "随后执行第二条print。",
+        "程序到达末尾退出。"
+      ],
+      "expected": "start\ndone",
+      "compare": "与C一样按入口和函数调用顺序理解，但Python用缩进确定代码块。",
+      "trap": "不能只记住运行结果；必须自己理解每个标点的作用。",
+      "task": "将两个print中间插入一个变量赋值，并解释程序执行顺序。",
+      "check": {
+        "q": "Python代码里的新符号应该怎样学？",
+        "options": [
+          "只背打印结果",
+          "先知道符号作用再通过运行验证",
+          "跳过语法直接写完整工程"
+        ],
+        "answer": 1,
+        "why": "先掌握最小语法单位，才能准确阅读组合表达式和工程调用。"
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
+    },
+    {
+      "id": "lists",
+      "phase": "数据组织",
+      "title": "10 · list列表、索引、切片和for循环",
+      "minutes": 35,
+      "goal": "把多帧日志变成数据序列，理解0下标和遍历。",
+      "story": [
+        "在C中你学过固定数组STEPS[5][3]。Python的list是可变化长度的有序序列，索引从0开始，可append追加。列表元素可以是数字，也可以是Frame实例。列表可以包含不同类型，但工程中的同一信号列表通常保持一致类型。",
+        "frames[0]取得第一项，frames[-1]取得最后一项，frames[1:3]取得索引1和2，不包含3。for frame in frames表示依次取每个元素，而不是在for里自动启动新程序。",
+        "range(3)生成0、1、2，enumerate(frames)能同时拿到索引和元素。下面开始像真实日志处理一样，用多帧数据循环计算。"
+      ],
+      "code": "distance_list = [45.0, 34.0, 38.0]\ndistance_list.append(42.0)            # 在末尾增加一个值。\nprint(distance_list[0])               # 第一个元素。\nprint(distance_list[-1])              # 最后一个元素。\nprint(distance_list[1:3])             # 包含下标1、2，不含3。\n\nfor index, distance in enumerate(distance_list):\n    print(index, distance)            # index从0增加，每轮取一项。",
+      "trace": [
+        "列表初始3项，append之后有4项。",
+        "取下标0得到45.0；-1得到42.0；1:3得到34.0和38.0。",
+        "enumerate第一次给(index=0,distance=45)，逐次迭代到3和42。",
+        "循环结束后退出for，没有任何默认无限循环。"
+      ],
+      "expected": "45.0\n42.0\n[34.0, 38.0]\n0 45.0\n1 34.0\n2 38.0\n3 42.0",
+      "compare": "C数组长度通常固定且需考虑容量/越界；Python列表自动管理容量，但索引超界仍会抛IndexError。",
+      "trap": "切片终点不包含在内；list.append返回None，不能写distance_list = distance_list.append(42)。",
+      "task": "构造五帧距离列表，打印所有小于等于35m的帧下标；不能直接修改原数据来让测试通过。",
+      "check": {
+        "q": "a=[10,20,30,40]，a[1:3]是什么？",
+        "options": [
+          "[10,20,30]",
+          "[20,30]",
+          "[20,30,40]"
+        ],
+        "answer": 1,
+        "why": "从索引1开始，到索引3之前结束。"
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "dict-tuple-set",
       "phase": "数据组织",
-      "title": "09 · dict、tuple、set和可变对象",
+      "title": "11 · dict、tuple、set和可变对象",
       "minutes": 35,
       "goal": "理解列表按位置取、字典按键取、元组通常作为记录、集合去重。",
       "story": [
@@ -337,12 +440,51 @@
         ],
         "answer": 1,
         "why": "赋值没有复制列表对象，a与b引用同一个可变列表。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
+    },
+    {
+      "id": "comprehensions",
+      "phase": "序列变换",
+      "title": "12 · 从普通for到列表推导式：先展开再缩写",
+      "minutes": 40,
+      "goal": "先用清楚的for逐项构造新列表，再识别[x for x in seq if ...]，不与循环基础混教。",
+      "story": [
+        "本章先掌握语言符号和基本执行过程，再看汽车数据示例。每一个新写法在下面的详解中拆成独立的语法部件。",
+        "先执行能看懂的最小程序，再根据输入和返回结果核对执行过程。"
+      ],
+      "code": "print('start')\nprint('done')",
+      "trace": [
+        "Python解释器执行第一条print。",
+        "随后执行第二条print。",
+        "程序到达末尾退出。"
+      ],
+      "expected": "start\ndone",
+      "compare": "与C一样按入口和函数调用顺序理解，但Python用缩进确定代码块。",
+      "trap": "不能只记住运行结果；必须自己理解每个标点的作用。",
+      "task": "将两个print中间插入一个变量赋值，并解释程序执行顺序。",
+      "check": {
+        "q": "Python代码里的新符号应该怎样学？",
+        "options": [
+          "只背打印结果",
+          "先知道符号作用再通过运行验证",
+          "跳过语法直接写完整工程"
+        ],
+        "answer": 1,
+        "why": "先掌握最小语法单位，才能准确阅读组合表达式和工程调用。"
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "func",
       "phase": "函数与调用",
-      "title": "10 · def、参数、return、None与作用域",
+      "title": "13 · def、参数、return、None与作用域",
       "minutes": 40,
       "goal": "理解函数并不自动运行，调用者与被调用者之间如何交换数据。",
       "story": [
@@ -370,12 +512,16 @@
         ],
         "answer": 2,
         "why": "print负责副作用输出，不等于给调用者返回那个字符串。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "params",
       "phase": "函数与调用",
-      "title": "11 · 默认参数、关键字参数、*args、**kwargs与返回多个值",
+      "title": "14 · 默认参数、关键字参数、*args、**kwargs与返回多个值",
       "minutes": 30,
       "goal": "学会阅读未来项目常见的函数签名，知道可变默认参数陷阱。",
       "story": [
@@ -403,12 +549,16 @@
         ],
         "answer": 0,
         "why": "关键字参数允许指定unit名称，默认值也可以覆盖。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "module",
       "phase": "函数与调用",
-      "title": "12 · import模块、__name__与真正的执行顺序",
+      "title": "15 · import模块、__name__与真正的执行顺序",
       "minutes": 45,
       "goal": "完整理解main.py→reader.py→monitor.py→返回main.py，以及导入时究竟发生什么。",
       "story": [
@@ -437,12 +587,16 @@
         ],
         "answer": 1,
         "why": "def建立可调用函数，正常函数体在调用时执行。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "dataclass",
       "phase": "工程对象",
-      "title": "13 · class、__init__、self、@dataclass和C结构体比较",
+      "title": "16 · class、__init__、self、@dataclass和C结构体比较",
       "minutes": 45,
       "goal": "理解Python对象、方法与存储状态，连接D14的MonitorContext/MonitorResult。",
       "story": [
@@ -471,12 +625,16 @@
         ],
         "answer": 1,
         "why": "对象保留跨帧状态；每轮新建会重置previous_alert。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "files",
       "phase": "工程输入输出",
-      "title": "14 · pathlib、with open、CSV、JSON和数据边界",
+      "title": "17 · pathlib、with open、CSV、JSON和数据边界",
       "minutes": 45,
       "goal": "读懂本项目为什么把CSV读取、业务处理、JSON输出分成模块。",
       "story": [
@@ -504,12 +662,16 @@
         ],
         "answer": 1,
         "why": "CSV是文本格式，必须显式转换并校验。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "exceptions",
       "phase": "工程输入输出",
-      "title": "15 · try / except / raise：异常与返回状态",
+      "title": "18 · try / except / raise：异常与返回状态",
       "minutes": 40,
       "goal": "处理损坏数据和程序错误，学会区分异常、状态返回和退出码。",
       "story": [
@@ -537,12 +699,16 @@
         ],
         "answer": 1,
         "why": "应保留可定位的错误信息，禁止无声掩盖异常。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "debug",
       "phase": "调试测试",
-      "title": "16 · 打印、断点、Traceback和单元测试",
+      "title": "19 · 打印、断点、Traceback和单元测试",
       "minutes": 40,
       "goal": "从错误信息找到文件、行号、函数调用栈，能写最小unittest。",
       "story": [
@@ -570,12 +736,16 @@
         ],
         "answer": 1,
         "why": "断言是验证需求的证据，不应为了绿灯随意改变预期。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "fullflow",
       "phase": "工程实作",
-      "title": "17 · 逐帧追踪完整ASW教学工程",
+      "title": "20 · 逐帧追踪完整ASW教学工程",
       "minutes": 50,
       "goal": "把前面独立语法串成真正的模块调用链，明确对象、变量、返回值怎样传递。",
       "story": [
@@ -605,12 +775,16 @@
         ],
         "answer": 1,
         "why": "同一个Monitor实例持有previous_alert，后续step调用会继续使用。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "practice",
       "phase": "工程实作",
-      "title": "18 · 五次必做改动与故障注入",
+      "title": "21 · 五次必做改动与故障注入",
       "minutes": 55,
       "goal": "通过能观察到的失败和修复证明自己理解代码，而不是复制粘贴。",
       "story": [
@@ -639,12 +813,16 @@
         ],
         "answer": 1,
         "why": "工程学习需要可重复的本地执行证据。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "atlas",
       "phase": "后续索引",
-      "title": "19 · 一天内看懂未来的Python语法地图",
+      "title": "22 · 一天内看懂未来的Python语法地图",
       "minutes": 35,
       "goal": "知道未来遇到陌生语法去哪里查，不要求一天内熟练掌握所有高级特性。",
       "story": [
@@ -672,12 +850,16 @@
         ],
         "answer": 1,
         "why": "NumPy本质上是在既有Python基础上引入新的数组类型及操作函数。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     },
     {
       "id": "next",
       "phase": "后续索引",
-      "title": "20 · 进入原D15：从list到ndarray，再到曲线",
+      "title": "23 · 进入原D15：从list到ndarray，再到曲线",
       "minutes": 25,
       "goal": "明确基础导学与原D15的衔接，不打乱84天路线。",
       "story": [
@@ -706,10 +888,28 @@
         ],
         "answer": 1,
         "why": "冒号表示所有行，0表示第0列。"
-      }
+      },
+      "deepDive": [],
+      "syntaxWords": [],
+      "prerequisites": [],
+      "chapterSummary": ""
     }
   ],
   "syntaxAtlas": [
+    [
+      "入门必会",
+      "符号基础",
+      "_、.、()、[]、{}、:、=、==、#、@、->、缩进、换行",
+      "02",
+      "逐字符阅读Python代码"
+    ],
+    [
+      "入门必会",
+      "循环辅助工具",
+      "range、enumerate、zip、start/stop/step、unpack",
+      "08–09",
+      "按帧索引和多信号对齐"
+    ],
     [
       "入门必会",
       "变量/注释",
@@ -1149,5 +1349,7 @@
       "venv/pip/requirements.txt",
       "工具链工作不同，工程都需要可复现依赖"
     ]
-  ]
+  ],
+  "subtitle": "先从最小符号与语句开始，再进入循环、容器、函数、模块和ASW工程",
+  "teachingApproach": "针对学过少量C但从未学Python的学习者。每个新语法必须解释语法形式、每个组成部分、逐步执行、输出、典型错误及本地练习。for与while同章讲；range、enumerate、zip在紧随其后的章节深讲。"
 }
