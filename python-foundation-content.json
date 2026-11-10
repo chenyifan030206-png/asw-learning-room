@@ -1027,5 +1027,127 @@
     "能在本地执行原始项目8帧并生成results.json",
     "能在本地运行unittest，完成故障注入FAIL→修复PASS",
     "知道原D15接下来学习NumPy矩阵shape和Matplotlib图，不把本页浏览器自测误算为Python本地通关"
+  ],
+  "cBridge": [
+    [
+      "声明变量",
+      "float speed = 72.0f;",
+      "speed = 72.0 / speed: float = 72.0",
+      "Python运行时名字绑定对象，类型提示非运行时强制"
+    ],
+    [
+      "函数定义与返回",
+      "int f(int x){return x+1;}",
+      "def f(x: int) -> int: return x+1",
+      "->是类型注解，值由return决定"
+    ],
+    [
+      "无返回值",
+      "void reset(void){...}",
+      "def reset() -> None: ...",
+      "无return时Python默认返回None"
+    ],
+    [
+      "结构体数据",
+      "typedef struct {...} Frame;",
+      "@dataclass class Frame: ...",
+      "Python dataclass是类，不等于C二进制布局"
+    ],
+    [
+      "创建结构化值",
+      "Frame sample = {0};",
+      "sample = Frame(...)",
+      "调用类创建实例"
+    ],
+    [
+      "结构体成员",
+      "sample.speed",
+      "sample.speed",
+      "属性访问外观相近"
+    ],
+    [
+      "指针修改上下文",
+      "Monitor_Step(&ctx,&frame)",
+      "monitor.step(frame, now_ms)",
+      "Python对象按对象引用传递，非C指针语义"
+    ],
+    [
+      "数组/列表",
+      "double a[3] = {1,2,3};",
+      "a = [1.0,2.0,3.0]",
+      "list可变长、可混类型，越界仍报错"
+    ],
+    [
+      "二维/向量",
+      "a[i][j]",
+      "a[i][j] / np_matrix[:,0]",
+      "list索引与NumPy切片是不同概念"
+    ],
+    [
+      "逻辑表达式",
+      "&& || !",
+      "and or not",
+      "布尔短路逻辑类似"
+    ],
+    [
+      "判断相等",
+      "==",
+      "==",
+      "=是赋值，is测试对象身份"
+    ],
+    [
+      "条件块",
+      "if(x){...}else{...}",
+      "if x:\\n    ...\\nelse:\\n    ...",
+      "Python以缩进确定代码块"
+    ],
+    [
+      "循环",
+      "for(int i=0;i<n;i++)",
+      "for i in range(n):",
+      "range(n)含0..n-1"
+    ],
+    [
+      "字符串格式化",
+      "printf(\"speed=%f\",speed);",
+      "print(f\"speed={speed:.1f}\")",
+      "Python f-string更适合生成日志文本"
+    ],
+    [
+      "文件输入",
+      "fopen/fgets/fclose",
+      "with open(...) as f:",
+      "with自动管理文件关闭"
+    ],
+    [
+      "模块互相调用",
+      "*.h声明 / *.c实现 / 链接",
+      "from reader import load_frames",
+      "import取得模块定义，调用时进入函数"
+    ],
+    [
+      "错误处理",
+      "return -2 / errno",
+      "raise ValueError / try-except",
+      "业务无效仍可显式返回valid=False"
+    ],
+    [
+      "单元测试",
+      "CTest / assert()",
+      "unittest.TestCase",
+      "两个环境都需要真实执行测试代码"
+    ],
+    [
+      "入口",
+      "int main(void)",
+      "if __name__ == '__main__': main()",
+      "防止作为模块导入时意外跑主程序"
+    ],
+    [
+      "包管理",
+      "CMake/库链接",
+      "venv/pip/requirements.txt",
+      "工具链工作不同，工程都需要可复现依赖"
+    ]
   ]
 }
