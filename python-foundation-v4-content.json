@@ -79,11 +79,25 @@
           "name": "什么是“解释器执行脚本”",
           "grammar": "终端：python3 hello.py；脚本：print('Hello')",
           "explanation": "命令行中的python3是解释器程序，hello.py是输入的源文件路径。终端按回车后，解释器读取文件，编译为字节码并执行相应操作；它并非像典型C工作流那样先交给GCC生成一个独立的可执行文件。文件里顶层语句从上向下执行。Python源码里的print不是英文说明，而是一个可调用的内置函数；圆括号表示调用，括号中的文字是实参。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "print('第一行')\nprint('第二行')",
           "trace": [
             "第1条调用print，把字符串交给它输出。",
-            "第2条调用print执行完成后，文件结束。"
+            "第2条调用print执行完成后，文件结束。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "第一行\n第二行",
           "errors": [
@@ -95,11 +109,29 @@
           "name": "三种常见输入方式：REPL、.py文件、VS Code运行",
           "grammar": "python3；python3 demo.py；python3 -m unittest",
           "explanation": "在终端只输入python3会进入交互式提示符>>>，可以输入一行表达式立即看结果；exit()退出。写在.py文件中的表达式不会自动显示结果，通常要print。VS Code的运行按钮本质上调用选定的Python解释器执行文件，必须确认选择的是哪个环境；python3 -m 后跟模块名，表示作为模块运行而不是读取同名普通文件路径。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "a = 72\nprint(a)\nprint(a / 3.6)",
           "trace": [
             "解释器先将名字a绑定到整数72。",
-            "读取a并输出72；读取a做除法并打印20.0。"
+            "读取a并输出72；读取a做除法并打印20.0。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "72\n20.0",
           "errors": [
@@ -111,7 +143,24 @@
           "name": "程序何时开始、何时结束：入口是调用",
           "grammar": "if __name__ == '__main__': main()",
           "explanation": "Python运行文件时，会执行文件顶层语句。函数def被执行时创建函数定义，函数体通常要等调用才执行。为了让一个文件既能独立运行又能被import复用，常写if __name__ == '__main__'。此时__name__是Python提供的特殊模块变量，并不是你随意取的变量名。直接运行文件时是'__main__'，被另一个文件导入时通常是模块名。现阶段只需理解它让真正入口清晰，后面会拆解下划线与模块名。",
-          "parts": [],
+          "parts": [
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "def main():\n    print('执行main')\n\nprint('定义已经完成')\nif __name__ == '__main__':\n    main()",
           "trace": [
             "执行def语句创建main这个函数对象，但不进入函数体。",
@@ -128,7 +177,24 @@
           "name": "错误信息如何读：从异常类型回到出错行",
           "grammar": "SyntaxError / NameError / TypeError / FileNotFoundError",
           "explanation": "SyntaxError说明源代码不符合Python语法，例如缺引号或冒号；NameError常是名字没有定义；TypeError可能是对不兼容类型执行操作；FileNotFoundError是路径错误或文件不存在。看到Traceback先从最后的异常类型读起，再沿上方文件和行号定位调用链。不要把所有异常都归为“解释器坏了”。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "speed = 72\nprint(speed)\n# print(sped)  # 如果取消注释：拼错名字，出现NameError。",
           "trace": [
             "正常两行无异常。",
@@ -162,7 +228,24 @@
           "name": "Python标点总览：先给符号分工",
           "grammar": "=  ==  .  _  :  ()  []  {}  #  @  ->  //  **",
           "explanation": "这些不是装饰。=用于赋值；==用于比较；.访问属性、方法或模块成员；_既能组成普通名字，也可作为约定性占位名字；:在if/for/def/class后开始缩进语句块，还能出现在字典、切片及类型注解中；()常表示调用或分组；[]表示列表或下标/切片；{}用于字典和集合；#开始注释；@引出装饰器；->通常是函数返回类型注解。不要在看到任何点号时都当小数点，更不能把所有冒号当作相同用途。",
-          "parts": [],
+          "parts": [
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "->",
+              "函数返回类型注解，不是C的指针箭头"
+            ]
+          ],
           "example": "speed_kmh = 72.0\nprint(speed_kmh == 72.0)\nprint(type(speed_kmh).__name__)",
           "trace": [
             "=把名字speed_kmh绑定72.0。",
@@ -213,7 +296,24 @@
           "name": "单独的_、前导_、末尾_分别是什么意思",
           "grammar": "for _ in range(3): ...；_cache；class_",
           "explanation": "当循环变量无需使用时，习惯写for _ in range(3)，表达“我不关心这个值”。请记住_仍然是一个普通有效变量名，Python不会因此忽略赋值。_cache单前导下划线是一种“内部使用”约定，并非强制访问限制；class_末尾下划线常用于避开关键字。双下划线与单下划线不同，放在类名内部可能触发名称改写机制，暂不要借此模仿C中的private访问控制。",
-          "parts": [],
+          "parts": [
+            [
+              "range(...)",
+              "产生整数可迭代序列，stop不包含，step不能为0"
+            ],
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "for _ in range(3):\n    print('检查一次')\nname_ = 'radar'\nprint(name_)",
           "trace": [
             "range(3)依次产生0、1、2。",
@@ -248,7 +348,8 @@
           "example": "print(__name__)\nprint(__file__)",
           "trace": [
             "__name__值取决于这个文件是入口还是被import。",
-            "__file__是在脚本/模块执行场景中可用的文件路径变量。"
+            "__file__是在脚本/模块执行场景中可用的文件路径变量。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "第一行直接运行脚本时为__main__；第二行依文件所在路径而变化。",
           "errors": [
@@ -359,7 +460,24 @@
           "name": "等号=、双等号==与is不是一回事",
           "grammar": "x = 1；x == 1；x is None",
           "explanation": "单=表示赋值，不会产生“是否相等”的布尔判断；==比较两个值是否相等，返回True/False；is比较对象身份是否为同一对象，最常见的是x is None或x is not None。不要用is比较普通整数、字符串或浮点内容是否相等。Python不使用C的&&或||，分别写and/or/not。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "None",
+              "表示没有值的单例，不是字符串'None'"
+            ],
+            [
+              "==",
+              "比较两侧值是否相等，并产生bool"
+            ]
+          ],
           "example": "a = 72\nprint(a == 72)\nmissing = None\nprint(missing is None)\nprint(a != 73)",
           "trace": [
             "a=72为赋值。",
@@ -377,7 +495,24 @@
           "name": "注释#、字符串引号、@、->的边界",
           "grammar": "'#'字符串 vs #注释；@dataclass；def f()->int",
           "explanation": "#在字符串外面表示本行后面的注释，不会作为程序指令执行；引号包起来的'#'只是字符串中的字符。@前缀通常用于装饰器，如@dataclass修改后面类定义的创建行为；先识别它的语法位置，后面的类章再彻底解释。->写在def(...)后表示返回类型注解，它不是C的指针成员访问操作符，Python没有同样的指针箭头含义。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "message = '#不是注释'\nprint(message)  # 真正的行内注释。\ndef add(a: int, b: int) -> int:\n    return a + b\nprint(add(2, 3))",
           "trace": [
             "message保存包含#字符的字符串。",
@@ -586,7 +721,24 @@
           "name": "在Windows/WSL里到底输入什么命令",
           "grammar": "python --version / python3 --version / py -3 --version",
           "explanation": "命令行是向操作系统的shell发出指令，不是Python源文件。Windows如果装了Python Launcher，可用py -3；WSL/Linux常见python3。若用VS Code，先确认右下角选中的解释器与终端python -c所显示的一致。Python版本建议使用项目支持的3.11+；本页工程只依赖标准库，不需为了刚入门立刻学包管理。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ]
+          ],
           "example": "import sys\nprint(sys.version.split()[0])\nprint(sys.executable)",
           "trace": [
             "在终端运行脚本。",
@@ -604,7 +756,24 @@
           "name": "工作目录和.py文件所在目录不同",
           "grammar": "Path.cwd() vs Path(__file__).resolve().parent",
           "explanation": "Path.cwd()反映终端当前所在目录；Path(__file__).resolve().parent得到脚本的所在目录。你在另一目录运行脚本时，这两个路径可能不同；写文件读取工程时，应确定路径是相对于当前目录还是相对于脚本目录。不要在读文件错误时直接怪CSV格式。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "from pathlib import Path\nprint('工作目录:', Path.cwd())\nprint('脚本目录:', Path(__file__).resolve().parent)",
           "trace": [
             "导入标准库pathlib中的Path类。",
@@ -621,7 +790,24 @@
           "name": "venv到底隔离了什么",
           "grammar": "python3 -m venv .venv；source .venv/bin/activate",
           "explanation": "虚拟环境主要隔离解释器使用的依赖安装位置，便于一个项目用一套版本。创建.venv目录后，激活会调整shell环境使python指向虚拟环境；不激活也能显式调用.venv/bin/python。Windows激活命令不同。D15要用NumPy、Matplotlib时才安装requirements；本基础工程可用系统Python 3.11+直接运行。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "import sys\nprint('执行的解释器:', sys.executable)\nprint('是否在venv:', sys.prefix != sys.base_prefix)",
           "trace": [
             "Python从sys取当前环境相关路径。",
@@ -638,11 +824,29 @@
           "name": "pip、requirements和包名/模块名",
           "grammar": "python -m pip install -r requirements.txt",
           "explanation": "pip是包安装工具；requirements.txt用于记录要安装的外部依赖。python -m pip保证用当前python对应的pip执行安装，通常比直接敲pip更不容易装错环境。一个安装包名称可能与import时的模块名称不完全一致；项目开头仍以本课无外部依赖为主。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "import csv\nimport json\nprint('标准库CSV/JSON已可导入')",
           "trace": [
             "import csv和json是导入Python标准库。",
-            "无需pip安装即可正常使用。"
+            "无需pip安装即可正常使用。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "标准库CSV/JSON已可导入",
           "errors": [
@@ -694,7 +898,24 @@
           "name": "Python变量并非C式提前分配的固定类型槽",
           "grammar": "name = value；type(name)",
           "explanation": "在常见Python代码中x=72把名字x绑定到整数对象72。之后写x='radar'也有效，x现在引用字符串对象；这叫动态类型，而不是C里int x一经声明就保持int的语法。推荐工程中仍遵循稳定的字段类型约定，便于调试和类型检查；不要为了灵活就随意混用同一变量名。",
-          "parts": [],
+          "parts": [
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "x = 72\nprint(type(x).__name__)\nx = 'radar'\nprint(type(x).__name__)",
           "trace": [
             "首先给x绑定整数72。",
@@ -712,7 +933,24 @@
           "name": "int、float、bool、str、None分别表示什么",
           "grammar": "int=整数；float=浮点；bool=True/False；str=字符串",
           "explanation": "int用于计数、周期号、毫秒整数；float用于车速、距离等带小数的量；bool表示雷达有效/使能；str表示状态名称或文件路径；None表示尚无结果。True与False首字母必须大写，None也大写；'True'仍是字符串而非布尔True。注意bool是int的子类，bool(True)为真而int(True)==1，但不能因此把布尔当作所有数值验证的替代品。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "None",
+              "表示没有值的单例，不是字符串'None'"
+            ]
+          ],
           "example": "frame_id = 3\nspeed = 72.5\nvalid = True\nstatus = 'ACTIVE'\nlast_result = None\nfor x in [frame_id,speed,valid,status,last_result]:\n    print(type(x).__name__)",
           "trace": [
             "各变量分别引用不同类型的对象。",
@@ -729,7 +967,24 @@
           "name": "类型转换与外部文本：float('72')不是魔法",
           "grammar": "int('3')、float('72.0')、str(72)、bool('0')",
           "explanation": "CSV是文本，因此'72.5'是字符串，必须经过float解析才成为可参与数值运算的对象。int('3')得到整数3；float('72.5')得到浮点72.5；str(72)得到字符串'72'。需要特别注意bool('0')是True，因为非空字符串按真值规则视为真，并非按字符串里的数字0转换。读取雷达标志时应显式判断raw=='1'，而不是用bool(raw)。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "==",
+              "比较两侧值是否相等，并产生bool"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "raw = '0'\nprint(bool(raw))\nprint(raw == '1')\nprint(float('72.5'))",
           "trace": [
             "bool('0')检查非空字符串的真值，得到True。",
@@ -746,7 +1001,24 @@
           "name": "类型提示、单位命名和真实检查的层次",
           "grammar": "speed_kmh: float = 72.0；math.isfinite(speed_kmh)",
           "explanation": "类型提示写在变量名称后冒号位置，用于沟通设计意图、IDE自动完成和静态类型检查。它不负责校验网络、CSV或传感器数据。速度公里每小时转米每秒需要除3.6，不能只改字段名字；车速上限、距离范围和数值是否为NaN也需要独立检查。在ASW数据接口上，类型、单位、取值范围、时间戳与有效标志是不同维度的约束。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "and/or/not",
+              "逻辑运算，and/or具有短路求值机制"
+            ]
+          ],
           "example": "import math\nspeed_kmh: float = 72.0\nspeed_mps = speed_kmh / 3.6\nvalid = math.isfinite(speed_kmh) and 0 <= speed_kmh <= 250\nprint(speed_mps, valid)",
           "trace": [
             "先定义速度变量并标注类型意图。",
@@ -803,7 +1075,20 @@
           "name": "加减乘除和取整：一行一行看运算顺序",
           "grammar": "+ - * / // % **",
           "explanation": "Python + - * /分别是加减乘除；/通常产生浮点商；//是向负无穷方向取整的商（负数时与C整型除法向零截断不同）；%求余；**是乘方。括号改变优先级。汽车单位换算一般保留浮点值，不应把速度结果误用//截断。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ],
+            [
+              "本节语法模板",
+              "+ - * / // % **。先确认它是语句头、表达式还是函数调用。"
+            ]
+          ],
           "example": "print(7 / 2)\nprint(7 // 2)\nprint(-7 // 2)\nprint(7 % 2)\nprint(2 ** 3)",
           "trace": [
             "7/2得到3.5。",
@@ -820,7 +1105,24 @@
           "name": "赋值与累加：=和+=的区别",
           "grammar": "x = 0；x += 1；x *= 2",
           "explanation": "x=0绑定一个初始值。x+=1大致表示取出当前值、加1、再把结果绑定到x；x*=2大致表示加倍。对int/float等不可变数值，适合这样理解；对list等可变对象，+=可能原地修改，后面会单独分析别名。一个函数里要累计帧数，应先给计数器一个初始值。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "+=",
+              "把右边值累计进现有左侧变量"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "count = 0\ncount += 1\ncount += 1\nprint(count)\ncount *= 2\nprint(count)",
           "trace": [
             "count先为0。",
@@ -838,7 +1140,24 @@
           "name": "比较表达式返回的是bool",
           "grammar": "== != > >= < <=",
           "explanation": "比较不会改变被比较对象。a==b是相等；a!=b是不等；> >= < <=比较大小。Python支持0<=distance<=500这样的链式比较，语义相当于同时满足两个条件，但只会按Python规则对中间表达式求值。对浮点结果不能默认所有运算都精确相等，做数值测试可使用math.isclose。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "==",
+              "比较两侧值是否相等，并产生bool"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "distance = 34.0\nprint(distance <= 35)\nprint(0 <= distance <= 500)\nprint(distance == 41)",
           "trace": [
             "34<=35成立。",
@@ -855,7 +1174,24 @@
           "name": "and / or / not及短路求值",
           "grammar": "a and b；a or b；not a",
           "explanation": "and要求两边条件成立才使布尔结果为真；or只要一边真即可；not取反。Python会短路：a为假时a and b不再求b，a为真时a or b不再求b。注意and/or本身返回的未必是bool对象（可能返回操作数），在写业务有效性判断时应让条件本身明确是布尔表达式。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "None",
+              "表示没有值的单例，不是字符串'None'"
+            ],
+            [
+              "True/False",
+              "布尔真或假，首字母大写"
+            ]
+          ],
           "example": "sample = None\nprint(sample is not None and sample > 0)\nvalid = True\nenable = False\nprint(valid and enable)\nprint(valid or enable)",
           "trace": [
             "sample is not None为False，and直接短路，不执行sample>0。",
@@ -872,7 +1208,24 @@
           "name": "is/in、运算优先级和括号",
           "grammar": "x is None；v in values；(a and b) or c",
           "explanation": "is用于比较对象身份，常见于is None；in检查元素是否在集合/列表或键是否在字典；not in是相反判断。写复杂条件时先加括号表达意图，避免and优先于or造成意外。例如故障或雷达无效时禁止警告，应先写not sensor_valid或fault_present，再进入业务判断。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "None",
+              "表示没有值的单例，不是字符串'None'"
+            ],
+            [
+              "and/or/not",
+              "逻辑运算，and/or具有短路求值机制"
+            ]
+          ],
           "example": "modes = [0, 1, 2]\nmode = 1\nprint(mode in modes)\nprint(mode not in [3, 4])\nvalue = None\nprint(value is None)",
           "trace": [
             "模式1存在于modes中。",
@@ -889,7 +1242,24 @@
           "name": "数值异常：math.isfinite、NaN与除零",
           "grammar": "math.isfinite(x)；try/except ZeroDivisionError",
           "explanation": "除数为零通常抛ZeroDivisionError；NaN、inf等特殊浮点值不是有效的车辆物理信号。isfinite既排除NaN也排除正负无穷；范围比较与非有限检查一起使用更明确。在C里isfinite来自math.h，Python里通常写math.isfinite，点号表示模块成员访问。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "except",
+              "捕获指定异常，执行错误处理代码"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "import math\nvalues = [72.0, float('nan'), float('inf')]\nfor value in values:\n    print(math.isfinite(value))",
           "trace": [
             "依次读取列表中的72、NaN、inf。",
@@ -946,7 +1316,24 @@
           "name": "字符串是什么：'文本'与数字不是一类数据",
           "grammar": "'72' / \"72\" / 72",
           "explanation": "引号把文本包起来形成字符串str。'72'表示两个字符'7'、'2'，数值72则是整数，两者不能直接加在一起计算。单引号、双引号在一般文本中都能定义字符串；遇到引号包含时可用不同引号或转义。中文同样可以出现在字符串中，保存.py文件时统一采用UTF-8更方便。",
-          "parts": [],
+          "parts": [
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "text = '72'\nnumber = 72\nprint(type(text).__name__)\nprint(type(number).__name__)\nprint(text + '3')\nprint(number + 3)",
           "trace": [
             "text引用两个字符组成的字符串。",
@@ -964,7 +1351,24 @@
           "name": "长度、正向/负向索引和切片",
           "grammar": "s[0]、s[-1]、s[1:4]",
           "explanation": "字符串是字符序列，可以len(s)获取字符数。s[0]为第一个字符，s[-1]为最后一个；s[1:4]取索引1、2、3，不包括4。字符串不可变，不能s[0]='x'来直接修改，只能创建新字符串。切片完整形式[start:stop:step]，后面列表章也使用同样思想。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "signal = 'radar'\nprint(len(signal))\nprint(signal[0])\nprint(signal[-1])\nprint(signal[1:4])",
           "trace": [
             "len('radar')返回5。",
@@ -982,7 +1386,24 @@
           "name": "字符串方法：点号后名字和圆括号",
           "grammar": "raw.strip()、raw.split(',')、','.join(parts)",
           "explanation": "字符串对象自带许多方法。raw.strip()去除两端空白；split(',')按照逗号分拆，返回字符串列表；','.join(parts)使用逗号作为连接符，把一组字符串拼成一个字符串。这里的点号取方法，()才执行；返回的结果通常是新的对象，原字符串自身不改变。先学会分别运行各步骤，不要一开始就嵌套十层方法调用。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "raw = ' 72.5,34.0 '\nclean = raw.strip()\nparts = clean.split(',')\nprint(clean)\nprint(parts)\nprint('|'.join(parts))",
           "trace": [
             "strip返回去掉空格的新字符串。",
@@ -999,7 +1420,20 @@
           "name": "转义字符、反斜线、原始字符串与路径",
           "grammar": "'a\\nb'、'\\t'、r'C:\\data'",
           "explanation": "反斜线在普通字符串中可引入转义序列。\\n表示换行、\\t表示制表符、\\\\表示一个反斜线。Windows路径若写'C:\\new'可能把\\n解析成换行，因此可用原始字符串r'C:\\new'，或pathlib.Path来处理路径。r前缀不是一个变量名，也不是把字符串转换成原始字节；原始字符串也不能简单以单个反斜线结尾。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ],
+            [
+              "冒号:",
+              "语句块、切片、字典或类型注解分隔符，取决于上下文"
+            ]
+          ],
           "example": "print('a\\nb')\nprint('a\\tb')\nprint(r'C:\\new')",
           "trace": [
             "第一个print中的\\n表示换行，输出占两行。",
@@ -1016,11 +1450,29 @@
           "name": "f-string：f前缀、花括号和格式说明",
           "grammar": "f'{speed:.1f} km/h'",
           "explanation": "f放在引号前表示格式化字符串。花括号{speed}在字符串内部表示“计算表达式并放到这里”；{speed:.1f}中的冒号后为格式规范，.1f是浮点保留一位小数格式，与对象成员访问的点号不是一回事。f'{count:03d}'把整数以至少3位显示并补零。输出中的单位要明确写成普通文本部分。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "speed = 72.56\ncount = 7\nprint(f'speed={speed:.1f} km/h')\nprint(f'frame={count:03d}')",
           "trace": [
             "f字符串计算speed值72.56并按小数一位显示为72.6。",
-            "count按3位十进制整数格式补零成007。"
+            "count按3位十进制整数格式补零成007。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "speed=72.6 km/h\nframe=007",
           "errors": [
@@ -1032,7 +1484,24 @@
           "name": "input()读入的都是字符串；转换必须明确",
           "grammar": "raw=input('请输入速度：')",
           "explanation": "input()打印提示并等待用户键盘输入，返回str，即使输入72也只是文本'72'。你必须明确float(raw)，并处理非法值。交互式输入适合初学练习；持续自动处理日志不应每轮都阻塞等待用户输入。没有终端交互时使用input还可能遇到EOFError。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "raw = input('车速km/h：')\nspeed = float(raw)\nprint(f'换算为 {speed / 3.6:.2f} m/s')",
           "trace": [
             "input等待用户输入并返回文本。",
@@ -1049,7 +1518,24 @@
           "name": "字符串中的in、比较、编码与CSV解析边界",
           "grammar": "'rad' in 'radar'；encode('utf-8')",
           "explanation": "in可判断一段文本是否包含在字符串中，如'rad' in 'radar'为True。文本与字节序列不同：str保存Unicode文本，bytes保存字节，.encode('utf-8')将文本编码为字节，.decode('utf-8')可以恢复。CSV是文本格式，但它有引号、转义、逗号等规则，后续不能仅靠split(',')处理所有真实CSV；正式读取应使用标准库csv.DictReader。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "name = 'radar'\nprint('rad' in name)\nraw = '车速'\ndata = raw.encode('utf-8')\nprint(isinstance(data, bytes))\nprint(data.decode('utf-8'))",
           "trace": [
             "子字符串'rad'出现在'radar'里。",
@@ -1106,7 +1592,24 @@
           "name": "if的最小语法：冒号、缩进与条件",
           "grammar": "if 条件表达式:\\n    语句",
           "explanation": "if后面是能按Python真值规则判断的条件表达式，后面的冒号表示将进入一个新的缩进代码块。缩进4个空格是惯例；如果条件为True就执行缩进块，否则跳过。if不要求像C那样用小括号包住条件，也不使用大括号包围代码块。条件里最好显式比较，例如if distance <= 35比if distance更清楚。",
-          "parts": [],
+          "parts": [
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "distance = 34\nif distance <= 35:\n    print('距离较近')\nprint('检查结束')",
           "trace": [
             "distance赋值34。",
@@ -1124,7 +1627,24 @@
           "name": "if...else二选一与完整的真值",
           "grammar": "if c:\\n    A\\nelse:\\n    B",
           "explanation": "else表示上一组if条件均未命中时执行另一个分支。两个分支不会在同一次if/else判断里都执行。Python真值规则中0、0.0、空字符串''、空列表[]、None通常是假，非空字符串'0'是真。对于传感器使能，应尽量使用明确布尔字段，而不是让任意文本隐式决定真伪。",
-          "parts": [],
+          "parts": [
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "else",
+              "根据所在结构确定含义：条件剩余分支或循环正常结束"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "enable = False\nif enable:\n    print('ACTIVE')\nelse:\n    print('OFF')",
           "trace": [
             "条件enable为False。",
@@ -1141,7 +1661,24 @@
           "name": "if/elif/else多分支按顺序匹配",
           "grammar": "if c1: A\\nelif c2: B\\nelse: C",
           "explanation": "elif是else if的合写，表示第一个条件失败后才试第二个。Python会依次检查直到遇到命中的分支，之后同一条条件链的剩余elif/else不执行。多个条件可以有覆盖关系，先判断非法/故障再判断正常；把正常条件放在最前面可能遮蔽需要优先处理的故障。",
-          "parts": [],
+          "parts": [
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "else",
+              "根据所在结构确定含义：条件剩余分支或循环正常结束"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "冒号:",
+              "语句块、切片、字典或类型注解分隔符，取决于上下文"
+            ]
+          ],
           "example": "radar_valid = False\nenable = False\nif not radar_valid:\n    state = 'INVALID'\nelif not enable:\n    state = 'OFF'\nelse:\n    state = 'ACTIVE'\nprint(state)",
           "trace": [
             "第一个条件not radar_valid为True。",
@@ -1158,7 +1695,24 @@
           "name": "嵌套if和and条件什么时候用",
           "grammar": "if valid:\\n    if enable: ...",
           "explanation": "if中还可以写if，层级由缩进确定。可以用and把两个条件合并成同一if，但需要清楚什么时候短路，以及各个不通过分支如何报告原因。对于ASW需求追踪，分开写故障/使能/数据年龄检查往往更方便定位具体拒绝理由。",
-          "parts": [],
+          "parts": [
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "True/False",
+              "布尔真或假，首字母大写"
+            ],
+            [
+              "else",
+              "根据所在结构确定含义：条件剩余分支或循环正常结束"
+            ]
+          ],
           "example": "valid = True\nenable = True\nif valid:\n    if enable:\n        print('允许监视')\n    else:\n        print('未启用')\nelse:\n    print('输入无效')",
           "trace": [
             "外层检查valid=True。",
@@ -1175,7 +1729,24 @@
           "name": "条件里的身份、成员和缺失值",
           "grammar": "is None、is not None、in、not in",
           "explanation": "对可能缺失的值，应先判断is not None再做数值比较。成员检查in适合判断模式码是否属于允许集合，例如mode in (0,1,2)。逻辑短路可以防止None参与浮点比较；但它不能替代数值范围/NaN检查。",
-          "parts": [],
+          "parts": [
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "None",
+              "表示没有值的单例，不是字符串'None'"
+            ]
+          ],
           "example": "sample = None\nif sample is not None and sample > 0:\n    print('有效')\nelse:\n    print('无输入')\nmode = 2\nprint(mode in (0, 1, 2))",
           "trace": [
             "sample不是非None，因此and短路。",
@@ -1192,7 +1763,24 @@
           "name": "工程化条件顺序：优先拒绝错误再给有效输出",
           "grammar": "先校验类型/范围/有效性→再计算业务结果",
           "explanation": "当输入已经无效时，不应先算距离提示再去补valid=False。这不仅影响可读性，也可能让错误值穿过代码路径。较易维护的方式是先验证radar_valid和数据年龄，再检查enable，最后再检查距离。每条分支给出明确的状态，让测试用例能一一对应。",
-          "parts": [],
+          "parts": [
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "True/False",
+              "布尔真或假，首字母大写"
+            ],
+            [
+              "else",
+              "根据所在结构确定含义：条件剩余分支或循环正常结束"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "age_ms = 101\nradar_valid = True\nenable = True\nif not radar_valid or age_ms > 100:\n    status = 'INVALID'\nelif not enable:\n    status = 'OFF'\nelse:\n    status = 'ACTIVE'\nprint(status)",
           "trace": [
             "radar_valid为True，所以not radar_valid为False。",
@@ -1249,7 +1837,24 @@
           "name": "为什么需要循环：循环体与重复次数",
           "grammar": "for 变量 in 可迭代对象:\\n    循环体",
           "explanation": "循环表示对某段代码重复执行。Python有for和while两类：for从一个“可迭代对象”依次取得元素，例如list、str、range；while每次先检查条件是否为真，再决定是否执行循环体。两者都通过冒号和缩进规定循环体的边界。不要把“Python执行循环”误解成真实20ms周期调度，离线模拟仅按顺序执行。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "print('开始')\nfor i in [0, 1, 2]:\n    print('帧', i)\nprint('结束')",
           "trace": [
             "先打印开始。",
@@ -1341,7 +1946,24 @@
           "name": "相同任务分别用for和while写出",
           "grammar": "for i in range(3) ≈ i=0; while i<3: ...",
           "explanation": "同一个“输出3次”的需求，for用range(3)自动提供0、1、2；while需自己初始化i、检查条件、递增i。for更适合已知范围或逐帧列表，while更适合条件式等待/重试。这里range(3)的结束点不包含3，下一章单独解释三种参数形式。",
-          "parts": [],
+          "parts": [
+            [
+              "range(...)",
+              "产生整数可迭代序列，stop不包含，step不能为0"
+            ],
+            [
+              "while",
+              "每次先检查条件是否成立，再决定是否执行循环体"
+            ],
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "for i in range(3):\n    print('for', i)\ni = 0\nwhile i < 3:\n    print('while', i)\n    i += 1",
           "trace": [
             "第一条for从range依次获取0、1、2。",
@@ -1358,7 +1980,24 @@
           "name": "range不是变量也不是神秘函数：从0到stop前",
           "grammar": "range(stop)、range(start,stop)、range(start,stop,step)",
           "explanation": "range(3)产生0、1、2供for依次访问；range(1,4)产生1、2、3；range(0,6,2)产生0、2、4，末端stop永远不包含。range对象不是完整的列表，想看所有数可list(range(...))；Python语法for只要求右边可迭代，并不强制使用range。下一章会详讲步长、负数和zero step异常。",
-          "parts": [],
+          "parts": [
+            [
+              "range(...)",
+              "产生整数可迭代序列，stop不包含，step不能为0"
+            ],
+            [
+              "list",
+              "有序可变容器，可通过下标、切片、方法读写"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ]
+          ],
           "example": "print(list(range(3)))\nprint(list(range(1, 4)))\nprint(list(range(0, 6, 2)))",
           "trace": [
             "range(3)从0开始，到3前停止。",
@@ -1405,11 +2044,29 @@
           "name": "从列表本身迭代：for value in values",
           "grammar": "for value in values:",
           "explanation": "不需要索引时，for直接从列表取得每个值，比先range(len(values))再values[i]简单。Python for不是C式计数循环，而是不断从可迭代对象取得元素。values中的元素类型决定value得到什么；例如列表里是Frame实例，value就是Frame对象。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "speeds = [72, 73, 74]\nfor speed in speeds:\n    print(speed / 3.6)",
           "trace": [
             "speed先绑定72，再绑定73，最后74。",
-            "每轮进行单位换算并打印。"
+            "每轮进行单位换算并打印。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "20.0\n20.27777777777778\n20.555555555555554",
           "errors": [
@@ -1460,12 +2117,25 @@
             [
               "start=1",
               "改变显示编号起点，原列表下标保持从0开始"
+            ],
+            [
+              "enumerate(...)",
+              "把可迭代对象的每个值附带编号，产生(index,value)二元组"
+            ],
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
             ]
           ],
           "example": "values = [45, 34]\nfor number, distance in enumerate(values, start=1):\n    print(number, distance)\nprint(values[0])",
           "trace": [
             "enumerate先生成(1,45)与(2,34)。",
-            "values真正第一个元素仍是下标0、值45。"
+            "values真正第一个元素仍是下标0、值45。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "1 45\n2 34\n45",
           "errors": [
@@ -1507,7 +2177,24 @@
           "name": "zip(strict=True)：长度不一致怎么发现",
           "grammar": "zip(speeds, distances, strict=True)",
           "explanation": "Python 3.10+的strict=True要求所有传入序列长度一致，否则遍历过程中抛ValueError。它适合必须完全对齐长度的数据组合，但仍不能检查物理采样周期是否一致。例如同为3帧、速度和距离对应的cycle不同，zip仍会按位置配对，必须有后续校验。",
-          "parts": [],
+          "parts": [
+            [
+              "zip(...)",
+              "按同一位置配对多个可迭代对象，普通zip在较短对象结束时停止"
+            ],
+            [
+              "except",
+              "捕获指定异常，执行错误处理代码"
+            ],
+            [
+              "list",
+              "有序可变容器，可通过下标、切片、方法读写"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "speeds = [72, 73]\ndistances = [45]\ntry:\n    print(list(zip(speeds, distances, strict=True)))\nexcept ValueError:\n    print('两组数据长度不匹配')",
           "trace": [
             "第一次迭代可能形成合法配对。",
@@ -1555,7 +2242,24 @@
           "name": "itertools与迭代器：知道“惰性取得数据”的概念",
           "grammar": "iter(values) / next(iterator)",
           "explanation": "range、enumerate、zip返回的是可迭代/迭代相关对象，并不要求先构造全部输出列表。iter(values)创建迭代器，next(it)取下一个值，没有下一个值会引发StopIteration；for在内部按照迭代协议取得元素并在耗尽时停止。初学阶段不必自己实现__iter__/__next__，理解for背后的“逐次取值”就足够了。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "values = [45, 34]\nit = iter(values)\nprint(next(it))\nprint(next(it))",
           "trace": [
             "iter创建指向列表遍历过程的迭代器。",
@@ -1572,7 +2276,24 @@
           "name": "break与continue：终止循环和跳过本轮",
           "grammar": "break；continue",
           "explanation": "break会立即退出最近的一层for/while循环；continue会跳过本轮循环体剩余的语句，开始下一轮。两者都不表示结束整个函数：循环之后仍可能执行其他语句。处理日志时，如果某条数据必须判定为非法，不应因为continue方便就无声丢弃它，除非需求明确允许过滤。",
-          "parts": [],
+          "parts": [
+            [
+              "range(...)",
+              "产生整数可迭代序列，stop不包含，step不能为0"
+            ],
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "break",
+              "立即退出当前最内层循环，执行循环后的语句"
+            ],
+            [
+              "continue",
+              "结束本轮剩余代码，进入下一次循环"
+            ]
+          ],
           "example": "for i in range(5):\n    if i == 1:\n        continue\n    if i == 4:\n        break\n    print(i)\nprint('循环外')",
           "trace": [
             "i=0打印0。",
@@ -1590,11 +2311,29 @@
           "name": "嵌套循环：外层一轮包含内层多轮",
           "grammar": "for i in range(2):\\n    for j in range(3):",
           "explanation": "循环体里面还能有另一个循环。外层i每取一个值，就会完整执行内层j的所有轮次；只有内层结束，外层才能取得下一个i。对于D12的二维场景数据，可以把i理解为场景编号，j理解为该场景里的帧编号。总组合数是外层2乘内层3等于6；如果内层break，只退出内层。",
-          "parts": [],
+          "parts": [
+            [
+              "range(...)",
+              "产生整数可迭代序列，stop不包含，step不能为0"
+            ],
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "for scenario in range(2):\n    for frame in range(3):\n        print(scenario, frame)",
           "trace": [
             "scenario=0时，内层frame依次为0、1、2。",
-            "内层完成后，scenario=1并重新执行frame=0、1、2。"
+            "内层完成后，scenario=1并重新执行frame=0、1、2。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "0 0\n0 1\n0 2\n1 0\n1 1\n1 2",
           "errors": [
@@ -1606,7 +2345,24 @@
           "name": "for/while上的else：为何和if的else不同",
           "grammar": "for ...:\\n    ...\\nelse:\\n    ...",
           "explanation": "Python允许在循环后写else：循环正常耗尽（for）或条件变False（while）时运行else；若被break提前退出，循环else不会执行。初学时它容易与if/else混淆，因此应先理解break和正常结束的区别。查找数据的代码中可用循环else表示“遍历完整列表仍未找到”。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "break",
+              "立即退出当前最内层循环，执行循环后的语句"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "distances = [45, 42, 40]\nfor d in distances:\n    if d <= 35:\n        print('发现近距离')\n        break\nelse:\n    print('都没有触发')",
           "trace": [
             "依次检查45、42、40，均不满足<=35。",
@@ -1623,7 +2379,24 @@
           "name": "循环变量与计数器的作用域/陷阱",
           "grammar": "for i in ...；total += x",
           "explanation": "Python的for不会自动建立新的块级变量作用域，在函数内部，循环结束后i通常仍可访问其最后一次绑定值。for空序列时变量可能从未被赋值。因此不要依赖循环外的最后一个索引，最好显式初始化结果变量。累计总和常写total=0，在for里total+=d，退出循环再打印total；print若缩进在for里，则每轮打印中间值。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "+=",
+              "把右边值累计进现有左侧变量"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "values = [1, 2, 3]\ntotal = 0\nfor v in values:\n    total += v\nprint(total)",
           "trace": [
             "total先初始化0。",
@@ -1856,11 +2629,29 @@
           "name": "从列表本身迭代：for value in values",
           "grammar": "for value in values:",
           "explanation": "不需要索引时，for直接从列表取得每个值，比先range(len(values))再values[i]简单。Python for不是C式计数循环，而是不断从可迭代对象取得元素。values中的元素类型决定value得到什么；例如列表里是Frame实例，value就是Frame对象。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "speeds = [72, 73, 74]\nfor speed in speeds:\n    print(speed / 3.6)",
           "trace": [
             "speed先绑定72，再绑定73，最后74。",
-            "每轮进行单位换算并打印。"
+            "每轮进行单位换算并打印。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "20.0\n20.27777777777778\n20.555555555555554",
           "errors": [
@@ -1911,12 +2702,25 @@
             [
               "start=1",
               "改变显示编号起点，原列表下标保持从0开始"
+            ],
+            [
+              "enumerate(...)",
+              "把可迭代对象的每个值附带编号，产生(index,value)二元组"
+            ],
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
             ]
           ],
           "example": "values = [45, 34]\nfor number, distance in enumerate(values, start=1):\n    print(number, distance)\nprint(values[0])",
           "trace": [
             "enumerate先生成(1,45)与(2,34)。",
-            "values真正第一个元素仍是下标0、值45。"
+            "values真正第一个元素仍是下标0、值45。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "1 45\n2 34\n45",
           "errors": [
@@ -1958,7 +2762,24 @@
           "name": "zip(strict=True)：长度不一致怎么发现",
           "grammar": "zip(speeds, distances, strict=True)",
           "explanation": "Python 3.10+的strict=True要求所有传入序列长度一致，否则遍历过程中抛ValueError。它适合必须完全对齐长度的数据组合，但仍不能检查物理采样周期是否一致。例如同为3帧、速度和距离对应的cycle不同，zip仍会按位置配对，必须有后续校验。",
-          "parts": [],
+          "parts": [
+            [
+              "zip(...)",
+              "按同一位置配对多个可迭代对象，普通zip在较短对象结束时停止"
+            ],
+            [
+              "except",
+              "捕获指定异常，执行错误处理代码"
+            ],
+            [
+              "list",
+              "有序可变容器，可通过下标、切片、方法读写"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "speeds = [72, 73]\ndistances = [45]\ntry:\n    print(list(zip(speeds, distances, strict=True)))\nexcept ValueError:\n    print('两组数据长度不匹配')",
           "trace": [
             "第一次迭代可能形成合法配对。",
@@ -2006,7 +2827,24 @@
           "name": "itertools与迭代器：知道“惰性取得数据”的概念",
           "grammar": "iter(values) / next(iterator)",
           "explanation": "range、enumerate、zip返回的是可迭代/迭代相关对象，并不要求先构造全部输出列表。iter(values)创建迭代器，next(it)取下一个值，没有下一个值会引发StopIteration；for在内部按照迭代协议取得元素并在耗尽时停止。初学阶段不必自己实现__iter__/__next__，理解for背后的“逐次取值”就足够了。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "values = [45, 34]\nit = iter(values)\nprint(next(it))\nprint(next(it))",
           "trace": [
             "iter创建指向列表遍历过程的迭代器。",
@@ -2064,11 +2902,29 @@
           "name": "list是什么：保存一组有序元素",
           "grammar": "values = [45, 34, 42]",
           "explanation": "方括号创建列表，元素按顺序排列并可以重复。与C固定大小数组不同，list长度可动态变化；它可以保存不同类型，但同一工程字段列表最好保持类型一致。列表名字如distances用复数更易理解。len(values)得到元素数，而不是最后一个索引。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ]
+          ],
           "example": "distances = [45, 34, 42]\nprint(len(distances))\nprint(distances)",
           "trace": [
             "[]包住3个逗号分隔的元素。",
-            "len返回元素个数3。"
+            "len返回元素个数3。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "3\n[45, 34, 42]",
           "errors": [
@@ -2080,7 +2936,24 @@
           "name": "正向/负向索引与IndexError",
           "grammar": "a[0]、a[2]、a[-1]",
           "explanation": "索引0开始，a[-1]表示最后一项，a[-2]表示倒数第二项；负数索引不是“负的元素值”。当索引超出有效范围时会抛IndexError，不是返回None。读取一帧前先确认列表长度或通过for直接迭代。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "a = [45, 34, 42]\nprint(a[0])\nprint(a[-1])\nprint(a[-2])",
           "trace": [
             "0指向第一项45。",
@@ -2097,7 +2970,24 @@
           "name": "切片是新序列的一段：start、stop、step",
           "grammar": "a[start:stop:step]",
           "explanation": "a[1:3]从索引1开始，取到3之前的元素；a[:2]省略起点，a[2:]省略终点；a[::2]每隔2个索引取一个；a[::-1]倒序得到一个新的列表。切片与单元素索引不同：单元素返回对象，切片返回list。列表切片通常创建新列表（浅拷贝），但内部如果包含可变对象并不是深复制。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "a = [10, 20, 30, 40, 50]\nprint(a[1:4])\nprint(a[:2])\nprint(a[::2])\nprint(a[::-1])",
           "trace": [
             "1:4取下标1、2、3。",
@@ -2114,7 +3004,24 @@
           "name": "append、extend、insert：添加内容的方式",
           "grammar": "a.append(x)、a.extend(xs)、a.insert(i,x)",
           "explanation": "append把一个对象作为一项追加；extend把一个可迭代对象中的元素逐个追加；insert(i,x)在指定位置前插入x。append([3,4])会追加一个内层列表，extend([3,4])追加两个数值。操作通常原地修改现有列表，返回值是None，不能写a = a.append(3)。",
-          "parts": [],
+          "parts": [
+            [
+              "append(...)",
+              "列表方法，将一个对象追加到原列表末尾"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "a = [1, 2]\na.append(3)\nprint(a)\na.extend([4, 5])\nprint(a)\na.insert(0, 0)\nprint(a)",
           "trace": [
             "append追加3。",
@@ -2131,7 +3038,24 @@
           "name": "remove、pop、del与排序、查找",
           "grammar": "a.remove(x)、a.pop(i)、del a[i]、sorted(a)",
           "explanation": "remove按值删除**第一次出现**的项；pop按索引删除并返回被删除项（不传索引默认末尾）；del可以删除指定位置或切片；sort()原地排序，而sorted(a)返回新的排序列表。index(x)找到首次出现位置，不存在时抛ValueError；count(x)统计出现次数。对于有序时间日志，不应未经说明就排序原始帧顺序。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ]
+          ],
           "example": "a = [3, 1, 2, 1]\nprint(a.count(1))\nprint(a.pop())\nprint(sorted(a))\nprint(a)",
           "trace": [
             "count找到2个1。",
@@ -2149,11 +3073,29 @@
           "name": "二维嵌套列表：场景和帧不是魔法",
           "grammar": "scenarios[scenario][frame]",
           "explanation": "一个列表的元素还可以是列表。scenarios[0]取得第一个内层列表，对应一个场景；scenarios[0][1]先取场景0再取这个场景的帧1。与C的STEPS[5][3]看起来很像，但Python的各内层列表长度可以不同。不要用[[0]*3]*5制作彼此独立的二维可变列表，它会重复引用同一个内层列表，修改一行可能影响所有行。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "scenarios = [[45, 34, 42], [50, 40, 30]]\nprint(scenarios[0])\nprint(scenarios[1][2])",
           "trace": [
             "scenarios[0]取第一内层列表。",
-            "scenarios[1]取第二内层列表，再[2]得到30。"
+            "scenarios[1]取第二内层列表，再[2]得到30。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "[45, 34, 42]\n30",
           "errors": [
@@ -2165,7 +3107,24 @@
           "name": "可变对象与别名：b=a不复制内容",
           "grammar": "b = a；b = a.copy()",
           "explanation": "list是可变对象。b=a让两个名字引用同一个列表，b.append会影响通过a看到的内容；b=a.copy()创建一个新的外层列表（浅复制）。函数参数传递列表时同样要考虑是否原地修改；Python并不是C式按值复制整个数组。带嵌套结构的真正独立复制需根据情况使用copy.deepcopy。",
-          "parts": [],
+          "parts": [
+            [
+              "append(...)",
+              "列表方法，将一个对象追加到原列表末尾"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "a = [1, 2]\nb = a\nb.append(3)\nprint(a)\nc = a.copy()\nc.append(4)\nprint(a)\nprint(c)",
           "trace": [
             "b与a共享同一list，所以b追加3后a也有3。",
@@ -2223,7 +3182,24 @@
           "name": "元组tuple：有序但不能直接修改长度和成员",
           "grammar": "pair = (72.0, 34.0)",
           "explanation": "元组和列表一样能按序号读取，通常用于表示一组不打算再改动的值。写(72.0,34.0)会创建两元素tuple；只有一个元素时必须写(72.0,)，否则(72.0)只是带括号的float。空元组是()，索引同样从0开始。元组不能像列表那样append或对其中一项赋新值，但元组若包含一个可变对象，该对象内部仍可能修改。",
-          "parts": [],
+          "parts": [
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "pair = (72.0, 34.0)\nprint(type(pair).__name__)\nprint(pair[0])\nprint((72.0,))\nprint(type((72.0)).__name__)",
           "trace": [
             "两个逗号分隔的值形成tuple。",
@@ -2241,7 +3217,24 @@
           "name": "打包和解包：左边两个名字如何拿到两个值",
           "grammar": "speed, distance = (72, 34)",
           "explanation": "元组打包表示把多个值放在一起；解包表示按位置分给多个名字。speed,distance = pair先求值右边的pair，按位置把第一个绑定给speed、第二个给distance。左边变量数与右边元素数不匹配一般会抛ValueError。enumerate()每轮能同时给index/value，原因就是它产生这样的二元组并被for左侧解包。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "sample = (72.0, 34.0)\nspeed, distance = sample\nprint(speed)\nprint(distance)\nx, y = 1, 2\nx, y = y, x\nprint(x, y)",
           "trace": [
             "从sample得到两个位置上的值。",
@@ -2258,7 +3251,24 @@
           "name": "dict字典：键值对不是按第几项取数据",
           "grammar": "frame = {'speed_kmh':72.0, 'valid':True}",
           "explanation": "字典写在花括号中，冒号分隔键和值，逗号分隔各对。访问字典要写frame['speed_kmh']，引号表示键本身是字符串；它并不会自动变成frame.speed_kmh属性（后者是对象属性访问写法）。字典保留插入顺序，但语义上按键检索，不应把它当成固定列位置的传感器数据数组。键一般要可哈希；str、int、tuple(合适元素)常见，list不能直接作为字典键。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "True/False",
+              "布尔真或假，首字母大写"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "frame = {'speed_kmh':72.0, 'valid':True}\nprint(frame['speed_kmh'])\nframe['distance_m'] = 35.0\nprint(frame)",
           "trace": [
             "花括号建立两个键值对。",
@@ -2276,7 +3286,24 @@
           "name": "字典查找、get、遍历键值和缺失字段",
           "grammar": "row.get('speed_kmh') / for key, value in row.items()",
           "explanation": "row['x']在键不存在时抛KeyError；row.get('x')通常返回None，也可给默认值，但不要因方便就把物理数据缺失强行填0。row.keys()取得键视图，values()取得值视图，items()取得(key,value)二元组视图，for key,value in row.items()可通过解包同时取两者。读取CSV时字段完整性需要显式验证。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              ".get(...)",
+              "字典方法，按键读取并允许提供缺失默认值"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ]
+          ],
           "example": "row = {'time_ms':20, 'speed_kmh':72.0}\nprint(row.get('distance_m'))\nfor key, value in row.items():\n    print(key, value)",
           "trace": [
             "get找不到distance_m，返回None。",
@@ -2293,7 +3320,24 @@
           "name": "set集合：去重、成员检查与空集合",
           "grammar": "set([1,1,2]) / {1,2}",
           "explanation": "set是无重复元素的集合，适合判断模式码是否属于允许值、去重故障码。{1,2}创建集合，{}却是空字典，空集合要set()。集合不保证按插入位置索引，不能写modes[0]取得第一项。set支持in、并集|、交集&、差集-等。",
-          "parts": [],
+          "parts": [
+            [
+              "set",
+              "不保存重复成员的集合"
+            ],
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "modes = {0, 1, 2}\nprint(1 in modes)\nprint(sorted(set([0, 1, 1, 2])))\nprint(type({}).__name__)\nprint(type(set()).__name__)",
           "trace": [
             "{0,1,2}创建集合。",
@@ -2311,11 +3355,29 @@
           "name": "引用共享与可变默认值：容器为什么会互相影响",
           "grammar": "b=a / a.copy() / def f(items=None)",
           "explanation": "字典和列表都是可变对象，b=a会让两个名字引用同一对象；一处修改可影响另一处的观察。tuple不可直接对成员赋新值，但内部包含可变list仍可能变化。函数定义时的默认参数对象只在定义阶段创建一次，如def add(item,items=[])会跨调用共享列表，容易累积旧数据；规范写法是items=None，函数内若为None再创建新列表。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "append(...)",
+              "列表方法，将一个对象追加到原列表末尾"
+            ]
+          ],
           "example": "def append_safe(x, items=None):\n    if items is None:\n        items = []\n    items.append(x)\n    return items\nprint(append_safe(1))\nprint(append_safe(2))",
           "trace": [
             "第一次调用items默认None，函数里创建列表[1]。",
-            "第二次调用再次得到None，再创建全新列表[2]。"
+            "第二次调用再次得到None，再创建全新列表[2]。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "[1]\n[2]",
           "errors": [
@@ -2364,7 +3426,24 @@
           "name": "先写普通for：要做的是“构造新列表”",
           "grammar": "result=[]；for x in source: result.append(...)",
           "explanation": "所谓列表推导式不是一种全新的业务逻辑。它通常把“遍历已有序列、对每项变换、把结果追加到新列表”的操作写成一个表达式。在刚掌握for时，最清楚的写法是先建立result=[]，再循环append，调试时每轮都能print中间值。先真正会写普通for，后面再看简写。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "append(...)",
+              "列表方法，将一个对象追加到原列表末尾"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "values = [1, 2, 3]\nsquared = []\nfor x in values:\n    squared.append(x * x)\nprint(squared)",
           "trace": [
             "建立空列表。",
@@ -2382,7 +3461,24 @@
           "name": "推导式最小语法：左边表达式、for、右边序列",
           "grammar": "[表达式 for 变量 in 可迭代对象]",
           "explanation": "[x*x for x in values]要从for部分开始读：for x in values依次取出原列表里的值；左边x*x决定为每个值生成什么结果；外层方括号把生成的结果收集成新的list。它与上一例的普通for具有相同的输出，但会创建新列表而不是修改原values。新手遇到复杂推导式时可以反向展开成普通for。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ]
+          ],
           "example": "values = [1, 2, 3]\nsquared = [x * x for x in values]\nprint(squared)\nprint(values)",
           "trace": [
             "for x in values依次给x绑定1、2、3。",
@@ -2400,7 +3496,24 @@
           "name": "过滤式：if写在右侧代表筛选",
           "grammar": "[x for x in values if x <= 35]",
           "explanation": "在推导式末尾加if条件表示只有满足该条件的元素才会生成结果。例如距离列表只提取小于等于35m的数值。这个if不是普通分支的if/else结构；它紧跟在for之后，作为筛选条件。若需要二选一变换，写x if cond else y的位置不同；不要把两种if顺序混淆。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ]
+          ],
           "example": "distances = [45, 34, 40, 30]\nnear = [d for d in distances if d <= 35]\nprint(near)",
           "trace": [
             "for依次产生45、34、40、30。",
@@ -2417,7 +3530,24 @@
           "name": "三元条件表达式与末尾if过滤不是同一语法",
           "grammar": "[A if cond else B for x in values]",
           "explanation": "Python的条件表达式“A if 条件 else B”需要同时出现if和else，用于从两个结果里选一个；如果放在推导式开头，意味着每个元素都将产生一个对应结果。末尾“for ... if 条件”则是过滤，有些元素根本不进入结果。状态序列转成文本标签时用条件表达式更合适。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ]
+          ],
           "example": "distances = [45, 34, 40]\nlabels = ['NEAR' if d <= 35 else 'OK' for d in distances]\nprint(labels)",
           "trace": [
             "每轮都取得一个距离值。",
@@ -2434,11 +3564,29 @@
           "name": "字典/集合推导式与生成器表达式：认识但暂不滥用",
           "grammar": "{x: f(x) for x in seq} / (f(x) for x in seq)",
           "explanation": "类似语法可用花括号创建字典或集合，用圆括号形成生成器表达式。生成器通常逐步产生值，而不是立即生成完整list。对初学者而言，只有当普通for清楚无误、调试便利时才建议用简写。对于多步骤校验、抛异常、按行定位CSV错误，仍应保持普通for显式写法。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ]
+          ],
           "example": "values = [1, 2, 2]\nsquares = {x: x*x for x in values}\nunique = {x for x in values}\nprint(squares)\nprint(sorted(unique))",
           "trace": [
             "字典推导式按数字x构造键和值x*x；重复键2被合并。",
-            "集合推导式去重得到1和2。"
+            "集合推导式去重得到1和2。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "{1: 1, 2: 4}\n[1, 2]",
           "errors": [
@@ -2491,7 +3639,24 @@
           "name": "def函数定义语法逐部分拆开",
           "grammar": "def 函数名(参数列表):\\n    函数体",
           "explanation": "def是关键字；函数名如kmh_to_mps是用户定义的名字；()里的speed_kmh是形参，在调用时接收实际对象；冒号后缩进块是函数体。定义函数时会创建函数对象，但正常情况下不会立刻进入函数体；写kmh_to_mps(72)才会调用。与C的float kmh_to_mps(float speed)类似，但Python不强制把参数类型写在声明位置。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "def kmh_to_mps(speed_kmh):\n    result = speed_kmh / 3.6\n    return result\n\nprint('定义完成')\nprint(kmh_to_mps(72.0))",
           "trace": [
             "def创建函数对象。",
@@ -2509,7 +3674,24 @@
           "name": "参数到底怎样进去：形参和实参",
           "grammar": "def add(a,b): ... / add(2,3)",
           "explanation": "定义时写a,b是形参；调用时写2,3是实参。函数被调用时，形参名字与传入对象建立绑定关系。Python传参可理解为传入对象引用，但不要简化成“完全按C传值”或“完全按C指针”：可变对象的原地修改可能被调用者观察到，而给形参重新赋值通常不改变调用者的变量绑定。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "def add(a, b):\n    print('函数收到', a, b)\n    return a + b\n\nx = 2\ny = 3\nresult = add(x, y)\nprint('返回值', result)",
           "trace": [
             "定义add时不打印。",
@@ -2557,7 +3739,24 @@
           "name": "一个函数能返回多个数据吗：tuple、dict、对象",
           "grammar": "return status, valid / return {'status':...}",
           "explanation": "Python的return a,b实际上返回一个包含两项的tuple，调用者可result=...或status,valid=...解包。也能return一个dict或dataclass实例，保存命名成员，便于较大的工程接口追踪。对于ASW处理结果，返回Decision(status,valid,alert,age_ms)比多个位置难辨的数字更易读。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "def check(distance):\n    status = 'NEAR' if distance <= 35 else 'OK'\n    return status, True\n\nresult = check(34)\nprint(result)\nstatus, valid = result\nprint(status, valid)",
           "trace": [
             "check得到distance=34。",
@@ -2575,7 +3774,24 @@
           "name": "局部变量、全局变量、作用域：名字在哪一层有效",
           "grammar": "def f():\\n    local=...",
           "explanation": "函数里赋值的普通名字通常是局部变量。函数外定义的全局名字可以被读取，但对同名名字赋值会使函数内名字视为局部，不会自动修改外面的名字。尽量把数据作为参数传入，再return结果，减少依赖可变全局状态；ASW单元测试也因此容易隔离。global/nonlocal具有专门语义，但新手先理解普通局部变量即可。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "speed = 72\n\ndef calc(x):\n    speed = x / 3.6\n    return speed\n\nprint(calc(90))\nprint(speed)",
           "trace": [
             "外层speed=72。",
@@ -2592,7 +3808,24 @@
           "name": "可变对象参数会怎样改变调用者可见的数据",
           "grammar": "def f(items): items.append(x)",
           "explanation": "Python把对象引用绑定到形参。若传入list，在函数中调用append会原地修改那个list，外面的名字也能看到新内容；若在函数中写items=[...]重新绑定形参，外面不会自动换到这个新list。工程中应通过明确的函数命名/文档告诉调用者是否修改原对象，必要时使用.copy()。",
-          "parts": [],
+          "parts": [
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "append(...)",
+              "列表方法，将一个对象追加到原列表末尾"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "def add_frame(frames):\n    frames.append(99)\n\nframes = [1, 2]\nadd_frame(frames)\nprint(frames)",
           "trace": [
             "frames列表在调用前存在。",
@@ -2610,7 +3843,24 @@
           "name": "递归、docstring与函数拆分原则",
           "grammar": "def f(...):\\n    '''说明'''",
           "explanation": "函数开头的三引号字符串通常作为docstring说明函数用途、参数、返回和异常。help(f)可以读取相关文档。函数如果在内部调用自身称递归，要有可靠终止条件；本日重点是普通调用链，不要求把所有循环改成递归。工程拆分时，一个函数最好承担清晰职责，例如读取CSV、校验数值、更新告警、写结果各自分层。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "def square(x):\n    '''计算一个数的平方，返回数值而非直接打印。'''\n    return x*x\n\nprint(square(3))\nprint(square.__doc__)",
           "trace": [
             "定义square并保存docstring。",
@@ -2667,7 +3917,24 @@
           "name": "位置参数：按顺序匹配名字",
           "grammar": "def f(a,b): ... / f(1,2)",
           "explanation": "位置参数按照实参出现的顺序匹配形参。若两个参数都是数字，填反之后Python可能仍能执行但业务结果错误，因此ASW接口适当采用关键字参数或数据对象可以降低混淆。函数签名里的逗号分隔多个形参，而调用圆括号里的逗号分隔多个实参。",
-          "parts": [],
+          "parts": [
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "def describe(speed, distance):\n    print('speed=',speed,'distance=',distance)\ndescribe(72,34)",
           "trace": [
             "定义describe(speed,distance)。",
@@ -2684,7 +3951,24 @@
           "name": "关键字参数：名字指定实参对应哪个形参",
           "grammar": "describe(distance=34, speed=72)",
           "explanation": "调用时可以写形参名=值，明确指出每个实参绑定目标，关键字参数的顺序可与定义时不同。不能把同一个形参同时用位置参数和关键字参数传两次；未知形参名称也会报TypeError。对于单位相近但不相同的参数，关键字调用通常更清楚。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ]
+          ],
           "example": "def describe(speed, distance):\n    return speed, distance\nprint(describe(distance=34, speed=72))",
           "trace": [
             "Python先识别每个关键字名称。",
@@ -2701,7 +3985,24 @@
           "name": "默认参数：为什么可以省略一部分值",
           "grammar": "def f(limit=35): ...",
           "explanation": "在函数定义时，limit=35是默认参数定义，不是调用函数内部的赋值语句；调用时若没有为limit提供值，就使用定义时保存的默认对象。调用f(40)或f(limit=40)可以覆盖。一般应把具有默认值的参数放在普通必需位置参数之后，以避免语法限制。默认值的对象通常在定义阶段计算，尤其不要用可变列表作为默认值。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ]
+          ],
           "example": "def is_near(distance, limit=35):\n    return distance <= limit\nprint(is_near(34))\nprint(is_near(38, limit=40))",
           "trace": [
             "首次调用只传distance=34，limit用默认35。",
@@ -2718,7 +4019,24 @@
           "name": "类型注解与->：哪部分是提示，哪部分才是返回",
           "grammar": "def f(x: float) -> bool: return ...",
           "explanation": "形参名后“: float”是类型注解；函数签名中“-> bool”是返回类型注解；最后的冒号开始函数体。这三处符号职责不同。Python本身通常不会强制阻止错误类型传入，代码仍须明确检查，或利用mypy/pyright等工具做静态检查。最终实际返回的对象由return表达式决定，不由->注解自动构造。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ]
+          ],
           "example": "def is_near(distance: float) -> bool:\n    return distance <= 35.0\nprint(is_near(34.0))",
           "trace": [
             "Python定义带注解的函数。",
@@ -2735,7 +4053,24 @@
           "name": "星号*args：收集额外的位置实参",
           "grammar": "def f(*values): ...",
           "explanation": "在形参列表中，*values表示把剩余位置实参收集成tuple，函数内部values是一个序列，可以for遍历或sum求和。它与乘法符号*在表达式中的用法不同，语境是函数定义的参数列表。若函数接口有固定数据字段，优先显式列出参数，不能因为*args方便就让单位不明的实参随意传入。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "def total(*values):\n    print(type(values).__name__)\n    return sum(values)\nprint(total(1, 2, 3))",
           "trace": [
             "调用提供三个位置实参。",
@@ -2752,7 +4087,24 @@
           "name": "双星号**kwargs：收集额外命名实参",
           "grammar": "def f(**fields): ...",
           "explanation": "**fields在形参位置把多余的关键字参数收集成dict。这个**与数学乘方语法2**3在不同位置具有不同用途：前者是参数打包，后者是运算符。关键字字符串如speed=72会变为字典中的键'speed'。需要固定协议时，不应把字段随意塞进**kwargs而不校验。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "True/False",
+              "布尔真或假，首字母大写"
+            ]
+          ],
           "example": "def capture(**fields):\n    return fields\nprint(capture(speed=72,valid=True))",
           "trace": [
             "调用提供两个关键字参数。",
@@ -2769,11 +4121,29 @@
           "name": "调用时的*和**：展开而不是接收",
           "grammar": "f(*sequence) / f(**mapping)",
           "explanation": "在函数调用位置，*sequence表示把序列元素展开成多个位置实参，**mapping表示把字典键值对展开为命名实参。这与定义处“*args收集、**kwargs收集”是相对的动作。先确认函数需要什么参数，再选择是否展开；常见的read_frame(*values)若字段数量与顺序不正确仍会报错。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "def add(a,b):\n    return a+b\npair=[2,3]\nprint(add(*pair))\noptions={'a':4,'b':5}\nprint(add(**options))",
           "trace": [
             "调用add(*pair)将列表元素2、3展开给a、b。",
-            "调用add(**options)把键a,b映射为对应形参。"
+            "调用add(**options)把键a,b映射为对应形参。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "5\n9",
           "errors": [
@@ -2785,11 +4155,29 @@
           "name": "位置限定/关键字限定参数：/与单独*",
           "grammar": "def f(a, /, *, b): ...",
           "explanation": "Python还支持参数列表中单独的/和*，分别限定某些参数只能按位置传，或只能按关键字传。很多标准库函数签名会出现这些符号，初学时只需要会读：/前的参数不接受关键字；*后的普通参数必须用名称指定。该符号在函数定义中不是除法或乘法。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ]
+          ],
           "example": "def check(distance, /, *, limit=35):\n    return distance <= limit\nprint(check(34, limit=35))",
           "trace": [
             "distance位于/之前，只能位置传入34。",
-            "limit位于单独*之后，调用时通过limit=35指定。"
+            "limit位于单独*之后，调用时通过limit=35指定。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "True",
           "errors": [
@@ -2842,7 +4230,24 @@
           "name": "一个.py文件就是一个模块，import首先做什么",
           "grammar": "import math / from math import isfinite",
           "explanation": "Python模块通常对应一个.py文件（也可能是包或扩展模块）。import math导入math模块后要写math.isfinite(...);from math import isfinite把函数名字直接绑定在当前模块，调用isfinite(...)即可。导入过程会执行模块顶层代码来创建函数/类等定义，通常一次加载后会在sys.modules缓存。被导入文件中的普通函数体不会因为函数定义存在就自动调用。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "import math\nfrom math import sqrt\nprint(math.isfinite(72.0))\nprint(sqrt(9))",
           "trace": [
             "import math让当前模块取得名为math的模块对象。",
@@ -2859,7 +4264,24 @@
           "name": "模块加载与函数调用是两种事件",
           "grammar": "import logic；logic.check(34)",
           "explanation": "先编写logic.py只包含def check(...):...，然后main.py通过import logic得到模块对象。导入时执行logic顶层的def语句，函数对象存在，但其缩进的函数体尚未执行。main.py真正写logic.check(34)才调用该函数。若logic.py顶层有print，它会在首次导入时输出，这也是为什么建议把演示/业务入口放进__main__保护。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "## logic.py\n# def check(d):\n#     print('真正进入check')\n#     return d <= 35\n## main.py\n# import logic\n# result = logic.check(34)\n# print(result)",
           "trace": [
             "main导入logic，logic定义check。",
@@ -2876,7 +4298,24 @@
           "name": "__name__ == '__main__'逐字符拆解",
           "grammar": "if __name__ == '__main__': main()",
           "explanation": "if是条件；__name__是系统为模块提供的特殊名字；==判断两个字符串是否相等；'__main__'是代表入口执行上下文的字符串；冒号引出缩进块；main()是实际调用。当脚本直接运行时该判断通常为真；模块被其他脚本导入时，该模块的__name__通常等于自身模块名称。这样测试函数可被单独导入而不触发全套主程序。",
-          "parts": [],
+          "parts": [
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "def main():\n    print('入口函数执行')\n\nprint('顶层语句执行')\nif __name__ == '__main__':\n    main()",
           "trace": [
             "定义main函数对象。",
@@ -2893,7 +4332,24 @@
           "name": "完整执行链：谁调用谁、返回什么",
           "grammar": "main()→run()→load_frames()→Monitor.step()→return",
           "explanation": "调用栈是理解跨文件工程的关键：main调用run时main暂停等待；run调用load_frames时run暂停；reader解析完成return list[Frame]后run恢复；run每轮调用monitor.step，得到Decision对象，再继续下一帧。文件名排序或代码物理位置不等于运行顺序，只有从入口沿实际函数调用才能正确解释。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "def read():\n    print('进入read')\n    return [34, 42]\n\ndef run():\n    print('进入run')\n    values = read()\n    print('run收到', values)\n\nrun()",
           "trace": [
             "执行run()进入run函数，先打印。",
@@ -2910,7 +4366,24 @@
           "name": "from、as与导入名称冲突",
           "grammar": "from pathlib import Path；import numpy as np",
           "explanation": "from module import name取得模块某个名字；import module as alias为模块创建别名；例如numpy常缩写成np，后续np.asarray(...)的点号是访问numpy模块成员。不要把自己的文件命名为csv.py、json.py、typing.py，否则可能遮蔽标准库模块。避免from module import *，它会隐藏名字来源，增加维护成本。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "import math as m\nfrom pathlib import Path\nprint(m.sqrt(16))\nprint(Path('log.csv').suffix)",
           "trace": [
             "m是math模块别名。",
@@ -2927,11 +4400,29 @@
           "name": "如何定位ImportError与ModuleNotFoundError",
           "grammar": "ModuleNotFoundError / ImportError",
           "explanation": "ModuleNotFoundError通常表示找不到对应模块名（可能没安装、当前路径错误、虚拟环境不一致），ImportError还可能表示模块存在但无法导入指定名字。排查顺序：确认文件名拼写、当前目录、sys.path、当前解释器、依赖是否安装，再检查循环导入问题。不要先在网上随便pip install与文件同名的包。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ]
+          ],
           "example": "import sys\nprint(sys.executable)\nprint(sys.path[0])",
           "trace": [
             "sys.executable指出哪个解释器正在执行。",
-            "sys.path[0]指明导入搜索路径首项，值因入口运行方式而异。"
+            "sys.path[0]指明导入搜索路径首项，值因入口运行方式而异。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "输出解释器路径和导入搜索路径的起始项；取决于本机运行方式。",
           "errors": [
@@ -2984,7 +4475,24 @@
           "name": "class到底定义了什么，实例到底是什么",
           "grammar": "class Monitor: ... / monitor = Monitor()",
           "explanation": "class定义一个可用于创建对象的类；它可以组织数据和方法。写class Monitor:只创建类型定义，不会自动处理一帧数据；写monitor=Monitor()才会创建一个实例。与C结构体都能把相关信息组合起来，但Python的类还可以定义行为；它不是按C语言结构体原样摆放字节的替代。使用实例属性时写monitor.previous_alert，点号是取这个对象的成员。",
-          "parts": [],
+          "parts": [
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "class Monitor:\n    pass\n\nmonitor = Monitor()\nprint(type(monitor).__name__)",
           "trace": [
             "执行class定义，创建Monitor类对象。",
@@ -3063,7 +4571,24 @@
           "name": "属性和方法：.后没有括号与有括号有什么区别",
           "grammar": "monitor.alert / monitor.step(34)",
           "explanation": "monitor.alert是从实例读取名为alert的属性值；monitor.step是取得绑定到该实例的方法对象；monitor.step(34)才真正调用它。不要以为点号右侧的任何名称都会自动执行。Python对象上也可动态设置普通属性，例如m.count=3，但工程中的正式类型应清楚声明属性和用途。",
-          "parts": [],
+          "parts": [
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "self",
+              "实例方法中表示当前对象的约定参数名"
+            ],
+            [
+              "__init__",
+              "实例创建时通常运行的初始化方法"
+            ]
+          ],
           "example": "class Counter:\n    def __init__(self):\n        self.count = 0\n    def add(self):\n        self.count += 1\n\nc = Counter()\nprint(c.count)\nc.add()\nprint(c.count)",
           "trace": [
             "初始化count=0。",
@@ -3081,7 +4606,24 @@
           "name": "@dataclass：为什么Frame和Decision能写得很短",
           "grammar": "@dataclass\\nclass Frame:\\n    speed_kmh: float",
           "explanation": "dataclasses是Python标准库。@dataclass写在class前，表示对后续类定义应用一个装饰器，自动生成如__init__、__repr__、__eq__等常见方法（细节受参数影响）。因此可以写Frame(speed_kmh=72.0,valid=True)创建数据实例，而无需手写初始化方法。这里的speed_kmh: float依然是类型注解，不自动验证CSV文本或范围。数据类适合承载Frame、Decision等结构化对象。",
-          "parts": [],
+          "parts": [
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "True/False",
+              "布尔真或假，首字母大写"
+            ]
+          ],
           "example": "from dataclasses import dataclass\n@dataclass\nclass Frame:\n    speed_kmh: float\n    valid: bool\n\nf = Frame(speed_kmh=72.0, valid=True)\nprint(f.speed_kmh)\nprint(f)",
           "trace": [
             "导入dataclass装饰器。",
@@ -3099,7 +4641,24 @@
           "name": "函数返回对象：对比C结构体返回值",
           "grammar": "def step(...) -> Decision: return Decision(...)",
           "explanation": "在C里MonitorResult Monitor_Step(...)的返回类型是结构体；Python可以写def step(...) -> Decision:，其中-> Decision是类型提示，真正返回值由return Decision(...)创建并返回。调用者decision=monitor.step(frame)后可以decision.status取得成员。Python返回对象的引用并由自动内存管理负责其生命周期，不等于C的结构体按值复制；现阶段关注相同的数据流：业务计算多个字段→组合为结构化结果→调用者按字段使用。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ]
+          ],
           "example": "from dataclasses import dataclass\n@dataclass\nclass Decision:\n    status: str\n    valid: bool\n\ndef check(x) -> Decision:\n    return Decision('ACTIVE', x > 0)\n\nresult = check(34)\nprint(result.status, result.valid)",
           "trace": [
             "定义Decision数据类型，包含两个字段。",
@@ -3117,7 +4676,24 @@
           "name": "实例状态如何跨帧保存：滞环为什么需要它",
           "grammar": "self.previous_alert",
           "explanation": "一个Monitor实例中的previous_alert会在连续调用step()之间保留；这相当于C中MonitorContext跨帧保存状态。35m及以下开启，41m及以上关闭，35～41间保持原值（教学标定而非真实ACC控制规则）。如果每帧都创建一个新Monitor实例，38m时会忘记之前34m触发的告警。",
-          "parts": [],
+          "parts": [
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "self",
+              "实例方法中表示当前对象的约定参数名"
+            ]
+          ],
           "example": "class Monitor:\n    def __init__(self):\n        self.alert = False\n    def step(self, d):\n        if not self.alert and d <= 35:\n            self.alert = True\n        elif self.alert and d >= 41:\n            self.alert = False\n        return self.alert\nm = Monitor()\nfor distance in [45,34,38,42]:\n    print(m.step(distance))",
           "trace": [
             "初始alert=False，距离45不触发。",
@@ -3135,7 +4711,24 @@
           "name": "类属性、实例属性及对象别名",
           "grammar": "self.x vs Class.x",
           "explanation": "self.x通常是实例属性，每个实例有自己的存储关系；类定义体中的Class.x是类属性，多个实例在没有同名实例属性遮蔽时可读取共享的类属性。初学者不要把跨帧状态放在可变类属性上，否则多个测试实例可能相互影响。两个名字m2=m1仍指向同一实例，并不会复制对象。",
-          "parts": [],
+          "parts": [
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "self",
+              "实例方法中表示当前对象的约定参数名"
+            ],
+            [
+              "__init__",
+              "实例创建时通常运行的初始化方法"
+            ]
+          ],
           "example": "class Sensor:\n    unit = 'km/h'\n    def __init__(self):\n        self.value = 0\n\na = Sensor()\nb = Sensor()\na.value = 72\nprint(b.value)\nprint(a.unit)",
           "trace": [
             "Sensor.unit在类上定义。",
@@ -3193,7 +4786,24 @@
           "name": "路径是什么：Path与工作目录的关系",
           "grammar": "Path('sample.csv') / Path(__file__).resolve().parent",
           "explanation": "文件名不是自动指向某个磁盘位置。相对路径通常相对于当前工作目录；Path.cwd()显示工作目录，Path(__file__).resolve().parent得到脚本所在文件夹（脚本环境）。使用pathlib.Path组合路径、检查exists与读取文件较跨平台。C里的相对文件路径也受运行目录影响，所以这个概念可以迁移。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "from pathlib import Path\npath = Path('sample.csv')\nprint(path.name)\nprint(path.suffix)",
           "trace": [
             "Path创建一个路径对象，不代表文件已经存在。",
@@ -3210,7 +4820,24 @@
           "name": "with...as：为什么文件要在块里打开",
           "grammar": "with open('file.txt') as f: ...",
           "explanation": "with是上下文管理语法。open返回文件对象，with会在进入和退出代码块时管理资源；as f绑定文件对象到名字f。即使在with块内发生异常，通常也会正确关闭文件。建议文本模式明确encoding='utf-8'，CSV使用newline=''让csv处理换行。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "with",
+              "进入资源管理上下文，离开时执行相应清理"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "from pathlib import Path\npath = Path('demo.txt')\nwith path.open('w', encoding='utf-8') as f:\n    f.write('radar')\nwith path.open('r', encoding='utf-8') as f:\n    print(f.read())",
           "trace": [
             "第一次with以写入方式打开，f.write写入radar。",
@@ -3227,7 +4854,24 @@
           "name": "read、readline、for line in file与内存占用",
           "grammar": "f.read() / for line in f:",
           "explanation": "read()通常读取文件剩余全部文本；readline()读取一行；for line in f逐行遍历，对于很大日志更节省内存。文件每行末尾通常含换行符，常用rstrip('\\n')去除，但不应随意strip所有空白导致字段内容失真。遍历文件一次后文件指针位于末尾，再想读取需要重新打开或seek。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "with",
+              "进入资源管理上下文，离开时执行相应清理"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "from pathlib import Path\nPath('demo.txt').write_text('A\\nB\\n', encoding='utf-8')\nwith open('demo.txt', encoding='utf-8') as f:\n    for line in f:\n        print(line.rstrip('\\n'))",
           "trace": [
             "先写入两行文本。",
@@ -3244,7 +4888,24 @@
           "name": "为什么真实CSV不能只用split(',')",
           "grammar": "csv.reader / csv.DictReader",
           "explanation": "CSV可能包含被引号包围的逗号字段，例如\"radar,front\"是一个字段而非两个；字符串split(',')不能正确处理完整CSV规则。标准库csv.reader返回按列排列的字符串列表；csv.DictReader使用首行列名映射为每行字典。读取到的是文本，即使速度列写72.0，仍需要float转换并校验。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "list",
+              "有序可变容器，可通过下标、切片、方法读写"
+            ],
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "import csv\nfrom io import StringIO\nraw = 'name,speed\\n\"radar,front\",72.0\\n'\nrows = list(csv.DictReader(StringIO(raw)))\nprint(rows[0]['name'])\nprint(type(rows[0]['speed']).__name__)",
           "trace": [
             "StringIO构造供csv读取的文本文件对象。",
@@ -3262,7 +4923,24 @@
           "name": "字符串→Frame对象的校验顺序",
           "grammar": "int(row['time_ms']); float(row['speed_kmh'])",
           "explanation": "解析顺序建议先核对表头/列数/空值，再进行类型转换，之后检查是否有限、单位和范围，最后才创建结构化Frame对象。如果某一行非法，应报告文件原物理行、字段和原因，而不是静默跳过它导致后续时间对齐错误。csv.DictReader.line_num反映读取到的物理行位置，在多行引号字段时可能大于记录条数。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "方括号[]",
+              "创建列表，或读取下标/切片，取决于语法位置"
+            ]
+          ],
           "example": "raw = {'time_ms':'20','speed_kmh':'72.0'}\ntime_ms = int(raw['time_ms'])\nspeed_kmh = float(raw['speed_kmh'])\nprint(time_ms + 20, speed_kmh / 3.6)",
           "trace": [
             "字典中存储的是字符串。",
@@ -3279,7 +4957,24 @@
           "name": "JSON：数据字典怎样保存，不等于Python源码",
           "grammar": "json.dump(data,file) / json.loads(text)",
           "explanation": "JSON是跨语言文本数据格式，常用来保存测试输出。Python中的dict可由json.dump写为JSON；json.load从文件解析，json.loads从字符串解析。Python布尔True/False写入JSON会成为true/false，Python None成为null。不要将JSON中的true当作可直接复制到Python脚本里的布尔常量，二者语法不同。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "True/False",
+              "布尔真或假，首字母大写"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "import json\nresult = {'status':'ACTIVE','valid':True,'alert':False}\ntext = json.dumps(result, ensure_ascii=False)\nprint(text)\nprint(json.loads(text)['valid'])",
           "trace": [
             "json.dumps把Python字典序列化为JSON字符串。",
@@ -3296,7 +4991,24 @@
           "name": "数据来源、输出目录与文件异常",
           "grammar": "FileNotFoundError / PermissionError / OSError",
           "explanation": "真实工程里文件可能不存在、路径错误、权限不足或编码不匹配。try/except捕获明确的OSError或ValueError可以向用户报告位置和原因，但不应在错误时虚构一份有效结果。输出目录可能还没创建，Path(...).parent.mkdir(parents=True,exist_ok=True)创建父目录；保存正式实验日志时应避免不经确认覆盖原始文件。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "True/False",
+              "布尔真或假，首字母大写"
+            ]
+          ],
           "example": "from pathlib import Path\npath = Path('reports') / 'result.json'\npath.parent.mkdir(parents=True, exist_ok=True)\nprint(path.parent.name)",
           "trace": [
             "Path用/把目录reports和文件result.json组合。",
@@ -3354,7 +5066,24 @@
           "name": "错误有不同种类：SyntaxError、ValueError、TypeError等",
           "grammar": "try: ... except ValueError: ...",
           "explanation": "SyntaxError通常来自语法错误，很多时候代码无法进入正常执行；ValueError表示类型合法但值不适合某操作，例如float('abc')；TypeError常见于不兼容参数类型；FileNotFoundError表示文件不存在。这些都是异常类型，Python会向调用栈上传播，直到找到合适的except或程序失败退出。不能把业务status='INVALID'简单等同于抛出的异常。",
-          "parts": [],
+          "parts": [
+            [
+              "except",
+              "捕获指定异常，执行错误处理代码"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "try:\n    speed = float('oops')\nexcept ValueError:\n    print('输入不是数字')",
           "trace": [
             "float转换抛ValueError。",
@@ -3371,7 +5100,24 @@
           "name": "try/except/else/finally四部分各负责什么",
           "grammar": "try: A / except: B / else: C / finally: D",
           "explanation": "try放可能失败的操作；匹配异常时except处理；若try块未抛异常，else可执行成功后逻辑；finally在离开这个try语句时通常执行清理动作，无论是否发生异常。不同于if/else，这是异常控制流。若在finally中又抛异常或return，可能影响之前的异常/返回，初学时应保持简单。",
-          "parts": [],
+          "parts": [
+            [
+              "except",
+              "捕获指定异常，执行错误处理代码"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "else",
+              "根据所在结构确定含义：条件剩余分支或循环正常结束"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "try:\n    value = float('72.0')\nexcept ValueError:\n    print('失败')\nelse:\n    print('成功', value)\nfinally:\n    print('处理结束')",
           "trace": [
             "float成功不抛ValueError。",
@@ -3389,7 +5135,24 @@
           "name": "raise主动拒绝非法字段",
           "grammar": "raise ValueError('解释')",
           "explanation": "发现速度超范围时，Python不会自动知道工程合同，因此应由你主动判断并raise ValueError说明原因。异常对象包含错误消息，可以被调用者捕获。异常在调用栈向上传播，谁最适合决定错误是否终止整个文件解析，谁就在对应层捕获；reader里抛出带行号异常，main里打印并返回退出码是常见分层。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "raise",
+              "主动报告异常，把错误传递给外层调用者"
+            ]
+          ],
           "example": "def parse_speed(x):\n    speed = float(x)\n    if not 0 <= speed <= 250:\n        raise ValueError('速度超范围')\n    return speed\n\ntry:\n    parse_speed('300')\nexcept ValueError as exc:\n    print(exc)",
           "trace": [
             "调用parse_speed('300')。",
@@ -3407,7 +5170,24 @@
           "name": "异常链：from exc告诉你原始原因",
           "grammar": "raise ValueError('第4行车速不合法') from exc",
           "explanation": "当底层float转换抛异常，较上层知道行号和列名时，可以捕获并用raise新的ValueError from exc保留原始异常链。这样终端Traceback既有底层原因，也有工程层解释；在日志解析中很实用。若只写raise新异常没有from，原始上下文仍可能显示，但明确的异常链更利于理解因果。",
-          "parts": [],
+          "parts": [
+            [
+              "except",
+              "捕获指定异常，执行错误处理代码"
+            ],
+            [
+              "raise",
+              "主动报告异常，把错误传递给外层调用者"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ]
+          ],
           "example": "try:\n    try:\n        float('bad')\n    except ValueError as exc:\n        raise ValueError('第4行speed_kmh无法解析') from exc\nexcept ValueError as exc:\n    print(exc)",
           "trace": [
             "最内层float抛ValueError。",
@@ -3425,11 +5205,29 @@
           "name": "什么时候return invalid、什么时候raise错误",
           "grammar": "return Decision(valid=False) vs raise ValueError",
           "explanation": "两种都可能有用，但角色不同。雷达标志为False是一条数据在业务上可预期的失效状态，可以返回Decision(status='INVALID',valid=False)供主程序显示/统计；CSV列数缺失或文本不能转换成数字，意味着输入格式破坏，通常应raise并拒绝对整份日志生成有效结论。不能用异常处理代替所有业务状态机分支，也不能把格式损坏变成正常的业务invalid从而丢失诊断。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "raise",
+              "主动报告异常，把错误传递给外层调用者"
+            ]
+          ],
           "example": "def check_flag(valid):\n    if not valid:\n        return {'status':'INVALID','valid':False}\n    return {'status':'ACTIVE','valid':True}\nprint(check_flag(False))",
           "trace": [
             "flag False属于预期业务输入。",
-            "函数返回结构化无效结果，不抛异常。"
+            "函数返回结构化无效结果，不抛异常。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "{'status': 'INVALID', 'valid': False}",
           "errors": [
@@ -3441,7 +5239,24 @@
           "name": "未捕获异常的调用栈：谁调用谁就怎样回溯",
           "grammar": "main→run→reader→float",
           "explanation": "如果reader内部抛异常、run没有捕获，异常会传回main；main可统一打印文件名、行号。Traceback按照调用栈展示发生的文件/行信息，通常从最后一行看异常类别，再回到上层调用过程。VS Code可打开异常断点、逐步进入函数观察局部变量。不要因为报错发生在reader就只检查reader，传入的路径和字段可能由main决定。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "except",
+              "捕获指定异常，执行错误处理代码"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "def read():\n    return float('bad')\ndef run():\n    return read()\ntry:\n    run()\nexcept ValueError:\n    print('main处理了read错误')",
           "trace": [
             "顶层调用run。",
@@ -3499,11 +5314,29 @@
           "name": "从输出定位问题：print不是return，也不是长期日志系统",
           "grammar": "print(f'frame={i} status={s}')",
           "explanation": "最小调试先在关键边界打印输入、状态和返回值，核对预期与实际。print适合入门，生产工具更常使用logging模块的级别和结构化记录。调试时应输出时刻ms、速度单位、雷达valid和状态，而不是只打印“到这里了”。日志输出不应泄露个人数据和系统秘密。",
-          "parts": [],
+          "parts": [
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "True/False",
+              "布尔真或假，首字母大写"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "distance = 34\nvalid = True\nprint(f'distance_m={distance} valid={valid}')",
           "trace": [
             "读取两个变量。",
-            "f-string把它们格式化成带字段名的文本。"
+            "f-string把它们格式化成带字段名的文本。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "distance_m=34 valid=True",
           "errors": [
@@ -3515,7 +5348,24 @@
           "name": "Traceback逐层定位和断点调试",
           "grammar": "文件行号→函数名→异常类型",
           "explanation": "Traceback把异常传播过程中相关函数调用位置列出来。VS Code断点允许程序暂停在某行，逐步进入step into、逐步跳过step over和跳出step out，用变量面板看当前frame对象和previous_alert。学习多文件执行链时，比反复猜测更直观。调试器只显示真实执行路径，浏览器教学页并未执行Python，不能代替本地调试。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "def step(x):\n    result = x + 1\n    return result\nprint(step(3))",
           "trace": [
             "在step里result=x+1设断点。",
@@ -3533,7 +5383,24 @@
           "name": "assert、unittest与测试预期的来源",
           "grammar": "self.assertEqual(actual,expected)",
           "explanation": "assert用于表达断言，unittest框架提供assertEqual、assertAlmostEqual、assertRaises等常用方法。测试预期应该从明确需求或人工推导得到，不应等程序输出后把错误值照抄为预期。浮点结果可能有舍入差，通常用assertAlmostEqual而不是完全等于。独立测试文件可以import业务函数而不启动demo入口。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "self",
+              "实例方法中表示当前对象的约定参数名"
+            ]
+          ],
           "example": "import unittest\n\ndef kmh_to_mps(x):\n    return x / 3.6\n\nclass TestUnits(unittest.TestCase):\n    def test_72(self):\n        self.assertAlmostEqual(kmh_to_mps(72),20.0)\n\nif __name__ == '__main__':\n    unittest.main()",
           "trace": [
             "运行脚本满足__main__条件。",
@@ -3550,7 +5417,24 @@
           "name": "测试用例怎样覆盖边界而不是只测正常值",
           "grammar": "35、41、100、101四个边界",
           "explanation": "对35/41m滞环和100ms数据年龄，应检查阈值恰好等于时的行为以及刚超过时的行为，避免只跑正常样例。检查有效性、错误注入、恢复帧和时间戳边界。对于离线教学监视器，业务阈值由课程定义，不代表真实ACC量产安全需求。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "distances = [34.9,35.0,35.1,40.9,41.0]\nprint([d <= 35.0 for d in distances])",
           "trace": [
             "对每个距离执行<=35判断。",
@@ -3567,7 +5451,20 @@
           "name": "故障注入→测试失败→修复通过",
           "grammar": "baseline PASS → injected FAIL → fix PASS",
           "explanation": "先记录基线PASS，再在个人工程副本中故意把<=35改成<=40，用已有unittest发现差异，最后恢复阈值并再次通过。三份日志构成明确的回归证据；改测试预期让测试绿灯不算修复。其他可注入的错误包括跨帧状态重置、错误单位换算、跳过CSV非法行及把bool('0')当False等。",
-          "parts": [],
+          "parts": [
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "## 本节是操作清单，不是Python可直接执行的片段。\n# 1. python3 -m unittest -v test_pipeline\n# 2. 将monitor.py中的 <= 35.0 改成 <= 40.0\n# 3. 重新执行test_pipeline，观察FAIL\n# 4. 恢复 <= 35.0，复测PASS",
           "trace": [
             "运行原始测试保存日志。",
@@ -3585,7 +5482,24 @@
           "name": "unittest的发现规则与测试隔离",
           "grammar": "python -m unittest -v test_pipeline",
           "explanation": "unittest通过命令行模块方式运行，test_pipeline.py里的TestCase类和test_前缀方法会被发现。本地测试不应依赖此前网页选择了哪个场景，也不应修改私有学习记录。每个测试尽量创建独立Monitor对象和临时输出目录，避免测试顺序相互污染。",
-          "parts": [],
+          "parts": [
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "self",
+              "实例方法中表示当前对象的约定参数名"
+            ]
+          ],
           "example": "import unittest\nclass TestCalc(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(2+3,5)\n\nif __name__ == '__main__':\n    unittest.main()",
           "trace": [
             "TestCase类被测试运行器发现。",
@@ -3644,7 +5558,24 @@
           "name": "先知道这是哪五层，为什么先看简单示例",
           "grammar": "main→reader→models→monitor→main",
           "explanation": "前面已经单独学过变量、列表、for/while、函数、import、class、文件和异常。现在把这些规则用到同一个离线ASW日志工程。工程不直接连车，不定时驱动车辆，也不是AUTOSAR实车软件。models.py负责字段定义，reader.py负责把CSV变为Frame列表，monitor.py完成跨帧状态判断，main.py组织执行与JSON输出，test_pipeline.py独立进行自动测试。把它当作一次对前面语法的综合验证。",
-          "parts": [],
+          "parts": [
+            [
+              "list",
+              "有序可变容器，可通过下标、切片、方法读写"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "->",
+              "函数返回类型注解，不是C的指针箭头"
+            ]
+          ],
           "example": "# 先看目录，不需要运行这段注释：\n# main.py          入口/命令行/输出\n# reader.py        CSV->list[Frame]\n# models.py        Frame与Decision类型\n# monitor.py       Monitor.step业务规则\n# test_pipeline.py unittest\n# sample.csv       8帧教学样例",
           "trace": [
             "入口main从命令行获得文件路径。",
@@ -3662,7 +5593,24 @@
           "name": "运行入口：if __name__在文件最底部",
           "grammar": "if __name__ == '__main__': raise SystemExit(main())",
           "explanation": "Python执行main.py时会依次执行顶部import和def定义，最后看到__name__检查，才真正调用main()。main中的argparse解析--input、--output，生成路径对象并调用run。SystemExit(main())会把main返回的整数作为程序退出码交给操作系统；它与main的业务结果list[dict]不同。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ],
+            [
+              "raise",
+              "主动报告异常，把错误传递给外层调用者"
+            ]
+          ],
           "example": "def main():\n    print('进入main')\n    return 0\nif __name__ == '__main__':\n    raise SystemExit(main())",
           "trace": [
             "定义main但不执行其函数体。",
@@ -3680,7 +5628,24 @@
           "name": "读取文件：list[Frame]是怎样构造的",
           "grammar": "load_frames(path) -> list[Frame]",
           "explanation": "reader.py用csv.DictReader迭代每行，最初row中的每项都是str。对每条记录校验数量、空值、int/float转换、数值有限性和取值范围后，才构造Frame(time_ms,speed_kmh,distance_m,radar_valid,enable)。frames.append(frame)把Frame实例放到列表。若有错误则报告CSV行号并抛ValueError；main捕获后不把结果标成有效。",
-          "parts": [],
+          "parts": [
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "list",
+              "有序可变容器，可通过下标、切片、方法读写"
+            ],
+            [
+              "append(...)",
+              "列表方法，将一个对象追加到原列表末尾"
+            ]
+          ],
           "example": "from dataclasses import dataclass\n@dataclass\nclass Frame:\n    time_ms: int\n    speed_kmh: float\n\nframes = []\nframes.append(Frame(0,72.0))\nprint(len(frames), frames[0].speed_kmh)",
           "trace": [
             "定义Frame数据类。",
@@ -3698,7 +5663,24 @@
           "name": "监视器生命周期：为什么Monitor()只创建一次",
           "grammar": "monitor = Monitor()放在for外",
           "explanation": "monitor.py的__init__初始previous_alert=False。run先创建一个Monitor实例，然后用for frame in frames逐帧调用同一个对象的step；前一帧状态因此保留。你在C里已经学过MonitorContext在for外，只需迁移相同的状态生命周期思路。35/41m的滞环阈值在此仅是课程值。",
-          "parts": [],
+          "parts": [
+            [
+              "enumerate(...)",
+              "把可迭代对象的每个值附带编号，产生(index,value)二元组"
+            ],
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "from models import Frame\nfrom monitor import Monitor\nm = Monitor()\nfor i, distance in enumerate([45,34,38,42]):\n    frame = Frame(i*20,72.0,float(distance),True,True)\n    result = m.step(frame,frame.time_ms+20)\n    print(i,result.alert)",
           "trace": [
             "创建一个Monitor并初始化previous_alert=False。",
@@ -3716,7 +5698,24 @@
           "name": "step内部怎样从Frame到Decision",
           "grammar": "def step(self,frame,now_ms)->Decision",
           "explanation": "监视器先根据now_ms-frame.time_ms计算数据年龄，检查未来时间或大于100ms、radar_valid是否为False；不通过时清掉旧告警并return一个INVALID的Decision。enable=False时返回OFF且valid=False；都合法才用前一帧previous_alert与当前distance_m执行滞环，再返回ACTIVE的Decision。每个return带回一个完整的对象，main仍可以按成员访问。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "self",
+              "实例方法中表示当前对象的约定参数名"
+            ]
+          ],
           "example": "from dataclasses import dataclass\n@dataclass\nclass Decision:\n    status: str\n    valid: bool\n    alert: bool\n\ndef result_for(valid):\n    if not valid:\n        return Decision('INVALID', False, False)\n    return Decision('ACTIVE', True, True)\n\nx = result_for(False)\nprint(x.status, x.valid, x.alert)",
           "trace": [
             "result_for收到False。",
@@ -3734,7 +5733,24 @@
           "name": "结果为什么要转换成dict才能方便写JSON",
           "grammar": "decision→asdict(decision)→results.append→json.dump",
           "explanation": "Decision是dataclass实例，不是原生JSON类型。main里asdict(decision)创建包含字段和值的普通dict，results.append将每帧结果放入列表，最终json.dump将列表保存到文件。这里不是又执行了一遍Monitor.step，而是把已经得到的结果转成易于保存的形式。原始输入CSV和输出JSON分别承担输入数据与计算结果的角色。",
-          "parts": [],
+          "parts": [
+            [
+              "class",
+              "定义一种可创建实例的类型"
+            ],
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "dict",
+              "通过键查找值的数据结构，键不是整数下标"
+            ],
+            [
+              "append(...)",
+              "列表方法，将一个对象追加到原列表末尾"
+            ]
+          ],
           "example": "from dataclasses import dataclass, asdict\n@dataclass\nclass Decision:\n    status: str\n    valid: bool\nx = Decision('ACTIVE', True)\nresult = asdict(x)\nprint(result)",
           "trace": [
             "创建Decision实例。",
@@ -3751,7 +5767,20 @@
           "name": "逐帧手工推导八个案例，不直接背结果",
           "grammar": "45,34,38,42,30invalid,34,34off,34",
           "explanation": "样例8帧距离依次是45、34、38、42、30（radar无效）、34、34（enable=False）、34。有效时距离<=35触发提示、>=41关闭；数据无效或未启用时本课清除旧告警。按同一Monitor跨帧状态推导结果：False、True、True、False、False、True、False、True。这是在模型规则基础上的离线算例，并不是实车ACC监视和控制需求。",
-          "parts": [],
+          "parts": [
+            [
+              "True/False",
+              "布尔真或假，首字母大写"
+            ],
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "# 要先自己填表格再运行本地工程：\n# 帧0  45m  valid=True  alert=False\n# 帧1  34m  valid=True  alert=True\n# 帧2  38m  valid=True  alert=True\n# 帧3  42m  valid=True  alert=False\n# 帧4  30m  radar_invalid  alert=False\n# 帧5  34m  valid=True  alert=True\n# 帧6  34m  enable=False  alert=False\n# 帧7  34m  valid=True  alert=True",
           "trace": [
             "每帧先判断雷达和使能再判断距离。",
@@ -3810,7 +5839,20 @@
           "name": "第1关：正确安装与第一次本地运行",
           "grammar": "python3 main.py --input sample.csv --output output/results.json",
           "explanation": "把完整工程ZIP下载解压，进入其中python-foundation-project目录，使用python3 --version确认解释器3.11或以上。运行main.py指定输入和输出路径；脚本在终端打印逐帧status/valid/alert，并将结果保存在output/results.json。应核对文件实际存在和8条记录，而不是看到了网页绿灯就认为完成。",
-          "parts": [],
+          "parts": [
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "本节语法模板",
+              "python3 main.py --input sample.csv --output output/results.json。先确认它是语句头、表达式还是函数调用。"
+            ]
+          ],
           "example": "# 终端（WSL/Linux）\n# python3 --version\n# python3 main.py --input sample.csv --output output/results.json\n# ls -l output/results.json\n# cat output/results.json",
           "trace": [
             "进入正确的工程目录。",
@@ -3828,7 +5870,20 @@
           "name": "第2关：逐行解析一条坏CSV",
           "grammar": "bad_string.csv第4物理行",
           "explanation": "在bad_string.csv中第4行的speed_kmh列注入了hello字符串。reader.py尝试float('hello')会抛ValueError，再向外包装带行号诊断，最终main.py捕获，输出失败信息并用退出码2结束。应区别“本程序正确识别坏输入”与“程序自身存在错误”；预设坏样本返回2是符合课程设计的。",
-          "parts": [],
+          "parts": [
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ],
+            [
+              "本节语法模板",
+              "bad_string.csv第4物理行。先确认它是语句头、表达式还是函数调用。"
+            ]
+          ],
           "example": "# 终端\n# python3 main.py --input bad_string.csv\n# echo $?  # WSL检查退出码",
           "trace": [
             "reader读取CSV表头。",
@@ -3846,7 +5901,20 @@
           "name": "第3关：故意写错阈值让测试抓住它",
           "grammar": "monitor.py 35.0→40.0",
           "explanation": "先运行unittest取得基线通过记录。然后只在自己复制的monitor.py里把触发阈值从35改为40，不改测试中的期望。原本距离38m应该保持上一帧状态的部分场景会发生错误，unittest应指出差异。之后恢复35重新通过。这样你会理解真正的业务判断、回归预期和故障定位三者的联系。",
-          "parts": [],
+          "parts": [
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "->",
+              "函数返回类型注解，不是C的指针箭头"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "# 终端\n# python3 -m unittest -v test_pipeline\n# 修改monitor.py阈值 35.0 -> 40.0 后再次运行同一命令\n# 恢复35.0后第三次运行同一命令",
           "trace": [
             "原始源码与测试匹配。",
@@ -3864,7 +5932,24 @@
           "name": "第4关：for循环里创建实例的陷阱",
           "grammar": "for frame in frames: monitor=Monitor()",
           "explanation": "如果把Monitor()放到for内部，每帧都会执行__init__把previous_alert重置False。原本在34m触发、38m应保留告警的场景会失去前态，导致测试失败。要求你明确从语法层解释：for有多轮，循环体每轮执行，所以Monitor()也每轮运行。恢复到for外之后重新验证。",
-          "parts": [],
+          "parts": [
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "# 错误位置示意（不要直接替换原工程所有代码）：\n# for frame in frames:\n#     monitor = Monitor()  # 每轮都重置状态\n#     decision = monitor.step(frame,frame.time_ms+20)",
           "trace": [
             "第一帧创建Monitor1。",
@@ -3881,7 +5966,24 @@
           "name": "第5关：函数返回值与打印值要分开",
           "grammar": "return Decision(...) 与 print(decision)",
           "explanation": "将monitor.step的某个return Decision(...)暂时改成print(Decision(...))，函数在该路径到结尾会返回None；main仍然期望Decision实例，因此读取它的属性时可能抛AttributeError。这个试验直接验证“print不等于return”，也把你在D14问过的结构体返回值问题与Python函数联系起来。完成后必须恢复源码并复测。",
-          "parts": [],
+          "parts": [
+            [
+              "return",
+              "结束当前函数调用，交还一个返回对象"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ]
+          ],
           "example": "# 错误演示：\n# def check():\n#     print({'valid':True})  # 只打印，不返回字典\n# result = check()\n# print(result)               # None",
           "trace": [
             "print执行输出副作用。",
@@ -3898,7 +6000,20 @@
           "name": "第6关：逐章语法与工程可复现验收",
           "grammar": "unittest +手算表+错误日志+笔记",
           "explanation": "一份可复核的学习结果至少包括：23章中核心语法自测、原始8帧手工推导、一次正常运行的JSON、损坏CSV的行号诊断、unit test绿灯以及至少一项故障注入后失败并恢复的证据。可以分几次做完，不建议因“页面标签完成”就跳过本地实际运行。不要把第三方CI的参考工程测试结果冒充用户自己本地通过。",
-          "parts": [],
+          "parts": [
+            [
+              "is",
+              "比较对象身份，特别适合value is None"
+            ],
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "# 终端\n# python3 -m unittest -v test_pipeline\n# python3 main.py --input sample.csv --output output/results.json\n# python3 main.py --input bad_missing.csv",
           "trace": [
             "单元测试验证需求与状态。",
@@ -3956,7 +6071,24 @@
           "name": "所有Python语法都要一天学会吗：分清熟练与见过",
           "grammar": "基本语法/标准库/第三方库是三个层次",
           "explanation": "真正能使用Python需要从符号、变量、流程控制、函数、容器开始形成熟练习惯。高级语言特性、标准库中的大量工具和NumPy/pandas等外部库没有理由全部要求同一天熟练，尤其你还要保持C与ASW主线。这里将知识明确分为入门必会、随后重点、用到再深入三层，遇到不熟悉的语法随时回到相应章节。",
-          "parts": [],
+          "parts": [
+            [
+              "while",
+              "每次先检查条件是否成立，再决定是否执行循环体"
+            ],
+            [
+              "for ... in ...:",
+              "每轮从右侧可迭代对象获取一个元素，绑定给左侧变量"
+            ],
+            [
+              "def",
+              "创建函数定义；括号里是形参，冒号后缩进块是函数体"
+            ],
+            [
+              "if/elif/else",
+              "从上到下检查分支条件，命中后进入对应缩进块"
+            ]
+          ],
           "example": "# 这一段是学习地图，不是程序语法。\n# 第一层：符号、变量、类型、if、for/while、list/dict、def\n# 第二层：class、CSV/JSON、异常、测试、NumPy/Matplotlib\n# 第三层：async、yield、装饰器、包发布、ROS2 Python接口",
           "trace": [
             "先会读一个表达式。",
@@ -3973,7 +6105,24 @@
           "name": "遇到陌生函数，先看对象再看调用",
           "grammar": "numpy.asarray、Path.cwd、rows.append",
           "explanation": "在看到a.b(...)时，先问a是什么对象（模块、列表、路径、数据类实例），再问b是属性还是方法，接着查它接受什么参数和返回什么。不要把所有点号调用都当作Python内置语法。比如np.mean是NumPy提供的函数、list.append是列表的方法、Frame.speed_kmh是属性，这些的层次并不相同。",
-          "parts": [],
+          "parts": [
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "append(...)",
+              "列表方法，将一个对象追加到原列表末尾"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "values=[1,2]\nprint(type(values).__name__)\nprint(values.append(3))\nprint(values)",
           "trace": [
             "values是list对象。",
@@ -3990,7 +6139,24 @@
           "name": "关键字查询的标准顺序：官方文档→示例→本地验证",
           "grammar": "docs.python.org、help(obj)、type(obj)",
           "explanation": "遇到for、range、enumerate、list、dict、def等语言或标准库规则，先查Python官方文档；需要中文递进示例可以查Python-100-Days；需要看实际输入输出的短视频可查Microsoft Python for Beginners或CS50P。然后写最小独立脚本实际运行，记录自己预测与输出差异。第三方视频的讲法可辅助理解，但语法准确性应以语言文档和本地验证为准。",
-          "parts": [],
+          "parts": [
+            [
+              "enumerate(...)",
+              "把可迭代对象的每个值附带编号，产生(index,value)二元组"
+            ],
+            [
+              "list",
+              "有序可变容器，可通过下标、切片、方法读写"
+            ],
+            [
+              "__name__",
+              "模块特殊名称，直接运行脚本时通常为'__main__'"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ]
+          ],
           "example": "values=[45,34]\nprint(type(enumerate(values)).__name__)\nprint(list(enumerate(values)))",
           "trace": [
             "创建enumerate对象。",
@@ -4007,11 +6173,25 @@
           "name": "导入与安装不是一回事：标准库、第三方依赖和ROS2",
           "grammar": "import csv vs import numpy vs import rclpy",
           "explanation": "csv/json/math/pathlib/unittest来自标准库；numpy/matplotlib来自第三方库，需在对应venv安装；rclpy属于ROS2相关Python接口，运行环境更复杂。你只需在本课知道分层，不要在Python刚入门时同时配置完整ROS2环境。将来做自动化测试、日志处理和仿真时，再学习具体库的API与版本兼容性。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "圆括号()",
+              "函数调用、形参声明或表达式分组，取决于语法位置"
+            ]
+          ],
           "example": "import csv\nimport json\nimport math\nprint('标准库可用')",
           "trace": [
             "Python从标准库取得三个模块。",
-            "不用pip安装即可执行。"
+            "不用pip安装即可执行。",
+            "执行到本段末尾，按上面每个条件和变量的实际变化核对预期输出。"
           ],
           "expected": "标准库可用",
           "errors": [
@@ -4064,7 +6244,24 @@
           "name": "为什么list还不等于NumPy ndarray",
           "grammar": "[1,2,3] 与 np.asarray([1,2,3])",
           "explanation": "Python list可以保存各种类型，便于一般程序数据组织；NumPy ndarray面向高效的数值数组，通常具有统一dtype、shape等属性并支持向量化运算。原D15读取CSV后把行列表转换为二维ndarray，再按列计算平均值、最小值等。没有Python基础就会难以区分“Python语法”与“NumPy库的特定API”，所以先修页在这里衔接。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              ".shape",
+              "数组对象的形状属性，反映每个维度的大小"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "import numpy as np\nvalues = [1.0,2.0,3.0]\narray = np.asarray(values,dtype=float)\nprint(array.shape)\nprint(np.mean(array))",
           "trace": [
             "import numpy as np取得模块别名。",
@@ -4082,7 +6279,24 @@
           "name": "矩阵shape=(N,4)与matrix[:,0]逐字符拆开",
           "grammar": "matrix[:, 0]",
           "explanation": "matrix变量指向二维NumPy数组，方括号中用逗号分隔两个维度：冒号:表示第一个维度“所有行”，0表示第二个维度“第0列”，因此matrix[:,0]得到时间列的一维数组。matrix[0,1]则取第一行第二列的单个数值。这里的逗号和冒号是NumPy多维下标语法，不能简单套到任意Python嵌套list上。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              ".shape",
+              "数组对象的形状属性，反映每个维度的大小"
+            ],
+            [
+              "print(...)",
+              "打印值到终端，不会自动作为函数return值"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "import numpy as np\nmatrix=np.asarray([[0,72.0,45.0,0],[20,73.0,40.0,1]])\nprint(matrix.shape)\nprint(matrix[:,0])\nprint(matrix[0,1])",
           "trace": [
             "创建2行4列的ndarray。",
@@ -4100,7 +6314,24 @@
           "name": "Matplotlib的plot和step不是Python关键字",
           "grammar": "ax.plot(...) / ax.step(...) / fig.savefig(...)",
           "explanation": "plot、step、savefig都是Matplotlib对象方法，不是Python语言核心语法。plot用于显示连续数量的采样变化；step更适合mode等离散状态，因为不应暗示中间的0.5状态真实存在。你已经掌握点号、函数参数和对象之后，这些调用就是“对绘图对象调用其方法”。速度纵轴km/h、距离m、时间ms、模式无量纲类别，均应在图中标明。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "set",
+              "不保存重复成员的集合"
+            ],
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "=",
+              "把右侧表达式结果绑定给左侧名称"
+            ]
+          ],
           "example": "# 示例需要本地安装matplotlib后执行：\n# from matplotlib import pyplot as plt\n# fig, ax = plt.subplots()\n# ax.plot([0,20,40],[72,73,74])\n# ax.set(xlabel='时间(ms)', ylabel='速度(km/h)')\n# fig.savefig('speed.png')",
           "trace": [
             "导入绘图库并创建图窗/坐标轴对象。",
@@ -4118,7 +6349,20 @@
           "name": "进入原D15前的检查：按能力链，而不是按页数",
           "grammar": "能读import→main→load_log→summarize→save_charts",
           "explanation": "建议用实际动作检查是否具备D15条件：能从python demo.py找到入口；看到from log_reader import load_log能说明导入的是什么；看到matrix[:,0]能解释行列；看到result=...能区分函数返回和print；看到try/except能明白异常从哪来；看到plt/np的点号能说出它们是库的对象成员。达到这些要求即可进入D15，不必当天把所有高级术语背完。",
-          "parts": [],
+          "parts": [
+            [
+              "import",
+              "导入模块或名称，不表示被导入函数自动执行"
+            ],
+            [
+              "#",
+              "在字符串之外开始当前行注释"
+            ],
+            [
+              "点号.",
+              "访问对象/模块的属性或方法；数字里的点则是小数点"
+            ]
+          ],
           "example": "# D15入口的阅读顺序：\n# 1. demo.py 从 __main__ 进入main\n# 2. main 解析场景并调用load_log\n# 3. load_log从CSV创建二维数值矩阵\n# 4. summarize按列计算\n# 5. save_charts保存三张PNG\n# 6. main汇总打印或者报告解析错误",
           "trace": [
             "辨认入口和参数。",
@@ -4831,5 +7075,11 @@
       "example": "radar_valid=True",
       "pitfall": "首字母大写"
     }
-  ]
+  ],
+  "qualityCriteria": {
+    "topicCount": 156,
+    "minimalParts": 3,
+    "minimalTrace": 3,
+    "notes": "所有章节已附最少三条语法部件说明与三步执行路径，学习仍以本地运行与修改为准。"
+  }
 }
