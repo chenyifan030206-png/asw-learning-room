@@ -5,6 +5,7 @@ const STORE_KEY = 'asw-python-foundation-v1:' + location.pathname;
 const stateDefault = () => ({schema:1,done:[],answers:{},notes:{},annotations:[],fileNotes:{},checklist:{},lastChapter:'start'});
 let book = null, state = stateDefault(), activeChapter = 'start', activePanel = 'chapter';
 let activeFile = 'main.py', currentFileText = '', lastSelection = '';
+let hasOpenedChapter = false;
 const fileCache = new Map();
 
 function loadState(){
@@ -120,7 +121,7 @@ function openChapter(id){
   const chapter=book.chapters.find(x=>x.id===id);
   if(!chapter)return;
   // 先保存离开前的笔记，不因切换章节而丢失。
-  if(activePanel==='chapter' && book.chapters.some(x=>x.id===activeChapter)){
+  if(hasOpenedChapter && activePanel==='chapter' && book.chapters.some(x=>x.id===activeChapter)){
     state.notes[activeChapter]=$('chapterNote').value;
     saveState();
   }
@@ -190,6 +191,7 @@ function openChapter(id){
   $('selectionHint').textContent='在当前章节说明或代码中选择文字，再点击“为当前选中的文字做批注”。';
   window.scrollTo({top:Math.max(0,target.getBoundingClientRect().top+window.scrollY-16),behavior:'auto'});
   renderChapterNav($('chapterSearch').value);
+  hasOpenedChapter = true;
 }
 function renderAnnotations(){
   const list=$('annotationList');list.replaceChildren();
@@ -414,7 +416,7 @@ $('importNotes').onchange=async()=>{
        !payload.data.fileNotes)throw Error('不是本导学页的正确笔记格式');
     if(!confirm('恢复这份备份会替换当前导学页的本地笔记，是否继续？'))return;
     state=Object.assign(stateDefault(),payload.data);saveState();
-    renderChapterNav();openChapter(state.lastChapter||book.chapters[0].id);
+    hasOpenedChapter=false;renderChapterNav();openChapter(state.lastChapter||book.chapters[0].id);
     alert('笔记已恢复。原D15课程笔记未受到修改。');
   }catch(error){alert('无法导入：'+error.message);}
   finally{input.value='';}
