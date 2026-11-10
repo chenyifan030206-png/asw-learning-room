@@ -18,12 +18,27 @@ def main() -> None:
         page = browser.new_page(viewport={"width": 1440, "height": 920}, accept_downloads=True)
         issues = []
         page.on("pageerror", lambda error: issues.append(str(error)))
+        # 模拟上一版在同一浏览器保存过的笔记：必须能找回来，不能按新章节误挂。
+        page.add_init_script("""() => {
+          const k='asw-python-foundation-v1:'+location.pathname;
+          if(!localStorage.getItem(k))localStorage.setItem(k,JSON.stringify({
+            schema:1,done:['start'],answers:{},
+            notes:{start:'旧版入口章节学习笔记：不要丢失'},
+            annotations:[{id:'legacy-a',chapter:'start',quote:'旧版划线内容',note:'旧版批注'}],
+            fileNotes:{},checklist:{},lastChapter:'start'
+          }));
+        }""")
         page.goto(URL, wait_until="networkidle")
         page.locator("#chapterNav button[data-chapter]").first.wait_for()
 
-        # 20章节和对照表是网站实际呈现，不只检查JSON文件中的声明。
-        assert page.locator("#chapterNav button[data-chapter]").count() == 20
-        assert "01 · Python到底如何运行" in page.locator("#chapterPanel").inner_text()
+        # 21章与逐点语法内容实际渲染，不能只检查JSON目录。
+        assert page.locator("#chapterNav button[data-chapter]").count() == 21
+        assert "01｜Python如何运行" in page.locator("#chapterPanel").inner_text()
+        assert page.locator("#chapterPanel .syntaxDetail").count() >= 4
+        page.get_by_role("button",name="旧版笔记与批注（保留）").click()
+        assert "旧版入口章节学习笔记" in page.locator("#legacyPanel").inner_text()
+        assert "旧版划线内容" in page.locator("#legacyPanel").inner_text()
+        page.locator("#chapterNav button[data-chapter]").first.click()
 
         # 保存本章笔记，然后离开再回来必须保持一致。
         page.locator("#chapterNote").fill("我理解了main()的入口以及函数调用与定义的区别。")
@@ -38,20 +53,28 @@ def main() -> None:
         print("Reloaded browser note:", repr(page.locator("#chapterNote").input_value()))
         assert "我理解了main()" in page.locator("#chapterNote").input_value()
         local_stored = page.evaluate("localStorage.getItem('asw-python-foundation-v1:' + location.pathname)")
-        assert local_stored and json.loads(local_stored)["notes"]["start"].startswith("我理解了")
+        assert local_stored and json.loads(local_stored)["notes"]["v2_01"].startswith("我理解了")
         original_db = page.evaluate("localStorage.getItem('asw-pages-v1:' + location.pathname)")
         assert original_db is None, "独立导学页不能擅自写原D15学习记录"
 
         # 逐章理解检测、掌握标记和笔记导出。
         page.get_by_role("button", name="标记本章已完成").click()
-        assert "1 / 20" in page.locator("#progressLine").inner_text()
+        assert "1 / 21" in page.locator("#progressLine").inner_text()
         with page.expect_download() as info:
             page.get_by_role("button", name="导出学习笔记 JSON").click()
         notes = info.value
         payload = json.loads(Path(notes.path()).read_text(encoding="utf-8"))
         assert payload["app"] == "asw-python-foundation"
-        assert payload["data"]["notes"]["start"].startswith("我理解了")
+        assert payload["data"]["notes"]["v2_01"].startswith("我理解了")
 
+        # 循环章必须把for/while/range/enumerate/zip/break/continue集中完整呈现。
+        page.locator("#chapterNav button[data-chapter='v2_08']").click()
+        loop = page.locator("#chapterPanel")
+        assert loop.locator(".syntaxDetail").count() >= 10
+        assert "for 变量 in 可迭代对象" in loop.inner_text()
+        assert "enumerate" in loop.inner_text()
+        assert "while 条件表达式" in loop.inner_text()
+        assert "break和continue" in loop.inner_text()
         page.get_by_role("button", name="C语言 → Python 对照表").click()
         assert not page.locator("#bridgePanel").is_hidden()
         assert page.locator("#bridgeTable tbody tr").count() >= 20
