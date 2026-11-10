@@ -106,6 +106,52 @@ function showPanel(type){
   if(type==='final') renderFinal();
   if(type==='legacy') renderLegacyNotes();
 }
+function renderSymbolGuide(card){
+  if(activeChapter!=='v2_02' || !Array.isArray(book.symbolGuide))return;
+  heading(card,'先查这张标点字典：相同符号的意义由位置决定');
+  paragraph(card,'表格先帮助你辨认符号，后面每节再用最小示例和执行步骤解释。你可以返回这一页查下划线、点号、方括号及其他符号。');
+  const wrap=node('div',undefined,'syntaxTable');wrap.dataset.role='symbol-guide';
+  const table=node('table'),head=node('tr');
+  for(const title of ['符号/写法','到底表示什么','一个最小例子','最容易误解的地方'])head.append(node('th',title));
+  const thead=node('thead');thead.append(head);table.append(thead);
+  const body=node('tbody');
+  for(const item of book.symbolGuide){
+    const tr=node('tr');
+    const first=node('td');first.append(node('code',item.token));tr.append(first);
+    tr.append(node('td',item.meaning));
+    const sample=node('td');sample.append(node('code',item.example));tr.append(sample);
+    tr.append(node('td',item.pitfall));
+    body.append(tr);
+  }
+  table.append(body);wrap.append(table);card.append(wrap);
+}
+function renderWalkthroughs(card,chapter){
+  if(!Array.isArray(chapter.walkthroughs)||!chapter.walkthroughs.length)return;
+  heading(card,'手算执行表：每一轮变量怎样变化（不是浏览器执行Python）');
+  paragraph(card,'看到输出之前，先用手指在表里逐轮移动：取得输入→检查条件→执行本轮代码→更新变量→再次判断或退出。');
+  for(const item of chapter.walkthroughs){
+    const wrap=node('section',undefined,'syntaxDetail');
+    wrap.append(node('h4',item.title));
+    const toolbar=node('div',undefined,'codeTop');
+    toolbar.append(node('span','独立的最小代码，可复制到本地运行'));
+    const copy=node('button','复制执行表代码');
+    copy.onclick=()=>copyText(item.code).then(ok=>{if(ok)copy.textContent='已复制';});
+    toolbar.append(copy);wrap.append(toolbar,node('pre',item.code));
+    const table=node('table'),header=node('tr');
+    for(const label of item.columns)header.append(node('th',label));
+    const head=node('thead');head.append(header);table.append(head);
+    const body=node('tbody');
+    for(const line of item.rows){
+      const tr=node('tr');
+      for(const v of line)tr.append(node('td',v));
+      body.append(tr);
+    }
+    table.append(body);const overflow=node('div',undefined,'syntaxTable');
+    overflow.append(table);wrap.append(overflow);
+    paragraph(wrap,'这一题要记住：'+item.point,'tip');
+    card.append(wrap);
+  }
+}
 function renderDetailedKnowledge(card,chapter){
   const details=chapter.details||[];
   if(!details.length)return;
@@ -194,7 +240,9 @@ function openChapter(id){
   paragraph(card,'本节要能做到：'+chapter.goal,'goal');
   heading(card,'先把问题和场景讲清楚');
   for(const p of chapter.story)paragraph(card,p,'explain');
+  renderSymbolGuide(card);
   renderDetailedKnowledge(card,chapter);
+  renderWalkthroughs(card,chapter);
   heading(card,'本章综合示例 · 将刚学的语法连在一起');
   const toolbar=node('div',undefined,'codeTop');
   toolbar.append(node('span','逐行中文注释 · 复制后到本地Python执行'));
@@ -523,11 +571,11 @@ $('importNotes').onchange=async()=>{
 };
 async function init(){
   try{
-    const response=await fetch('./python-foundation-v3-content.json?v=20261110-v3',{cache:'no-store'});
+    const response=await fetch('./python-foundation-v4-content.json?v=20261110-v4',{cache:'no-store'});
     if(!response.ok)throw Error('教程教材数据未能加载');
     book=await response.json();
-    if(book.chapters.length!==23||book.chapters.reduce((n,x)=>n+(x.details?.length||0),0)!==144)throw Error('新版23章144节教材内容不完整');
-    $('heroIntro').textContent='新版23章、144个逐项详解语法点：从_ . () [] :等标点开始；for与while放在同一章，随后单独讲range、enumerate与zip，再从列表、函数、返回值、对象、模块深入完整ASW工程。每节有代码、执行链、预期输出、错误提示和修改练习；旧笔记与ZIP保留。';
+    if(book.chapters.length!==23||book.chapters.reduce((n,x)=>n+(x.details?.length||0),0)!==156)throw Error('新版23章156个语法专题教材数据不完整');
+    $('heroIntro').textContent='新版23章、156个逐项讲解语法专题：下划线与点号等32个符号可查；for、while、range、enumerate、zip在第08章统一讲透，并有逐轮变量执行表；第09章接着做车辆多帧练习。每个语法点含符号拆解、代码、执行过程、预期结果、常见错误与修改任务。完整ASW工程在后半部分，旧笔记与ZIP保留。';
     for(const t of book.principles)$('principles').append(node('p',t));
     for(const item of book.schedule){
       const card=node('div',undefined,'scheduleCard');
