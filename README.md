@@ -27,3 +27,9 @@ D13曾遗漏独立的结果展示分支，错用D01“速度模式/间距模式�
 D15原计划为CSV日志读取、NumPy shape/标量/向量，输出速度（km/h）、距离（m）、模式类别三张独立中文曲线。课程包含6个浏览器错误定位案例、10道Q题、4道P题、完整中文注释Python工程与五组故障CSV。浏览器案例仅运行JavaScript；本地Python/NumPy/Matplotlib和unittest必须由学员实际执行。D01–D14的本地真实C验收要求保持不变。
 
 本次没有修改既有笔记、逐文件代码副本、划线批注、自动保存、云同步逻辑和私有记录仓库。修复了首选demo.c的源码视图逻辑，Python工程按lesson.source展示demo.py，并识别Python # 注释。发布版本：day15-20261109-python-numpy-csv-v1。
+
+## D15独立零基础导学（2026-11-10）
+
+已新增`python-foundation.html`：面向完全没系统学过Python的学习者，20章详细中文解释、完整执行链、C→Python20项对照、24项未来语法索引、11个官方/开源资源。提供`python-foundation-project/`全套原创标准库工程，网页可读源码/下载完整ZIP，含8帧ASW离线监视、两类坏CSV和unittest。导学页支持浏览器本地自动保存章节笔记、划线批注、逐文件代码理解、导出/导入JSON；补充页与D15原主课进度相互独立。要私有云同步导学页总结，可复制到D15原笔记框继续同步；不将补充页保存机制冒充原私有同步。
+
+所有D01–D15既有课程、试题、代码旁注和本地真实C/Python验收规则保留。参考资料与教学选择详见`docs/python-foundation/RESOURCE_AUDIT_AND_TEACHING_DESIGN.md`。

@@ -1,0 +1,118 @@
+name: Python zero-foundation project and browser supplement
+
+on:
+  pull_request:
+    paths:
+      - 'python-foundation.html'
+      - 'python-foundation.css'
+      - 'python-foundation.js'
+      - 'python-foundation-content.json'
+      - 'python-foundation-project/**'
+      - 'tests/python_foundation_browser.py'
+      - 'index.html'
+      - 'app.js'
+      - '.github/workflows/python-foundation-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'python-foundation.html'
+      - 'python-foundation.css'
+      - 'python-foundation.js'
+      - 'python-foundation-content.json'
+      - 'python-foundation-project/**'
+      - 'tests/python_foundation_browser.py'
+      - 'index.html'
+      - 'app.js'
+      - '.github/workflows/python-foundation-tests.yml'
+
+jobs:
+  real-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile every delivered Python module and execute real unit tests
+        run: |
+          set -euxo pipefail
+          cd python-foundation-project
+          python -m compileall -q .
+          python -m unittest -v test_pipeline
+          python main.py --input sample.csv --output output/results.json | tee output-log.txt
+          test -s output/results.json
+      - name: Verify output meaning and invalid CSV diagnostics
+        run: |
+          python - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          folder=Path('python-foundation-project')
+          rows=json.loads((folder/'output/results.json').read_text(encoding='utf-8'))
+          assert len(rows)==8
+          assert [r['alert'] for r in rows]==[False,True,True,False,False,True,False,True]
+          assert rows[4]['valid'] is False and rows[4]['status']=='INVALID'
+          for name,line in [('bad_string.csv',4),('bad_missing.csv',3)]:
+              p=subprocess.run(['python','main.py','--input',name],
+                cwd=folder,text=True,capture_output=True)
+              assert p.returncode==2,(name,p.stdout,p.stderr)
+              assert f'第{line}行' in p.stdout,(name,p.stdout)
+          print('PASS actual Python project output + exact error line numbers')
+          PY
+      - name: Verify source count, 20-chapter textbook, 24 syntax categories and references
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('python-foundation-content.json').read_text(encoding='utf-8'))
+          assert len(j['chapters'])==20
+          assert len(j['syntaxAtlas'])>=24 and len(j['cBridge'])==20
+          assert len(j['resources'])>=10
+          assert len(j['projectFiles'])==9
+          for x in j['chapters']:
+              for k in ('id','title','phase','story','code','trace','expected','task','check','compare','trap'):
+                  assert x.get(k), (x.get('id'),k)
+              assert len(x['story'])>=2 and len(x['trace'])>=3
+              assert 0<=x['check']['answer']<len(x['check']['options'])
+          for file in j['projectFiles']:
+              assert Path('python-foundation-project',file).exists(),file
+          assert 'python-foundation.html' in Path('index.html').read_text(encoding='utf-8')
+          print('PASS 20 independent lessons, 24 syntax entries, C bridge and all project assets')
+          PY
+      - name: Check JavaScript syntax and existing D15 runtime remains intact
+        run: |
+          node --check python-foundation.js
+          node --check app.js
+          node --check pages-runtime.js
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          b=json.loads(Path('courses.json').read_text(encoding='utf-8'))
+          assert b['lessons']['15']['runner']=='python_numpy_logs_day15'
+          assert b['release']=='day15-20261109-python-numpy-csv-v1'
+          assert len(b['lessons'])==15
+          print('PASS: D01–D15 untouched; supplement does not overwrite original course')
+          PY
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Playwright Chromium
+        run: |
+          python3 -m pip install --user playwright
+          python3 -m playwright install chromium --with-deps
+      - name: Exercise actual page on desktop/mobile and validate downloaded ZIP
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/python-foundation-pages.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          python3 tests/python_foundation_browser.py
+      - name: Upload screenshots of reviewed page
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-foundation-page-evidence
+          path: |
+            python-foundation-test-desktop.png
+            python-foundation-test-mobile.png
+          if-no-files-found: warn
