@@ -1,0 +1,1654 @@
+{
+  "release": "2026-11-10-python-zero-foundation-v2-grammar-first",
+  "title": "Python 从零精讲｜代码符号、循环、函数到ASW工程",
+  "status": "原D15先修·按基础语法重排；原D15和用户旧笔记不覆盖",
+  "principles": [
+    "先认识每个符号，再看变量与表达式；每节按“语法形式→符号拆解→逐行运行→输出→错误→动手”推进。",
+    "for/while/range/enumerate/zip/break/continue合在一个完整循环专题，先讲透再使用。",
+    "先用数字、字符串和少量信号列表讲基础，最后再进入ASW跨文件工程。",
+    "有C基础时对比算法结构和函数返回，但不假设你知道Python的新语法。",
+    "参考代码在网页阅读自测；实际Python在本人机器运行，旧笔记和原D15进度不改。"
+  ],
+  "schedule": [
+    {
+      "label": "入门语言符号",
+      "time": "按掌握进度",
+      "chapters": "01–03",
+      "outcome": "环境与标点"
+    },
+    {
+      "label": "基本语法",
+      "time": "按掌握进度",
+      "chapters": "04–07",
+      "outcome": "变量、类型、运算、字符串、if"
+    },
+    {
+      "label": "控制与容器",
+      "time": "按掌握进度",
+      "chapters": "08–10",
+      "outcome": "完整循环、列表、字典和元组"
+    },
+    {
+      "label": "组织程序",
+      "time": "按掌握进度",
+      "chapters": "11–14",
+      "outcome": "函数、模块、对象和调用链"
+    },
+    {
+      "label": "文件与验证",
+      "time": "按掌握进度",
+      "chapters": "15–17",
+      "outcome": "CSV/JSON、异常、测试"
+    },
+    {
+      "label": "ASW应用",
+      "time": "按掌握进度",
+      "chapters": "18–21",
+      "outcome": "逐帧工程、故障注入、衔接NumPy"
+    }
+  ],
+  "chapters": [
+    {
+      "id": "v2_01",
+      "phase": "起步",
+      "title": "01｜Python如何运行：先懂脚本、解释器和终端",
+      "minutes": 25,
+      "goal": "理解脚本入口、解释器、文件路径与执行次序，不把import和调用混在一起。",
+      "story": [
+        "假设你要检查车速传感器日志。先不要接触NumPy：Python可以直接运行一个.py文件，让计算机按顺序执行顶部语句。与C工程先编译再运行不同，常见的Python使用方式是让Python解释器执行脚本；导入模块时也会执行模块的顶层语句一次。",
+        "打开终端并进入保存脚本的目录，输入python3 main.py（Windows常用py -3 main.py）。如果提示找不到文件，检查当前目录；提示找不到Python，先检查解释器安装与PATH。真正执行的是本地Python，网页里的示例只是静态讲解。",
+        "完整工程中，main.py从if __name__ == '__main__'进入main()，然后调用run()，run()再调用其他模块；与C的main→App_RunOnce思路相通，但不是所有.py都独立运行自己的main。"
+      ],
+      "code": "# 文件 hello.py，先学习直接运行一份最小脚本。\nprint(\"程序开始\")           # 第一条语句打印一句话。\nspeed_kmh = 72.0           # 变量speed_kmh保存数值72.0。\nprint(\"车速是\", speed_kmh)  # print传多个参数，自动以空格分隔。\nprint(\"程序结束\")",
+      "trace": [
+        "终端python3 hello.py启动解释器，找到hello.py。",
+        "第1行打印程序开始；speed_kmh绑定到72.0这个浮点对象。",
+        "第三行读取speed_kmh并打印；最后一行打印结束。",
+        "执行到文件末尾后程序退出；没有任何自动重试或周期调度。"
+      ],
+      "expected": "程序开始\n车速是 72.0\n程序结束",
+      "compare": "C通常写main()并用printf；Python可直接执行顶层语句，但工程最好统一提供清楚的main入口。",
+      "trap": "把终端命令python3 hello.py写进.py文件，或者在错误目录执行，都会导致混淆；命令写在终端，Python代码写在文件。",
+      "task": "自己写hello.py：加一个distance_m=35.0，并打印“距离 35.0 m”；在本地运行而不是只阅读。",
+      "check": {
+        "q": "执行python3 hello.py时，谁负责读取和执行.py源码？",
+        "options": [
+          "Python解释器",
+          "monitor.py自动运行",
+          "CSV文件"
+        ],
+        "answer": 0,
+        "why": "Python解释器按程序规则执行脚本；CSV只是数据。"
+      },
+      "original_id": "start",
+      "details": []
+    },
+    {
+      "id": "v2_02",
+      "phase": "起步",
+      "title": "02｜环境与工具：Python版本、目录、编辑器和venv",
+      "minutes": 25,
+      "goal": "明白解释器、命令行、目录、库安装的关系。",
+      "story": [
+        "在WSL/Linux，python3 --version查看当前解释器；which python3检查路径。在Windows PowerShell通常使用py -3 --version或python --version。终端的工作目录决定相对路径从哪里寻找，而__file__指向脚本文件所在位置。",
+        "venv虚拟环境相当于项目自己的Python依赖空间，避免不同工程的库版本相互影响。执行python3 -m venv .venv创建环境，source .venv/bin/activate激活；Windows PowerShell通常为.venv\\Scripts\\Activate.ps1。再用python -m pip安装库。",
+        "本补充工程只需要Python标准库，不需要安装NumPy。这是为了先理解Python如何运行和组织程序。D15原课再在另一个虚拟环境安装NumPy/Matplotlib。"
+      ],
+      "code": "# 在终端执行（这些不是Python代码）：\n# python3 --version\n# python3 -m venv .venv\n# source .venv/bin/activate\n# python -m pip --version\n\n# 创建 env_check.py 后，在终端运行python env_check.py：\nimport sys                    # 导入标准库sys，查看解释器信息。\nfrom pathlib import Path       # 从pathlib模块取得Path类。\nprint(\"解释器:\", sys.executable)\nprint(\"当前目录:\", Path.cwd())\nprint(\"脚本目录:\", Path(__file__).resolve().parent)",
+      "trace": [
+        "终端执行python3 -m venv .venv创建一个目录，里面包含项目解释器等资源。",
+        "激活后终端中的python通常指向这个环境的解释器。",
+        "运行env_check.py时导入sys和Path；print分别显示解释器、工作目录和脚本目录。",
+        "进入D15 NumPy项目后再用python -m pip install -r requirements.txt安装第三方库。"
+      ],
+      "expected": "输出依赖你的机器；解释器路径、当前目录和脚本目录通常不同。",
+      "compare": "类似C项目里选择GCC工具链、CMake构建目录和外部库；Python使用解释器、venv及pip。",
+      "trap": "不要把终端提示符里的$或>复制成Python代码。不要把“安装了Python”理解为“所有外部库已经安装”。",
+      "task": "本机执行python3 --version、python3 -m venv .venv、激活venv、python -m pip --version，记录解释器实际路径。",
+      "check": {
+        "q": "本项目什么时候需要安装NumPy？",
+        "options": [
+          "所有Python脚本都必须安装",
+          "只有需要NumPy功能的D15原课才安装",
+          "打开CSV时一定要安装"
+        ],
+        "answer": 1,
+        "why": "标准库csv、json、dataclasses等随Python提供；NumPy是第三方库。"
+      },
+      "original_id": "environment",
+      "details": []
+    },
+    {
+      "id": "v2_03",
+      "phase": "语法符号",
+      "minutes": 70,
+      "goal": "拿到一行Python代码能够逐字解释每个常见标点；先学语法，不跳进ASW工程。",
+      "story": [
+        "你指出看不懂下划线、点号和括号，而旧版却已经调用复杂模块。这个顺序确实不合适。本章单独以“为什么写这个符号、在哪个位置、会做什么”为主，不要求提前理解类、装饰器或多模块工程。",
+        "Python和C会复用很多标点，但可能有不同的意义：C的花括号经常定义代码块，Python的代码块主要靠英文冒号和缩进；点号在Python可以用于一般对象属性访问，也可能是浮点数里的小数点。",
+        "学习时按每个符号的最小代码→逐行运行→改变符号观察错误进行，不要求背所有特殊用法。后面看到新用法再回来查。"
+      ],
+      "details": [
+        {
+          "name": "符号 _",
+          "grammar": "speed_kmh、_、_internal、__name__",
+          "explanation": "在speed_kmh中_是变量名的一部分，分隔两个单词；下划线并不会自动进行单位转换。单独_也可以绑定对象，惯例上表示“不需要这个值”。_internal表示约定上供内部使用，并非真正强制私有。双前导加双后缀的__name__、__init__是文档定义的特殊名字，不能随意创造。",
+          "parts": [
+            [
+              "先读写法",
+              "speed_kmh、_、_internal、__name__"
+            ],
+            [
+              "含义",
+              "在speed_kmh中_是变量名的一部分，分隔两个单词；下划线并不会自动进行单位转换。单独_也可以绑定对象，惯例上表示“不需要这个值”。_internal表示约定上供内部使用，并非真正强制私有。双前导加双后缀的__name__、__init__是文档定义的特殊名字，不能随意创造。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "speed_kmh = 72\n_ = 99\nprint(speed_kmh, _)",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "72 99",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        },
+        {
+          "name": "符号 .",
+          "grammar": "72.5、text.upper()、math.sqrt(9)",
+          "explanation": "72.5里的.是浮点数字面量的小数点。text.upper先从对象text取到名叫upper的方法；text.upper()多了一对圆括号，表示实际调用。math.sqrt(9)先从模块math找到sqrt函数，再传9进去运行。",
+          "parts": [
+            [
+              "先读写法",
+              "72.5、text.upper()、math.sqrt(9)"
+            ],
+            [
+              "含义",
+              "72.5里的.是浮点数字面量的小数点。text.upper先从对象text取到名叫upper的方法；text.upper()多了一对圆括号，表示实际调用。math.sqrt(9)先从模块math找到sqrt函数，再传9进去运行。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "text='asw'\nprint(text.upper())\nimport math\nprint(math.sqrt(9))",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "ASW\n3.0",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        },
+        {
+          "name": "符号 ()",
+          "grammar": "print('hi')、(2+3)*4、(1,)",
+          "explanation": "通常在函数名后表示调用；括号里的值是传入的实参。运算里括号会改变优先级。元组不只是看括号，(1)仍是整数，(1,)才是一元素元组。定义函数时的def f(x):里括号声明形参，调用f(5)时括号传实参。",
+          "parts": [
+            [
+              "先读写法",
+              "print('hi')、(2+3)*4、(1,)"
+            ],
+            [
+              "含义",
+              "通常在函数名后表示调用；括号里的值是传入的实参。运算里括号会改变优先级。元组不只是看括号，(1)仍是整数，(1,)才是一元素元组。定义函数时的def f(x):里括号声明形参，调用f(5)时括号传实参。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "print((2+3)*4)\nprint(type((1,)).__name__)",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "20\ntuple",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        },
+        {
+          "name": "符号 []",
+          "grammar": "[72,73]与values[0]",
+          "explanation": "[]单独包住元素可以创建list；跟在现有序列/映射后面表示按索引或键读取。values[0]是第0个元素，也就是第一项；values[1]才是第二项。索引越界会触发IndexError。",
+          "parts": [
+            [
+              "先读写法",
+              "[72,73]与values[0]"
+            ],
+            [
+              "含义",
+              "[]单独包住元素可以创建list；跟在现有序列/映射后面表示按索引或键读取。values[0]是第0个元素，也就是第一项；values[1]才是第二项。索引越界会触发IndexError。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "values = [72,73]\nprint(values[0],values[1])",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "72 73",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        },
+        {
+          "name": "符号 {}",
+          "grammar": "{'speed':72}、{}、f'{speed}'",
+          "explanation": "字典中{键:值}存对应关系；空{}创建空dict，不是空set。在f-string里{...}插入表达式。Python的if语句不需要C风格的{}包裹代码块。",
+          "parts": [
+            [
+              "先读写法",
+              "{'speed':72}、{}、f'{speed}'"
+            ],
+            [
+              "含义",
+              "字典中{键:值}存对应关系；空{}创建空dict，不是空set。在f-string里{...}插入表达式。Python的if语句不需要C风格的{}包裹代码块。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "row={'speed':72}\nprint(row['speed'])\nprint(type({}).__name__)",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "72\ndict",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        },
+        {
+          "name": "符号 :",
+          "grammar": "if x:、{'speed':72}、x: float、{x:.1f}",
+          "explanation": "相同的:在不同上下文含义不同。if/for/while/def后冒号表示开始缩进代码块；字典中分隔键和值；函数参数或变量注解中说明建议类型；f-string冒号后面指定显示格式。必须结合位置理解。",
+          "parts": [
+            [
+              "先读写法",
+              "if x:、{'speed':72}、x: float、{x:.1f}"
+            ],
+            [
+              "含义",
+              "相同的:在不同上下文含义不同。if/for/while/def后冒号表示开始缩进代码块；字典中分隔键和值；函数参数或变量注解中说明建议类型；f-string冒号后面指定显示格式。必须结合位置理解。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "x=72\nif x==72:\n    print('yes')\nprint('done')",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "yes\ndone",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        },
+        {
+          "name": "符号 ,",
+          "grammar": "print(a,b)、a,b=(1,2)",
+          "explanation": "逗号用于分隔参数、列表元素、字典成员及解包赋值目标。print(a,b)传两个参数；a,b=(1,2)把两个数分别分给两个名字。单元素元组的关键也是逗号而非外面的括号。",
+          "parts": [
+            [
+              "先读写法",
+              "print(a,b)、a,b=(1,2)"
+            ],
+            [
+              "含义",
+              "逗号用于分隔参数、列表元素、字典成员及解包赋值目标。print(a,b)传两个参数；a,b=(1,2)把两个数分别分给两个名字。单元素元组的关键也是逗号而非外面的括号。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "a,b=(1,2)\nprint(a,b)",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "1 2",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        },
+        {
+          "name": "符号 = 与 ==",
+          "grammar": "speed=72 与 speed==72",
+          "explanation": "=是赋值/绑定，程序把右侧计算结果赋给左侧目标。==是比较两个值是否相等，得到True或False。不要在if条件中误用=。is比较对象身份，通常只在判断None时写x is None。",
+          "parts": [
+            [
+              "先读写法",
+              "speed=72 与 speed==72"
+            ],
+            [
+              "含义",
+              "=是赋值/绑定，程序把右侧计算结果赋给左侧目标。==是比较两个值是否相等，得到True或False。不要在if条件中误用=。is比较对象身份，通常只在判断None时写x is None。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "speed=72\nprint(speed==72)\nprint(speed==73)",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "True\nFalse",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        },
+        {
+          "name": "符号 # 与引号",
+          "grammar": "print('A#B') # comment",
+          "explanation": "引号括住字符串。字符串内的#是普通字符，字符串外的#开始注释直到行尾。普通代码缩进4个空格，空行一般仅用于排版。不要把中文全角冒号、括号复制进Python语法位置。",
+          "parts": [
+            [
+              "先读写法",
+              "print('A#B') # comment"
+            ],
+            [
+              "含义",
+              "引号括住字符串。字符串内的#是普通字符，字符串外的#开始注释直到行尾。普通代码缩进4个空格，空行一般仅用于排版。不要把中文全角冒号、括号复制进Python语法位置。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "print('A#B') #真正的注释\nprint('OK')",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "A#B\nOK",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        },
+        {
+          "name": "符号 @、->、*、**",
+          "grammar": "@dataclass、-> int、*args、**kwargs",
+          "explanation": "@常表示装饰器，后面的@dataclass是类定义辅助工具，放到类章节再学；-> int是返回类型注解，不自动校验；*可表示乘法或收集多个位置参数；**可表示乘方或收集关键字参数。符号的用途由所处语法位置确定。",
+          "parts": [
+            [
+              "先读写法",
+              "@dataclass、-> int、*args、**kwargs"
+            ],
+            [
+              "含义",
+              "@常表示装饰器，后面的@dataclass是类定义辅助工具，放到类章节再学；-> int是返回类型注解，不自动校验；*可表示乘法或收集多个位置参数；**可表示乘方或收集关键字参数。符号的用途由所处语法位置确定。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "print(2*3)\nprint(2**3)",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "6\n8",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        },
+        {
+          "name": "符号 \\ 与转义",
+          "grammar": "'A\\nB'、r'C:\\data'",
+          "explanation": "字符串中的反斜杠用于转义，\\n代表换行，\\t代表制表符。r前缀常保留反斜杠，方便表示路径等内容，但有特殊边界限制。本节只做初步认读，字符串章节详细解释。",
+          "parts": [
+            [
+              "先读写法",
+              "'A\\nB'、r'C:\\data'"
+            ],
+            [
+              "含义",
+              "字符串中的反斜杠用于转义，\\n代表换行，\\t代表制表符。r前缀常保留反斜杠，方便表示路径等内容，但有特殊边界限制。本节只做初步认读，字符串章节详细解释。"
+            ],
+            [
+              "判断位置",
+              "这个符号属于名字、表达式、函数调用、数据访问、字符串还是语句块？"
+            ],
+            [
+              "动手原则",
+              "必须先能预测输出，再到本地执行。"
+            ]
+          ],
+          "example": "print('A\\nB')",
+          "trace": [
+            "找到第一条赋值或import，确认有哪些名字可用。",
+            "逐个标出本节符号的作用及它连接的对象。",
+            "按代码顺序运行，遇到函数调用先进去执行，再回到原位置。",
+            "对照实际输出并确认没有额外隐藏操作。"
+          ],
+          "expected": "A\nB",
+          "errors": [
+            "不要因为外观和C相似就直接照搬C的含义。",
+            "分清半角代码符号与中文标点。"
+          ],
+          "practice": "写一个含此符号的三行最小例子，注释解释每个部分。"
+        }
+      ],
+      "code": "speed_kmh = 72\nvalues = [speed_kmh, 73]\nif values[0] == 72:\n    print('满足条件')",
+      "trace": [
+        "speed_kmh是一个名字，_只是名字的组成部分。",
+        "[]构建列表；values[0]按下标获取第一个元素。",
+        "==比较数值，冒号开始缩进if块，括号调用print。",
+        "打印满足条件。"
+      ],
+      "expected": "满足条件",
+      "compare": "C使用花括号圈出语句块，Python使用缩进；对象访问的点号和函数调用括号需要分别识别。",
+      "trap": "同样的符号会有多种含义，不要脱离上下文背诵。",
+      "task": "分别用一句话解释speed_kmh、text.upper()、values[0]、if valid:中各标点的作用。",
+      "check": {
+        "q": "在text.upper()里点号后面的upper与圆括号分别代表？",
+        "options": [
+          "小数与索引",
+          "取方法与调用方法",
+          "文件名与结束符"
+        ],
+        "answer": 1,
+        "why": "点号访问对象属性，圆括号调用取到的可调用方法。"
+      },
+      "original_id": null,
+      "title": "03｜代码符号逐字讲解：_ . () [] {} : , = == #"
+    },
+    {
+      "id": "v2_04",
+      "phase": "基础语法",
+      "title": "04｜变量命名、赋值、类型和转换",
+      "minutes": 30,
+      "goal": "认识int、float、str、bool、None和type，理解类型提示并非自动校验。",
+      "story": [
+        "变量可以理解为给一个对象起名字。speed_kmh=72.0会把名字speed_kmh绑定到一个浮点数对象，Python一般无需像C那样先写float speed_kmh，但这种灵活性也意味着错误类型可能在运行到某行时才暴露。",
+        "最常用类型有整数int、浮点float、文本str、布尔bool和None（表示没有值）；type(x)查看运行时类型。工程中名字应包含单位，例如speed_kmh与speed_mps分别表示km/h和m/s，它们不能直接比较。",
+        "speed_kmh: float = 72.0里的冒号是类型注解，便于阅读和工具检查，普通Python运行时并不会仅凭这个注解阻止赋入字符串；仍需明确的解析/校验函数。"
+      ],
+      "code": "speed_kmh: float = 72.0  # 声明变量的意图；: float是类型注解。\ndistance_m = 35            # int整数，与35.0的float不同。\nsensor_name = \"radar\"      # str文本，必须加引号。\nradar_valid = True         # bool真；假写False，首字母大写。\nno_sample = None           # None表示目前没有数据。\n\nprint(type(speed_kmh).__name__)\nprint(type(distance_m).__name__)\nprint(radar_valid, no_sample)\nspeed_mps = speed_kmh / 3.6 # 转换为m/s，不能直接把72当作72m/s。\nprint(round(speed_mps, 2))",
+      "trace": [
+        "speed_kmh绑定浮点72.0，distance_m绑定整数35。",
+        "sensor_name绑定字符串，radar_valid绑定bool，no_sample绑定None。",
+        "type(...)得到对象的真实类型，而不是直接读变量注解。",
+        "72/3.6=20，单位由km/h转换为m/s。"
+      ],
+      "expected": "float\nint\nTrue None\n20.0",
+      "compare": "C的float/int是静态声明类型，Python的名字可以在运行期间重新绑定；清晰命名和显式验证更重要。",
+      "trap": "Python写True/False/None，不能写C式true/false/NULL。'72'是字符串，不等于72数字。float类型不意味着一定是有效有限数。",
+      "task": "写speed_kmh=90.0并计算speed_mps；用type分别检查'90'和90的类型。",
+      "check": {
+        "q": "speed_kmh: float = 'fast'会被Python的类型注解自动拒绝吗？",
+        "options": [
+          "会，编译阶段报错",
+          "不会，普通运行时类型提示不提供自动校验",
+          "会自动变成0.0"
+        ],
+        "answer": 1,
+        "why": "类型注解是给开发者与检查工具看的，不是通用运行时验证机制。"
+      },
+      "original_id": "types",
+      "details": []
+    },
+    {
+      "id": "v2_05",
+      "phase": "基础语法",
+      "title": "05｜数值、算术、比较、单位和有限性",
+      "minutes": 30,
+      "goal": "认识/、//、%、**、==、and/or/not与NaN问题。",
+      "story": [
+        "Python的/即使两个数都是整数，通常也得到浮点结果；//表示向下取整，不是C中的整数除法在负数上向零截断。%为取余，**为乘方。比较相等用==，赋值用=。",
+        "逻辑运算写and、or、not，而不是C的&&、||、!。Python的短路计算可以避免访问None的成员，例如frame is not None and frame.speed_kmh > 0。",
+        "汽车数据检查还需考虑NaN和无穷大。float('nan')是特殊浮点值，不能因为“类型是float”就直接用于有效性判断；math.isfinite()很重要。"
+      ],
+      "code": "import math\n\nspeed_kmh = 72.0\nspeed_mps = speed_kmh / 3.6\nprint(speed_mps == 20.0)               # 比较相等。\nprint(7 / 2, 7 // 2, 7 % 2)           # 三种运算。\nprint(2 ** 3)                         # 2的3次方。\nradar_valid = True\ndistance_m = 34.0\nalert = radar_valid and distance_m <= 35.0\nprint(alert)\nprint(math.isfinite(float(\"nan\")))     # nan是非有限浮点数。",
+      "trace": [
+        "计算72/3.6为20.0；进行相等判断返回True。",
+        "7/2=3.5；7//2=3；7%2=1；2**3=8。",
+        "radar_valid为True且distance<=35，于是alert为True。",
+        "NaN不是有限数，因此isfinite返回False。"
+      ],
+      "expected": "True\n3.5 3 1\n8\nTrue\nFalse",
+      "compare": "C里&&/||/!用于逻辑；Python改为and/or/not。Python的/与C整型除法行为也不同。",
+      "trap": "不要把=写成==，也不要用is比较两个普通数值是否相等。浮点运算有舍入误差，测试容差应明确设置。",
+      "task": "写一个范围判断0<=speed_kmh<=250，测试-1、72、251；再用math.isfinite拒绝NaN。",
+      "check": {
+        "q": "要判断速度在0～250区间且雷达有效，哪种写法正确？",
+        "options": [
+          "0 <= speed <= 250 and radar_valid",
+          "speed = 72 && radar_valid",
+          "speed in 0..250"
+        ],
+        "answer": 0,
+        "why": "Python支持链式比较和and逻辑运算。"
+      },
+      "original_id": "operators",
+      "details": []
+    },
+    {
+      "id": "v2_06",
+      "phase": "基础语法",
+      "title": "06｜字符串：引号、转义、索引、方法、格式化",
+      "minutes": 25,
+      "goal": "知道文本和数值必须区分，掌握格式化、strip、split与显式转换。",
+      "story": [
+        "日志既有数字也有文本。读取CSV或命令行时，拿到的往往是str。'72' + '3'会得到'723'，而72+3等于75。把外部文本变成数字用float(text)或int(text)，失败时会抛ValueError。",
+        "f-string把变量嵌入文本，例如f'{speed_kmh:.1f} km/h'保留一位小数，用于规范输出日志；{...}在这里是表达式，不是C的结构体初始化语法。",
+        "input()是手动实验的输入函数，会暂停等人输入；自动化ASW离线测试更常从CSV、配置文件或命令行参数读取，避免每个周期等待键盘。"
+      ],
+      "code": "raw = \" 72.5,34.0 \"                # 原始文本含空格和逗号。\ntext = raw.strip()              # 去掉两端空白。\nfields = text.split(\",\")        # 按逗号分成两个字符串。\nspeed = float(fields[0])        # 显式转为数值。\ndistance = float(fields[1])\nprint(fields)\nprint(f\"速度={speed:.1f} km/h\")\nprint(f\"距离={distance:.1f} m\")\nprint(len(fields))              # 列表中有几个元素。",
+      "trace": [
+        "strip得到'72.5,34.0'，split得到两个字符串。",
+        "float分别转换为72.5和34.0。",
+        "f-string把真实数值按一位小数格式化。",
+        "len(fields)得到元素个数2。"
+      ],
+      "expected": "['72.5', '34.0']\n速度=72.5 km/h\n距离=34.0 m\n2",
+      "compare": "C通常scanf/sscanf/printf或字符串解析；Python字符串方法更直接，但仍须主动验证格式和单位。",
+      "trap": "float('')和float('oops')会报ValueError；float('nan')虽然成功转换，但仍需要用math.isfinite()验证。",
+      "task": "将raw改为'80.0,41.0'，打印一位小数的车速和距离；把raw改为'bad,41.0'并观察异常。",
+      "check": {
+        "q": "为什么不能直接把CSV文本'72.5'用于数学比较？",
+        "options": [
+          "它已经自动是float",
+          "它首先是str，应解析并校验",
+          "它只能打印不能存储"
+        ],
+        "answer": 1,
+        "why": "从文本文件读取的是文本，不保证一定可转换为合法数值。"
+      },
+      "original_id": "strings",
+      "details": []
+    },
+    {
+      "id": "v2_07",
+      "phase": "基础语法",
+      "title": "07｜布尔判断、if/elif/else和缩进",
+      "minutes": 30,
+      "goal": "分清条件判断、分支优先级及缩进的意义。",
+      "story": [
+        "在C里大括号包住代码块；Python用冒号后面的缩进划分。if条件为真就执行对应缩进块，elif尝试其他条件，else处理剩下的情况。通常一层缩进4个空格。",
+        "工程里检查顺序有含义：先判断输入非法，再检查功能是否启用，最后才计算业务输出。若把范围判断放在最后，非法数据可能先参与计算。",
+        "初学者应在运行前画出决策树：speed是否有限？雷达是否有效？enable是否为True？距离是否触发告警？这比记关键词有效。"
+      ],
+      "code": "speed_kmh = 72.0\ndistance_m = 34.0\nradar_valid = True\nenable = True\n\nif not radar_valid:\n    status = \"INVALID\"          # 只有雷达无效才执行。\nelif not enable:\n    status = \"OFF\"              # 雷达有效但未启用。\nelif distance_m <= 35.0:\n    status = \"ALERT\"            # 有效且距离在触发范围。\nelse:\n    status = \"NORMAL\"           # 剩余情况。\nprint(status)                   # 与if对齐：所有分支之后都执行。",
+      "trace": [
+        "先判断not radar_valid：False，跳过第一个分支。",
+        "再判断not enable：False。",
+        "判断distance<=35：True，status变为ALERT。",
+        "不进入else；从分支结构退出，执行print。"
+      ],
+      "expected": "ALERT",
+      "compare": "C用if (...) {...}，Python用if ...:后加缩进；没有强制括号也没有花括号。",
+      "trap": "缩进混乱会报IndentationError。不要在elif后面再写独立if导致逻辑变成两次判断。",
+      "task": "把radar_valid改为False和enable改为False，分别预测status。观察为什么先检查radar会改变优先级。",
+      "check": {
+        "q": "上例radar_valid=False且enable=False，最终status是什么？",
+        "options": [
+          "OFF",
+          "INVALID",
+          "ALERT"
+        ],
+        "answer": 1,
+        "why": "第一个if命中后，其余elif/else不执行。"
+      },
+      "original_id": "conditions",
+      "details": []
+    },
+    {
+      "id": "v2_08",
+      "phase": "数据组织",
+      "title": "08｜循环完整专题：for、while、range、enumerate、break等",
+      "minutes": 25,
+      "goal": "分清迭代条件、跳过本轮、结束整个循环、创建新列表。",
+      "story": [
+        "本章把for、while放在一起讲。for每轮从一个可迭代对象取元素，while每轮先求条件真假；这两者都依靠冒号和缩进指定循环体。你不必先懂类、NumPy或ASW工程。",
+        "按顺序从for item in items的每个词与符号开始，再学range(终点)、range(起点,终点,步长)，再学while的初始化/更新/退出，随后讲break、continue、嵌套循环、enumerate、zip。",
+        "Python的for不是C的for(i=0;i<n;i++)。与C的计数循环最接近的写法是for i in range(n)。enumerate返回索引与元素对，for i,value in enumerate(items)是对这两个值解包。"
+      ],
+      "code": "values = [45,34,38]\nfor index,value in enumerate(values):\n    print(index,value)\nretry=0\nwhile retry<2:\n    print('重试',retry)\n    retry+=1",
+      "trace": [
+        "创建三元素列表。",
+        "enumerate逐次产生(0,45)、(1,34)、(2,38)；for依次解包并打印。",
+        "retry从0开始，while每轮判断retry<2，为真则打印并加1。",
+        "retry变2之后条件为假，while停止。"
+      ],
+      "expected": "0 45\n1 34\n2 38\n重试 0\n重试 1",
+      "compare": "与C的for/while/break/continue概念相同，Python通过缩进控制循环体；for-in常遍历元素而非手动索引。",
+      "trap": "while没有改变条件变量容易无限循环。continue用于合法的过滤条件，不应用来掩盖必须报错的损坏帧。",
+      "task": "不用推导式写出所有小于35m的距离，之后再用推导式写等价版本。",
+      "check": {
+        "q": "continue的作用是什么？",
+        "options": [
+          "立刻退出整个函数",
+          "跳过本轮剩余循环体，继续下一轮",
+          "让程序结束"
+        ],
+        "answer": 1,
+        "why": "break退出循环；continue跳过当前迭代的剩余部分。"
+      },
+      "original_id": "loops",
+      "details": []
+    },
+    {
+      "id": "v2_09",
+      "phase": "数据组织",
+      "title": "09｜列表：创建、索引、切片、修改、复制",
+      "minutes": 35,
+      "goal": "把多帧日志变成数据序列，理解0下标和遍历。",
+      "story": [
+        "list是可变有序容器，先完整学习创建、索引、切片、方法、复制，再用已经学过的for处理它。这里不再把for的定义混在列表知识里。",
+        "list和C的固定数组在长度变化、元素类型和内存管理上不同；都需要遵守索引从0开始的原则。",
+        "b=a让两个名字指向同一列表；b=a.copy()创建一个新的浅层列表对象。"
+      ],
+      "code": "distance_list = [45.0, 34.0, 38.0]\ndistance_list.append(42.0)            # 在末尾增加一个值。\nprint(distance_list[0])               # 第一个元素。\nprint(distance_list[-1])              # 最后一个元素。\nprint(distance_list[1:3])             # 包含下标1、2，不含3。\n\nfor index, distance in enumerate(distance_list):\n    print(index, distance)            # index从0增加，每轮取一项。",
+      "trace": [
+        "列表初始3项，append之后有4项。",
+        "取下标0得到45.0；-1得到42.0；1:3得到34.0和38.0。",
+        "enumerate第一次给(index=0,distance=45)，逐次迭代到3和42。",
+        "循环结束后退出for，没有任何默认无限循环。"
+      ],
+      "expected": "45.0\n42.0\n[34.0, 38.0]\n0 45.0\n1 34.0\n2 38.0\n3 42.0",
+      "compare": "C数组长度通常固定且需考虑容量/越界；Python列表自动管理容量，但索引超界仍会抛IndexError。",
+      "trap": "切片终点不包含在内；list.append返回None，不能写distance_list = distance_list.append(42)。",
+      "task": "构造五帧距离列表，打印所有小于等于35m的帧下标；不能直接修改原数据来让测试通过。",
+      "check": {
+        "q": "a=[10,20,30,40]，a[1:3]是什么？",
+        "options": [
+          "[10,20,30]",
+          "[20,30]",
+          "[20,30,40]"
+        ],
+        "answer": 1,
+        "why": "从索引1开始，到索引3之前结束。"
+      },
+      "original_id": "lists",
+      "details": []
+    },
+    {
+      "id": "v2_10",
+      "phase": "数据组织",
+      "title": "10｜元组、字典、集合及数据结构选择",
+      "minutes": 35,
+      "goal": "理解列表按位置取、字典按键取、元组通常作为记录、集合去重。",
+      "story": [
+        "字典dict保存键→值关系，是日志字段的重要载体。比如row['speed_kmh']找到车速。与list按整数索引不同，字典按字段名称访问更清晰；缺失键row['x']会抛KeyError，row.get('x')可得到None。",
+        "tuple元组常用来固定地打包几个值并按位置解包；set集合用于去重和快速成员检查。列表和字典可变，元组不可变（但其内部若含可变对象仍可能变化）。",
+        "一个容易忽略的坑是别名：b = a不是复制列表，两个名字可能指向同一列表；b.append会影响a。需要独立列表用a.copy()或list(a)。这和C的指针/结构体赋值语义不能简单完全等同。"
+      ],
+      "code": "row = {\"time_ms\": 20, \"speed_kmh\": 72.0, \"mode\": 1}\nprint(row[\"speed_kmh\"])\nrow[\"valid\"] = True                 # 给字典增加一项。\nprint(row.get(\"distance_m\"))         # 不存在则返回None。\n\npair = (72.0, 34.0)                 # 元组存两个数值。\nspeed, distance = pair              # 解包。\nprint(speed, distance)\n\nmodes = [0, 1, 1, 0, 2]\nprint(sorted(set(modes)))            # set去重后排序。\na = [1, 2]\nb = a                               # 两个变量引用同一个列表。\nb.append(3)\nprint(a)",
+      "trace": [
+        "row读取speed_kmh得到72.0，添加valid=True。",
+        "缺少distance_m，get返回None。",
+        "tuple中的两个值分别解包到speed/distance。",
+        "set(modes)去重得到0、1、2，sorted排序。",
+        "b与a是同一个列表对象，所以b.append后a也包含3。"
+      ],
+      "expected": "72.0\nNone\n72.0 34.0\n[0, 1, 2]\n[1, 2, 3]",
+      "compare": "C struct按字段访问与dict有类似体验，但dict字段动态，适合原始CSV；有明确协议时@dataclass更适合承载结构化帧。",
+      "trap": "当row.get('distance_m')返回None时不能直接做数值计算。不要以为b=a总会复制一个新列表。",
+      "task": "构造包含time_ms、distance_m、radar_valid的字典，安全读取一个不存在的key；然后演示列表复制与别名。",
+      "check": {
+        "q": "a=[1,2]; b=a; b.append(3)，a是什么？",
+        "options": [
+          "[1,2]",
+          "[1,2,3]",
+          "报错"
+        ],
+        "answer": 1,
+        "why": "赋值没有复制列表对象，a与b引用同一个可变列表。"
+      },
+      "original_id": "dict-tuple-set",
+      "details": []
+    },
+    {
+      "id": "v2_11",
+      "phase": "函数与调用",
+      "title": "11｜函数第一课：def、调用、参数、return",
+      "minutes": 40,
+      "goal": "理解函数并不自动运行，调用者与被调用者之间如何交换数据。",
+      "story": [
+        "Python的函数用def定义。def只建立函数对象，函数体并不是在定义那一刻就正常执行；当其他代码写函数名(参数)时才调用。函数的返回类型通常不强制声明，但可以使用->类型作注解。",
+        "return既结束本次函数执行，也把一个结果交还调用者；如果没有return表达式，正常结束会返回None。与C中返回int或结构体类似，Python还能返回dict、list、dataclass实例等对象。",
+        "函数参数是局部名字。调用validate_distance(34.0)会让参数distance_m在本次调用里对应34.0；改变局部变量的绑定不自动改变外层同名变量。"
+      ],
+      "code": "def is_near(distance_m: float) -> bool:\n    # 参数distance_m是本次调用的局部名字。\n    if distance_m < 0:\n        return False         # 条件命中立刻结束，后面语句不执行。\n    return distance_m <= 35.0\n\ndef describe(distance_m: float) -> str:\n    near = is_near(distance_m)  # 在一个函数里调用另一个函数。\n    if near:\n        return \"距离提示\"\n    return \"正常距离\"\n\nmessage = describe(34.0)        # 调用describe，得到返回的字符串。\nprint(message)\nprint(is_near(42.0))",
+      "trace": [
+        "执行到def语句时定义函数is_near和describe，不会打印结果。",
+        "调用describe(34)进入函数体，接着内部调用is_near(34)。",
+        "is_near返回True，describe据此返回'距离提示'。",
+        "main层拿到message后打印，再调用is_near(42)得到False。"
+      ],
+      "expected": "距离提示\nFalse",
+      "compare": "C的int/void/MonitorResult出现在函数名前；Python写def函数名(...)->类型提示，返回值由return给出。",
+      "trap": "把print(...)当成return是常见错误：print只负责显示，函数没return通常返回None。函数中的return后面同一分支不再继续执行。",
+      "task": "编写validate_speed(value)返回bool，限制0～250 km/h；再由另一个函数调用它。",
+      "check": {
+        "q": "只有print('ok')而没有return的Python函数通常返回什么？",
+        "options": [
+          "字符串'ok'",
+          "0",
+          "None"
+        ],
+        "answer": 2,
+        "why": "print负责副作用输出，不等于给调用者返回那个字符串。"
+      },
+      "original_id": "func",
+      "details": []
+    },
+    {
+      "id": "v2_12",
+      "phase": "函数与调用",
+      "title": "12｜函数第二课：默认值、关键字和可变参数",
+      "minutes": 30,
+      "goal": "学会阅读未来项目常见的函数签名，知道可变默认参数陷阱。",
+      "story": [
+        "函数的调用除了按位置传参，还能按名称传参，例如make_threshold(limit_m=35.0)。有默认值的参数可以省略；关键字参数便于在多个相似浮点参数中表明单位与含义。",
+        "*args把额外位置参数收成tuple；**kwargs把额外命名参数收成dict。初学时知道它们的用途即可，真正工程接口更应优先写清楚的固定参数，不要滥用通配参数。",
+        "Python能用return a,b返回一个tuple，调用者可以写x,y=func()解包。可变默认参数例如def f(items=[])会在多次调用之间共享那份列表，应改用None并在函数体内创建新列表。"
+      ],
+      "code": "def format_signal(value: float, unit: str = \"km/h\") -> str:\n    return f\"{value:.1f} {unit}\"\n\nprint(format_signal(72.0))\nprint(format_signal(value=34.0, unit=\"m\"))\n\ndef summarize(*values: float) -> tuple[float, int]:\n    total = sum(values)  # values是tuple，不是普通单个float。\n    return total, len(values)\n\ntotal, count = summarize(1.0, 2.0, 3.0)\nprint(total, count)\n\ndef capture(**fields):\n    return fields         # fields是dict。\nprint(capture(speed=72, valid=True))",
+      "trace": [
+        "format_signal(72)没有给unit，使用默认'km/h'。",
+        "第二次按名称传入value和unit='m'。",
+        "summarize获得(1,2,3)，返回(6.0,3)的tuple，解包为total/count。",
+        "capture把speed、valid两个关键字参数放入dict后返回。"
+      ],
+      "expected": "72.0 km/h\n34.0 m\n6.0 3\n{'speed': 72, 'valid': True}",
+      "compare": "C没有完全对应的关键字参数语法；Python接口灵活，但项目中最好明确字段单位与是否可选。",
+      "trap": "不要写def add(x, items=[]):并在里面append，因同一默认列表会跨多次调用保留内容。",
+      "task": "写一个threshold(distance_m, limit_m=35.0)，分别用默认值及limit_m=40.0调用。",
+      "check": {
+        "q": "函数def f(x, unit='m')允许怎样调用？",
+        "options": [
+          "f(34, unit='km')",
+          "只能传两个位置参数",
+          "unit默认值会强制改变x的单位"
+        ],
+        "answer": 0,
+        "why": "关键字参数允许指定unit名称，默认值也可以覆盖。"
+      },
+      "original_id": "params",
+      "details": []
+    },
+    {
+      "id": "v2_13",
+      "phase": "函数与调用",
+      "title": "13｜import与执行入口：跨文件调用的先后顺序",
+      "minutes": 45,
+      "goal": "完整理解main.py→reader.py→monitor.py→返回main.py，以及导入时究竟发生什么。",
+      "story": [
+        "一个.py文件就是一个模块。main.py可以from reader import load_frames，再写load_frames(...)调用。导入模块时Python会处理那个模块的顶层代码并创建函数/类定义；不会自动调用这些函数，除非顶层代码自己写了调用语句。",
+        "if __name__ == '__main__'是常见入口保护：直接执行main.py时条件成立，才会调用main()；其他文件import main时该条件为False，避免仅为了拿run()函数就意外执行整套流程。",
+        "本项目对应链：终端→main.py入口→main()→run()→reader.load_frames()返回list[Frame]→创建Monitor()→每一帧调用monitor.step()返回Decision→asdict转dict→JSON保存→run返回列表→main返回0。文件中写得靠前不一定先于调用关系执行；应从入口和每次调用展开。"
+      ],
+      "code": "# 文件 logic.py：\ndef warning(distance_m):\n    return distance_m <= 35.0\n\n# 文件 main.py：\nfrom logic import warning        # 找到logic.py并导入函数对象。\n\ndef main():\n    print(\"入口开始\")\n    value = warning(34.0)       # 此刻才进入logic.py的warning函数体。\n    print(\"告警：\", value)       # 返回main.py继续向下执行。\n\nif __name__ == \"__main__\":      # 只有直接运行main.py才调用main。\n    main()",
+      "trace": [
+        "Python启动main.py；执行from logic import warning。",
+        "导入logic.py时建立warning函数定义，不会自己调用warning。",
+        "main.py定义main函数；入口判断True后调用main()。",
+        "main()打印入口开始，调用warning(34)，warning返回True。",
+        "恢复到main()，打印告警True，main结束，脚本结束。"
+      ],
+      "expected": "入口开始\n告警： True",
+      "compare": "C在链接阶段解析不同.c之间的函数定义；Python在运行时导入模块并取得名称，依赖关系仍要明确。",
+      "trap": "模块名不要取csv.py、json.py、typing.py等标准库同名名称，否则可能导入了自己的文件。删掉或移动reader.py会使from reader import ...失败。",
+      "task": "在本地创建logic.py和main.py，运行main.py；再单独import main观察为什么不会输出入口开始。",
+      "check": {
+        "q": "main.py导入logic.py里的warning函数时，warning的函数体什么时候执行？",
+        "options": [
+          "每次import就必执行",
+          "调用warning(...)时",
+          "只有删除.py文件时"
+        ],
+        "answer": 1,
+        "why": "def建立可调用函数，正常函数体在调用时执行。"
+      },
+      "original_id": "module",
+      "details": []
+    },
+    {
+      "id": "v2_14",
+      "phase": "工程对象",
+      "title": "14｜class、self、__init__与dataclass",
+      "minutes": 45,
+      "goal": "理解Python对象、方法与存储状态，连接D14的MonitorContext/MonitorResult。",
+      "story": [
+        "C的struct主要组织数据；Python的class能把数据和操作封装在一个对象中。class Monitor定义一个类型，monitor=Monitor()创建实例，__init__在创建时执行初始化，self表示当前这个实例。",
+        "@dataclass用于方便地声明主要承担数据存储角色的类，能自动生成__init__等常用方法。Frame(...)创建数据实例，Decision(...)创建结果实例。这里的属性类型注解同样不自动替你验证外部CSV。",
+        "两类对象要区分：Frame/Decision用于传递数据，Monitor用于保存跨帧状态和执行step。不要每次for都Monitor()，否则每帧会丢失之前的告警状态，与D14把ctx放到循环外是相同道理。"
+      ],
+      "code": "from dataclasses import dataclass\n\n@dataclass\nclass Result:\n    valid: bool\n    alert: bool\n\nclass Monitor:\n    def __init__(self):\n        self.previous_alert = False   # 每个Monitor实例自己的状态。\n\n    def step(self, distance_m):\n        if distance_m <= 35:\n            self.previous_alert = True\n        elif distance_m >= 41:\n            self.previous_alert = False\n        return Result(True, self.previous_alert)\n\nmonitor = Monitor()                   # 初始化一次。\nfor d in [45, 34, 38, 42]:\n    result = monitor.step(d)          # 每次更新同一个对象。\n    print(d, result.alert)",
+      "trace": [
+        "定义Result数据类型、Monitor类；此时尚未创建Monitor实例。",
+        "monitor=Monitor()创建实例并调用__init__一次，previous_alert=False。",
+        "第一轮45m→False；第二轮34m→True。",
+        "第三轮38m处于滞环保持区，仍True；第四轮42m→False。",
+        "每次step返回一个新的Result对象，主程序按result.alert读取成员。"
+      ],
+      "expected": "45 False\n34 True\n38 True\n42 False",
+      "compare": "Monitor的self.previous_alert对应C MonitorContext中保留的alert；Result对应C MonitorResult。Python的class不等于C的内存布局。",
+      "trap": "self不是随便删除的普通参数；调用monitor.step(34)时Python会把monitor实例作为方法的self传入。",
+      "task": "把monitor = Monitor()移到for循环内部，预测输出并解释为何38m会失去保持效果。",
+      "check": {
+        "q": "要记住前一帧的告警，应把Monitor()放在哪里？",
+        "options": [
+          "每轮for内部",
+          "for循环之前，只创建一次",
+          "放在print后面"
+        ],
+        "answer": 1,
+        "why": "对象保留跨帧状态；每轮新建会重置previous_alert。"
+      },
+      "original_id": "dataclass",
+      "details": []
+    },
+    {
+      "id": "v2_15",
+      "phase": "工程输入输出",
+      "title": "15｜文件路径、with、CSV和JSON",
+      "minutes": 45,
+      "goal": "读懂本项目为什么把CSV读取、业务处理、JSON输出分成模块。",
+      "story": [
+        "Python可以直接读文件，但应清楚文本与数值之间的边界。reader.py用csv.DictReader读取每一行的字典，再用int/float转换成Frame对象。DictReader让字段名明确，但原CSV仍可能有缺列、空值、NaN、非法模式等情况。",
+        "with Path(...).open(...) as file会在离开代码块时关闭文件，即使中途抛异常也能清理文件资源。读写路径用Path，可避免硬编码不同系统的斜杠。",
+        "JSON常用于保存测试结果。dataclasses.asdict把Decision转换为dict，json.dump写入文件。注意输出仅是离线结果文件，不代表将值写入ECU或控制总线。"
+      ],
+      "code": "import csv\nimport json\nfrom pathlib import Path\n\n# 这段代码需要在目录中准备一份logs.csv：\n# time_ms,speed_kmh\n# 0,72.0\n# 20,73.0\n\nwith Path(\"logs.csv\").open(\"r\", encoding=\"utf-8\", newline=\"\") as file:\n    rows = list(csv.DictReader(file))   # list存储所有行，字段值仍是str。\n\nspeed_values = [float(row[\"speed_kmh\"]) for row in rows]\nmean_speed = sum(speed_values) / len(speed_values)\n\nwith Path(\"summary.json\").open(\"w\", encoding=\"utf-8\") as file:\n    json.dump({\"mean_speed_kmh\": mean_speed}, file, indent=2)\n\nprint(round(mean_speed, 1))",
+      "trace": [
+        "open打开logs.csv；csv.DictReader把两条记录读取为字典。",
+        "rows是长度2的列表；每个row['speed_kmh']依然是字符串。",
+        "float转换后得到72.0与73.0；均值72.5。",
+        "打开summary.json写入字典对应的JSON，关闭后再打印均值。"
+      ],
+      "expected": "72.5（并生成summary.json）",
+      "compare": "C使用fopen/fgets/fclose、手动转换；Python的with上下文管理更便于管理文件资源。",
+      "trap": "没有准备logs.csv就会抛FileNotFoundError；相对路径依赖当前工作目录。不要假设读取了CSV后数值自动变为float。",
+      "task": "在本地准备两行logs.csv、生成summary.json并打开检查；把一个速度改为oops观察错误。",
+      "check": {
+        "q": "csv.DictReader读取到row['speed_kmh']通常是什么类型？",
+        "options": [
+          "自动就是float",
+          "str文本",
+          "固定是int"
+        ],
+        "answer": 1,
+        "why": "CSV是文本格式，必须显式转换并校验。"
+      },
+      "original_id": "files",
+      "details": []
+    },
+    {
+      "id": "v2_16",
+      "phase": "工程输入输出",
+      "title": "16｜异常：错误类型、raise、try/except",
+      "minutes": 40,
+      "goal": "处理损坏数据和程序错误，学会区分异常、状态返回和退出码。",
+      "story": [
+        "当float('oops')转换失败时会抛ValueError；当文件不存在时会抛FileNotFoundError（属于OSError的子类）；当索引越界时会抛IndexError。异常不是说整个Python语言坏了，而是正在执行的操作无法按约定完成。",
+        "try把可能失败的语句放进保护块，except处理指定异常；raise可以主动报告发现的非法值。业务函数返回Decision(valid=False)也可以表示预期中的无效信号，两者有不同用途：输入文件格式错误常使用异常终止解析，而传感器雷达invalid可作为普通业务状态。",
+        "捕获异常应写明具体异常类型，不要except:然后安静忽略，更不能用continue把错误行直接丢弃再当正常数据绘图。"
+      ],
+      "code": "def parse_speed(raw: str) -> float:\n    try:\n        speed = float(raw)               # 可能抛ValueError。\n    except ValueError as exc:\n        raise ValueError(f\"车速不是数字：{raw!r}\") from exc\n    if not 0.0 <= speed <= 250.0:\n        raise ValueError(\"车速超出约定范围\")\n    return speed\n\nfor text in [\"72.0\", \"oops\", \"300\"]:\n    try:\n        speed = parse_speed(text)\n        print(\"成功\", speed)\n    except ValueError as exc:\n        print(\"拒绝\", exc)",
+      "trace": [
+        "第一个文本72.0成功转换，且满足范围，返回72.0。",
+        "第二个oops转换失败，被内部except捕获后raise更明确的信息，外层except接住。",
+        "第三个300能转换成float，但超过范围，主动raise ValueError。",
+        "每一轮的异常都被当前循环处理，所以循环可以继续演示下一个文本。"
+      ],
+      "expected": "成功 72.0\n拒绝 车速不是数字：'oops'\n拒绝 车速超出约定范围",
+      "compare": "C多通过return状态码与errno等约定表达失败；Python常使用异常处理程序性错误，也能用对象的valid表示正常业务失效。",
+      "trap": "成功float('nan')后普通范围比较不一定能给出足够清晰的诊断；对传感器数值应增加math.isfinite。除非有明确目的，不要使用宽泛except Exception吞掉内部错误。",
+      "task": "修改parse_speed加入math.isfinite，并针对'nan'写测试用例。",
+      "check": {
+        "q": "外部CSV的字符串无法转换为float，适合怎样处理？",
+        "options": [
+          "默默删除记录",
+          "抛出或捕获ValueError并带行号诊断",
+          "将原数据当有效零"
+        ],
+        "answer": 1,
+        "why": "应保留可定位的错误信息，禁止无声掩盖异常。"
+      },
+      "original_id": "exceptions",
+      "details": []
+    },
+    {
+      "id": "v2_17",
+      "phase": "调试测试",
+      "title": "17｜调试与测试：Traceback、断点、unittest",
+      "minutes": 40,
+      "goal": "从错误信息找到文件、行号、函数调用栈，能写最小unittest。",
+      "story": [
+        "Python错误往往显示Traceback，末尾给出异常类型和信息，往上能看到各层函数调用文件及行号。面对异常不要只看最后一行，也要找到它发生在哪个函数、谁调用它。",
+        "调试可以先用print输出局部变量，再用VS Code断点、逐步进入/跳出，观察调用顺序和局部状态。日志项目还要记录输入案例和每轮输出，保证问题可复现。",
+        "unittest是Python标准库的测试工具。测试先写输入和期望，不应为了让测试通过而改期望值去迎合错误结果。补充工程提供test_pipeline.py，实际调用main.run、reader.load_frames及Monitor.step。"
+      ],
+      "code": "import unittest\n\ndef kmh_to_mps(speed_kmh: float) -> float:\n    return speed_kmh / 3.6\n\nclass TestConversion(unittest.TestCase):\n    def test_known_value(self):\n        # 期望值来自物理单位换算：72 km/h = 20 m/s。\n        self.assertAlmostEqual(kmh_to_mps(72.0), 20.0)\n\n    def test_zero(self):\n        self.assertEqual(kmh_to_mps(0.0), 0.0)\n\nif __name__ == \"__main__\":\n    unittest.main()  # 也可运行python -m unittest -v test_module。",
+      "trace": [
+        "创建TestConversion测试类，不会像普通业务函数那样由main手写循环调用。",
+        "运行unittest，测试框架查找test_开头的方法。",
+        "test_known_value实际调用kmh_to_mps(72)，比较结果和20.0。",
+        "test_zero比较0.0；两个断言都通过则显示OK。"
+      ],
+      "expected": "Ran 2 tests ... OK（具体输出格式随Python版本和运行命令而变）",
+      "compare": "类似此前D11–D14用独立test_main或CTest核对期望；测试对象与演示入口分离。",
+      "trap": "断言写在测试里会真正执行；在网页看见绿色结果不等于本地unittest已经运行。",
+      "task": "在补充工程里把35阈值故意改为40，运行unittest观察失败，再恢复并保存成功日志。",
+      "check": {
+        "q": "测试失败后正确的做法是什么？",
+        "options": [
+          "马上把测试期望改成错误输出",
+          "定位原因、修复被测代码并重新运行",
+          "只隐藏失败日志"
+        ],
+        "answer": 1,
+        "why": "断言是验证需求的证据，不应为了绿灯随意改变预期。"
+      },
+      "original_id": "debug",
+      "details": []
+    },
+    {
+      "id": "v2_18",
+      "phase": "工程实作",
+      "title": "18｜从main到每帧输出：完整执行链",
+      "minutes": 50,
+      "goal": "把前面独立语法串成真正的模块调用链，明确对象、变量、返回值怎样传递。",
+      "story": [
+        "你以前问过app.c、mock.c、demo.c谁先运行。这次对应到Python：models.py声明Frame和Decision数据类型；reader.py把CSV变为list[Frame]；monitor.py保存previous_alert并处理每帧；main.py负责入口、调用、输出；test_pipeline.py用于独立验证。",
+        "关键不是背名字，而是每轮回答：这个对象在哪里创建？当前函数拿到什么参数？调用了哪个函数？返回了什么类型？谁把结果放入列表？谁决定写JSON？跟随这五个问题就能读懂大多数Python工程。",
+        "样例8帧：distance=45→34→38→42→30但radar无效→34有效→34但未启用→34重新启用。输出alert为0/1/1/0/0/1/0/1。第五帧无效清掉告警；第七帧OFF也清掉告警。课程不会把这些提示用于车辆实际驾驶。"
+      ],
+      "code": "# 摘取完整工程中main.py的run()执行顺序。\nframes = load_frames(input_file)         # ① reader.py生成list[Frame]。\nmonitor = Monitor()                     # ② 初始化一次跨帧状态。\nresults = []                            # ③ 创建空结果列表。\n\nfor frame in frames:                    # ④ 按时间逐帧循环。\n    now_ms = frame.time_ms + 20         # 教学模拟处理时刻。\n    decision = monitor.step(frame, now_ms)  # ⑤ 返回Decision实例。\n    result = asdict(decision)           # ⑥ 对象转换为dict。\n    results.append(result)              # ⑦ 把本帧结果追加到列表。\n\n# ⑧ json.dump(results, file)将列表写入文件。\n# ⑨ return results把所有处理结果返回给调用者。",
+      "trace": [
+        "终端调用python main.py，进入main()读取--input和--output。",
+        "main()调用run()，run先调用reader.load_frames；reader加载模型类Frame并解析CSV，返回8个Frame的列表。",
+        "run创建一个Monitor实例，然后for读取第一帧，调用monitor.step返回Decision；把其值转换为dict并追加。",
+        "第二帧进入同一个Monitor，保留previous_alert；第三帧38m依靠前一帧状态保持告警。",
+        "无效雷达帧返回Decision(valid=False,alert=False)，下一帧可重新按阈值触发。",
+        "八轮结束后保存output/results.json，run返回列表，main打印完成并返回0。"
+      ],
+      "expected": "八帧alert依次为0 / 1 / 1 / 0 / 0 / 1 / 0 / 1",
+      "compare": "C的MonitorResult是结构体按值返回；Python的Decision是对象，由函数返回其引用，但调用者同样按属性读取成员。底层对象/内存模型不同，理解逻辑数据流即可。",
+      "trap": "不要在for里重新写monitor=Monitor()，否则38m那帧会因为没有上一帧的状态而错误；不要将result=asdict(decision)理解为再次运行monitor.step。",
+      "task": "在纸上画main→load_frames→Monitor.step→main的调用栈，并逐帧写出8个status、valid、alert。然后本地真正运行项目。",
+      "check": {
+        "q": "哪一条语句让下次循环还能读取上帧告警？",
+        "options": [
+          "每帧Monitor()",
+          "for循环外的monitor = Monitor()",
+          "json.dump调用"
+        ],
+        "answer": 1,
+        "why": "同一个Monitor实例持有previous_alert，后续step调用会继续使用。"
+      },
+      "original_id": "fullflow",
+      "details": []
+    },
+    {
+      "id": "v2_19",
+      "phase": "工程实作",
+      "title": "19｜本地工程改动、故障注入与修复",
+      "minutes": 55,
+      "goal": "通过能观察到的失败和修复证明自己理解代码，而不是复制粘贴。",
+      "story": [
+        "练习1：用原始sample.csv运行，先人工预测8帧，再对照终端日志和JSON文件。练习2：打开bad_string.csv，先预测第几行报错，运行后核对“第4行”；恢复合法车速，再验证解析通过。",
+        "练习3：将monitor.py中35.0阈值暂改为40.0，运行test_pipeline.py，看到测试失败；恢复35.0后重新通过。练习4：将monitor = Monitor()临时移动到for循环内部，说明为什么38m时的alert变化，并把代码恢复。",
+        "练习5：在reader.py中增加一个有明确字段名和行号的输入检查，例如禁止time_ms为负，构造单独CSV证明拒绝有效数据之外的错误；保存终端结果。所有修改只在自己复制的项目中进行。"
+      ],
+      "code": "# 在终端按顺序执行：\n# python3 main.py --input sample.csv --output output/results.json\n# python3 -m unittest -v test_pipeline\n\n# 故障注入：只在本地副本中临时修改monitor.py\n# 原始条件\n# if not self.previous_alert and frame.distance_m <= 35.0:\n# 故意引入错误\n# if not self.previous_alert and frame.distance_m <= 40.0:\n# 再运行python3 -m unittest -v test_pipeline\n# 记录FAIL之后恢复35.0，复测应PASS。\n\n# 模块故障：暂时重命名reader.py观察ModuleNotFoundError，\n# 恢复文件名后重新运行。不要在公开仓库推送损坏版本。",
+      "trace": [
+        "先取得基线PASS和八帧输出，留存原始日志。",
+        "修改35→40后，第三帧38m会出现不符合测试期望的路径。",
+        "unittest报告实际值与期望值不同，定位到具体测试和调用逻辑。",
+        "恢复代码后再次运行，确认同样案例通过。",
+        "保存“基线、注入、修复”三份证据以说明因果关系。"
+      ],
+      "expected": "基线PASS → 故障注入FAIL → 恢复PASS。具体失败行号由本机测试输出决定。",
+      "compare": "与C的故障注入/CTest方法一致，但这里由Python unittest执行。",
+      "trap": "本地修改坏CSV后的运行结果不应声称是原始bad_*.csv的预置结果；记录文件变更及测试时间。",
+      "task": "完成5项实践，提交三份终端日志截图或文本，以及一段你自己写的调用链解释。",
+      "check": {
+        "q": "最能证明你理解模块逻辑的证据是什么？",
+        "options": [
+          "只截图网页绿色通过",
+          "预测→本地实际运行→故意注入故障→失败→修复再验证",
+          "只背代码注释"
+        ],
+        "answer": 1,
+        "why": "工程学习需要可重复的本地执行证据。"
+      },
+      "original_id": "practice",
+      "details": []
+    },
+    {
+      "id": "v2_20",
+      "phase": "后续索引",
+      "title": "20｜后续Python语法地图",
+      "minutes": 35,
+      "goal": "知道未来遇到陌生语法去哪里查，不要求一天内熟练掌握所有高级特性。",
+      "story": [
+        "后续你会用到NumPy、Matplotlib、数据类、文件路径、标准测试、日志接口，以及可能的ROS2 Python脚本。它们大多是在本课已经学过的函数、对象、循环、模块基础上增加新的库调用。",
+        "还会遇到async/await、生成器yield、装饰器@、上下文管理器with、类型注解typing、lambda、match-case和包的__init__.py等。这里给出可检索索引，明确区分“当天能写”与“未来看得懂即可”。",
+        "从ASW就业需求看，Python主要用于数据处理、测试自动化、仿真和工程工具，不能仅因为能写Python脚本就跳过C/C++、调试和真实软件架构。"
+      ],
+      "code": "# 以下是以后“遇见时知道去哪查”的语法预告，不是本课测试重点。\nfrom pathlib import Path               # 模块导入：本课已掌握。\nfrom dataclasses import dataclass      # 装饰器：自动生成数据对象方法。\nfrom typing import Iterable            # 类型提示：用于开发工具。\n\nvalues = [10, 20, 30]\nsquares = [x * x for x in values]      # 列表推导式：本课已掌握。\nfirst = next(iter(values))             # 迭代器：以后深入。\nselect = lambda x: x > 15              # lambda：匿名小函数。\nprint(first, select(20))\n\n# async def worker(): ...             # 并发/异步：以后专题。\n# yield value                         # 生成器：以后专题。\n# match status: case \"ACTIVE\": ...     # 模式匹配：以后专题。",
+      "trace": [
+        "本课能直接读懂import、列表推导式和lambda的基本形式。",
+        "iter(values)得到迭代器，next取出第一个数10。",
+        "lambda x: x>15创建函数，调用select(20)得到True。",
+        "async、yield、match等仅做语法地图，未来按项目需求学习，不要求此刻记忆细节。"
+      ],
+      "expected": "10 True",
+      "compare": "C/C++也有函数、指针、迭代器和异步概念，但写法和底层执行机制不同，不能直接照字面套用。",
+      "trap": "不要一次性把Python高级语法全部塞进真实工程；优先选择简单、明确、可测试的接口。",
+      "task": "打开下方“未来语法索引”，对不熟悉的关键字做备注；进入D15原课时可以随时返回查阅。",
+      "check": {
+        "q": "进入D15 NumPy之前最重要的是哪一组能力？",
+        "options": [
+          "生成器、元类、异步框架",
+          "函数调用、列表、数据类型、模块、文件、异常",
+          "背下所有标准库函数"
+        ],
+        "answer": 1,
+        "why": "NumPy本质上是在既有Python基础上引入新的数组类型及操作函数。"
+      },
+      "original_id": "atlas",
+      "details": []
+    },
+    {
+      "id": "v2_21",
+      "phase": "后续索引",
+      "title": "21｜进入原D15：NumPy数组和三条曲线",
+      "minutes": 25,
+      "goal": "明确基础导学与原D15的衔接，不打乱84天路线。",
+      "story": [
+        "完成这份导学后，你应能读懂原D15的demo.py：为什么先import、为什么定义main、为什么传入CSV路径、为什么try/except处理错误、为什么load_log返回数组、为什么save_charts保存图片。",
+        "D15的NumPy ndarray与list不同：通常存同质元素，拥有shape属性，支持向量化计算和按列取数据；Matplotlib负责画图，不是Python解释器自带的基本语法。理解这一点后，原D15课程会更自然。",
+        "本导学页面的勾选和笔记不改变D15在线通关记录；学习笔记可导出/复制到D15主课笔记，继续使用原有的私有同步。D16依然按原路线进入二维旋转与坐标系。"
+      ],
+      "code": "# 原D15（需要安装NumPy）里你会遇到：\nimport numpy as np\n\nrows = [\n    [0, 72.0, 45.0, 0],\n    [20, 72.5, 43.0, 0],\n    [40, 73.0, 39.0, 0],\n]\nmatrix = np.asarray(rows, dtype=float) # list→二维NumPy数组。\ntime_ms = matrix[:, 0]                 # 所有行第0列。\nspeed_kmh = matrix[:, 1]               # 所有行第1列。\nprint(matrix.shape)                    # 3行×4列。\nprint(time_ms.shape)                   # 3个元素的一维向量。\nprint(float(np.mean(speed_kmh)))       # 求速度均值。",
+      "trace": [
+        "main.py或交互环境先import numpy取得外部库接口。",
+        "np.asarray把三个四元素行列表转换成shape=(3,4)的二维数组。",
+        "matrix[:,0]得到时间向量，shape=(3,)。",
+        "np.mean得到(72.0+72.5+73.0)/3=72.5。",
+        "之后原D15再加载真实的教学CSV并输出三张PNG。"
+      ],
+      "expected": "(3, 4)\n(3,)\n72.5",
+      "compare": "C的二维数组语法与Python list/NumPy的切片语义不同，但都需要理解行、列和下标。",
+      "trap": "本节代码需要NumPy；标准库零依赖的基础工程不必安装它。不要把浏览器上的模拟结果当成自己Python本地通过。",
+      "task": "完成基础项目后返回原D15，查看并解释demo.py的前20行，记录每一处import和函数调用的用途。",
+      "check": {
+        "q": "原D15中的matrix[:,0]是什么意思？",
+        "options": [
+          "取第0行所有列",
+          "取所有行的第0列",
+          "清空整个矩阵"
+        ],
+        "answer": 1,
+        "why": "冒号表示所有行，0表示第0列。"
+      },
+      "original_id": "next",
+      "details": []
+    }
+  ],
+  "syntaxAtlas": [
+    [
+      "入门必会",
+      "变量/注释",
+      "x=72、# 注释、type(x)、print、input",
+      "03、06",
+      "数据字段和调试输出"
+    ],
+    [
+      "入门必会",
+      "基础类型",
+      "int、float、str、bool、None、int()、float()、str()",
+      "03",
+      "日志解析与类型转换"
+    ],
+    [
+      "入门必会",
+      "运算与判断",
+      "+ - * / // % **、==、!=、and/or/not、is None",
+      "04、05",
+      "范围与有效性判断"
+    ],
+    [
+      "入门必会",
+      "控制流",
+      "if/elif/else、for/in、while、break、continue、range、enumerate",
+      "05、07、08",
+      "逐帧处理与条件判断"
+    ],
+    [
+      "入门必会",
+      "序列",
+      "list、append、len、索引[-1]、切片[1:3]、列表推导式",
+      "07、08",
+      "批量处理日志"
+    ],
+    [
+      "入门必会",
+      "容器",
+      "dict、get、items、tuple、set、in、解包",
+      "09",
+      "字段映射与去重"
+    ],
+    [
+      "入门必会",
+      "字符串",
+      "f-string、strip、split、join、replace、startswith",
+      "06",
+      "清洗和格式化日志"
+    ],
+    [
+      "入门必会",
+      "函数",
+      "def、return、None、默认值、关键字参数、作用域",
+      "10、11",
+      "模块接口与测试"
+    ],
+    [
+      "入门必会",
+      "模块与脚本",
+      "import、from ... import、__name__、__main__、Path",
+      "02、12、14",
+      "多文件工程调用"
+    ],
+    [
+      "入门必会",
+      "异常与文件",
+      "try/except/raise、with open、csv、json",
+      "14、15",
+      "坏行定位与文件输出"
+    ],
+    [
+      "入门必会",
+      "工程数据类型",
+      "class、self、__init__、@dataclass、对象属性",
+      "13、17",
+      "帧、结果、跨帧上下文"
+    ],
+    [
+      "入门必会",
+      "验证工具",
+      "assert、unittest、Traceback、venv、pip",
+      "02、16",
+      "本地可复现实验"
+    ],
+    [
+      "随后重点",
+      "NumPy",
+      "ndarray、shape、dtype、切片[:,0]、mean、diff",
+      "20及原D15",
+      "日志矩阵和状态分析"
+    ],
+    [
+      "随后重点",
+      "Matplotlib",
+      "pyplot、figure、plot、step、savefig、轴标签",
+      "原D15",
+      "速度/距离/模式曲线"
+    ],
+    [
+      "随后重点",
+      "类型提示",
+      "list[Frame]、dict[str,int]、int|None、Optional、Protocol",
+      "03、13",
+      "接口可读性和静态检查"
+    ],
+    [
+      "随后重点",
+      "上下文对象",
+      "__enter__/__exit__、with、contextlib",
+      "14",
+      "文件与资源管理"
+    ],
+    [
+      "随后重点",
+      "更完整的面向对象",
+      "@property、继承、super()、实例/类方法",
+      "13",
+      "大型软件模型与协议"
+    ],
+    [
+      "用到再深入",
+      "生成器/迭代器",
+      "iter、next、yield、yield from",
+      "19",
+      "流式大文件读取"
+    ],
+    [
+      "用到再深入",
+      "装饰器与高阶函数",
+      "@装饰器、lambda、map/filter、functools",
+      "19",
+      "工具封装与测试夹具"
+    ],
+    [
+      "用到再深入",
+      "异步/并发",
+      "async、await、asyncio、threading、multiprocessing",
+      "19",
+      "I/O并发和任务工具"
+    ],
+    [
+      "用到再深入",
+      "现代控制语法",
+      "match/case、try/except*、:=、*args/**kwargs",
+      "11、19",
+      "更大工程里的语法识别"
+    ],
+    [
+      "用到再深入",
+      "包与发布",
+      "__init__.py、pyproject.toml、pip install -e、pytest",
+      "12、19",
+      "可复用工具链"
+    ],
+    [
+      "用到再深入",
+      "ROS 2 Python接口",
+      "rclpy、Node、publisher、subscriber、timer callback",
+      "后续ROS2",
+      "仿真/工具集成，非实时安全证明"
+    ],
+    [
+      "用到再深入",
+      "数据和科学计算生态",
+      "pandas、scipy、sklearn、matplotlib",
+      "D15以后按计划",
+      "数据分析和验证"
+    ]
+  ],
+  "resources": [
+    {
+      "title": "Python 官方中文教程",
+      "type": "权威语言参考",
+      "url": "https://docs.python.org/zh-cn/3/tutorial/index.html",
+      "why": "适合遇到具体语法时查准确规则；官方也说明它主要面向已有一般编程概念的人，因此本页为零基础补充执行链。",
+      "topics": "控制流、数据结构、模块、文件、异常、类"
+    },
+    {
+      "title": "哈佛 CS50P 课程与视频章节",
+      "type": "系统视频与练习",
+      "url": "https://cs50.harvard.edu/python/weeks/",
+      "why": "按变量→条件→循环→异常→库→测试→文件的节奏推进；借鉴“讲概念、跑例子、交作业”的方式。",
+      "topics": "Week 0–6优先；后续再看类"
+    },
+    {
+      "title": "Microsoft Learn 中文 Python 基础路线",
+      "type": "分模块初学教程",
+      "url": "https://learn.microsoft.com/zh-cn/training/paths/get-started-with-python-fundamentals/",
+      "why": "小单元搭配练习，适合安装配置、变量、类型和条件判断；不是从大型数据科学工程开头。",
+      "topics": "Part 1基础（4模块）"
+    },
+    {
+      "title": "Microsoft Learn Python 第二部分",
+      "type": "循环、容器、函数及文件",
+      "url": "https://learn.microsoft.com/zh-cn/training/paths/get-started-with-python-programs/",
+      "why": "直接覆盖本课第7–15章最关键的操作，尤其函数与文件的拆分。",
+      "topics": "Part 2工程入门"
+    },
+    {
+      "title": "微软 Python for Beginners 视频系列",
+      "type": "短视频",
+      "url": "https://learn.microsoft.com/en-us/shows/intro-to-python-development/",
+      "why": "44集的短片可按需观看。建议先看1–6入门、13–14数字、17–24错误与条件、25–31容器和循环/函数。",
+      "topics": "英文视频，页面可按集选择"
+    },
+    {
+      "title": "骆昊 Python-100-Days",
+      "type": "中文 GitHub 开源教材",
+      "url": "https://github.com/jackfrued/Python-100-Days",
+      "why": "Day01–20的变量、条件、循环、列表、字典、函数及类按递进顺序安排；本页借鉴覆盖范围但使用原创ASW例子。",
+      "topics": "Day01–20；CSV可查Day23"
+    },
+    {
+      "title": "Automate the Boring Stuff with Python · 第三版",
+      "type": "免费在线图书",
+      "url": "https://automatetheboringstuff.com/3e/",
+      "why": "通过真实任务解释列表、字典、文本、调试、文件与自动化；可在做本项目时查对应章节。",
+      "topics": "1–10、18等章节"
+    },
+    {
+      "title": "MicrosoftLearning 官方 Python 练习仓库",
+      "type": "开源练习工程",
+      "url": "https://github.com/MicrosoftLearning/mslearn-python-programming",
+      "why": "习题按小任务拆分，适合补充单元练习；此处未复制其代码。",
+      "topics": "Beginner exercises"
+    },
+    {
+      "title": "微软 Python 视频示例仓库",
+      "type": "GitHub 视频配套素材",
+      "url": "https://github.com/microsoft/c9-python-getting-started",
+      "why": "官方说明面向具有少量其他语言经验的学习者；你学过C基础，可辅助对照，但本页解释不假设Python经验。",
+      "topics": "模块、语法、包使用"
+    },
+    {
+      "title": "Python Packaging User Guide",
+      "type": "官方环境和安装说明",
+      "url": "https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/",
+      "why": "遇到venv、pip和依赖环境问题时以这个文档为准。",
+      "topics": "pip / venv"
+    },
+    {
+      "title": "NumPy 官方绝对初学者指南",
+      "type": "后续D15资料",
+      "url": "https://numpy.org/doc/stable/user/absolute_beginners.html",
+      "why": "基础Python完成后再读，重点是ndarray、shape、轴与切片；不提前替代Python语法学习。",
+      "topics": "ndarray基础"
+    },
+    {
+      "title": "Python官方PEP8：命名及下划线",
+      "type": "官方规范",
+      "url": "https://peps.python.org/pep-0008/",
+      "why": "确认snake_case、_internal、__init__等用法和限制。",
+      "topics": "变量名与符号"
+    },
+    {
+      "title": "Python官方控制流参考",
+      "type": "官方教程",
+      "url": "https://docs.python.org/3/tutorial/controlflow.html",
+      "why": "确认for迭代、range、enumerate、break/continue与C计数for的差异。",
+      "topics": "循环"
+    },
+    {
+      "title": "Python语言参考：对象属性访问",
+      "type": "官方语法参考",
+      "url": "https://docs.python.org/3/reference/expressions.html#primaries",
+      "why": "确认点号属性访问、调用和方括号下标是不同操作。",
+      "topics": "标点"
+    }
+  ],
+  "projectFiles": [
+    "models.py",
+    "reader.py",
+    "monitor.py",
+    "main.py",
+    "test_pipeline.py",
+    "sample.csv",
+    "bad_string.csv",
+    "bad_missing.csv",
+    "README.md"
+  ],
+  "callchain": [
+    {
+      "file": "终端",
+      "action": "python main.py --input sample.csv",
+      "why": "启动解释器，指定入口文件与CSV。"
+    },
+    {
+      "file": "main.py",
+      "action": "if __name__ == '__main__' → main()",
+      "why": "只有直接运行入口模块，才自动触发main。"
+    },
+    {
+      "file": "main.py",
+      "action": "main() → run(Path(...), Path(...))",
+      "why": "主函数把命令行参数转换成路径，并协调实际工作。"
+    },
+    {
+      "file": "reader.py",
+      "action": "load_frames() → list[Frame]",
+      "why": "先将每一行字符串检查后转换为结构化帧。"
+    },
+    {
+      "file": "models.py",
+      "action": "Frame / Decision 两个@dataclass",
+      "why": "提供不同模块共享的数据类型；类型声明本身不处理数据。"
+    },
+    {
+      "file": "monitor.py",
+      "action": "monitor=Monitor() → __init__",
+      "why": "只创建一次监视器对象，跨帧保存previous_alert。"
+    },
+    {
+      "file": "monitor.py",
+      "action": "for frame: monitor.step() → Decision",
+      "why": "每帧输入Frame，内部计算并返回Decision对象。"
+    },
+    {
+      "file": "main.py",
+      "action": "asdict→results.append→json.dump",
+      "why": "转换为字典、累计结果、写入JSON。"
+    },
+    {
+      "file": "main.py",
+      "action": "run() return list → main() return 0",
+      "why": "逐层返回；程序退出状态0。"
+    }
+  ],
+  "finalChecklist": [
+    "能自己解释python main.py从哪个文件、哪一行进入；if __name__的意义",
+    "会区分str/int/float/bool/None，知道: float是类型注解而非自动运行时验证",
+    "会写if/elif/else、for、while、list、dict、索引和切片",
+    "能写def并解释参数、return与print的区别、默认参数的作用",
+    "能逐层追踪main.py→reader.py→monitor.py→main.py，解释为什么import不等于函数自动执行",
+    "会区分Frame/Decision/Monitor对象，理解创建实例与调用step",
+    "能从CSV读取数据并定位错误物理行号，明确数值单位",
+    "能在本地执行原始项目8帧并生成results.json",
+    "能在本地运行unittest，完成故障注入FAIL→修复PASS",
+    "知道原D15接下来学习NumPy矩阵shape和Matplotlib图，不把本页浏览器自测误算为Python本地通关"
+  ],
+  "cBridge": [
+    [
+      "声明变量",
+      "float speed = 72.0f;",
+      "speed = 72.0 / speed: float = 72.0",
+      "Python运行时名字绑定对象，类型提示非运行时强制"
+    ],
+    [
+      "函数定义与返回",
+      "int f(int x){return x+1;}",
+      "def f(x: int) -> int: return x+1",
+      "->是类型注解，值由return决定"
+    ],
+    [
+      "无返回值",
+      "void reset(void){...}",
+      "def reset() -> None: ...",
+      "无return时Python默认返回None"
+    ],
+    [
+      "结构体数据",
+      "typedef struct {...} Frame;",
+      "@dataclass class Frame: ...",
+      "Python dataclass是类，不等于C二进制布局"
+    ],
+    [
+      "创建结构化值",
+      "Frame sample = {0};",
+      "sample = Frame(...)",
+      "调用类创建实例"
+    ],
+    [
+      "结构体成员",
+      "sample.speed",
+      "sample.speed",
+      "属性访问外观相近"
+    ],
+    [
+      "指针修改上下文",
+      "Monitor_Step(&ctx,&frame)",
+      "monitor.step(frame, now_ms)",
+      "Python对象按对象引用传递，非C指针语义"
+    ],
+    [
+      "数组/列表",
+      "double a[3] = {1,2,3};",
+      "a = [1.0,2.0,3.0]",
+      "list可变长、可混类型，越界仍报错"
+    ],
+    [
+      "二维/向量",
+      "a[i][j]",
+      "a[i][j] / np_matrix[:,0]",
+      "list索引与NumPy切片是不同概念"
+    ],
+    [
+      "逻辑表达式",
+      "&& || !",
+      "and or not",
+      "布尔短路逻辑类似"
+    ],
+    [
+      "判断相等",
+      "==",
+      "==",
+      "=是赋值，is测试对象身份"
+    ],
+    [
+      "条件块",
+      "if(x){...}else{...}",
+      "if x:\\n    ...\\nelse:\\n    ...",
+      "Python以缩进确定代码块"
+    ],
+    [
+      "循环",
+      "for(int i=0;i<n;i++)",
+      "for i in range(n):",
+      "range(n)含0..n-1"
+    ],
+    [
+      "字符串格式化",
+      "printf(\"speed=%f\",speed);",
+      "print(f\"speed={speed:.1f}\")",
+      "Python f-string更适合生成日志文本"
+    ],
+    [
+      "文件输入",
+      "fopen/fgets/fclose",
+      "with open(...) as f:",
+      "with自动管理文件关闭"
+    ],
+    [
+      "模块互相调用",
+      "*.h声明 / *.c实现 / 链接",
+      "from reader import load_frames",
+      "import取得模块定义，调用时进入函数"
+    ],
+    [
+      "错误处理",
+      "return -2 / errno",
+      "raise ValueError / try-except",
+      "业务无效仍可显式返回valid=False"
+    ],
+    [
+      "单元测试",
+      "CTest / assert()",
+      "unittest.TestCase",
+      "两个环境都需要真实执行测试代码"
+    ],
+    [
+      "入口",
+      "int main(void)",
+      "if __name__ == '__main__': main()",
+      "防止作为模块导入时意外跑主程序"
+    ],
+    [
+      "包管理",
+      "CMake/库链接",
+      "venv/pip/requirements.txt",
+      "工具链工作不同，工程都需要可复现依赖"
+    ]
+  ],
+  "notesMigration": "新章节采用v2_前缀，旧笔记保存在原独立浏览器记录中；新页面增加旧笔记查看功能。"
+}
