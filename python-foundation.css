@@ -95,3 +95,6 @@ footer{text-align:center;font-size:13px;color:var(--muted);padding-bottom:38px}
 @media(max-width:1250px){.workspace{grid-template-columns:215px minmax(0,1fr)}.notebook{grid-column:2;position:static}.notebookSticky{position:static}.scheduleCards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:810px){.topbar{align-items:flex-start;flex-direction:column}.hero{grid-template-columns:1fr}.workspace{grid-template-columns:1fr}.sidebar{position:static;max-height:none}.sidebar-content{padding:14px}.notebook{grid-column:auto}#chapterNav{grid-template-columns:repeat(2,minmax(0,1fr))}.scheduleCards{grid-template-columns:repeat(2,minmax(0,1fr))}.chapter,.panel{padding:18px}.projectLayout{grid-template-columns:1fr}.fileNav{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.topbar,main,footer{padding:14px}.hero{padding:18px}.hero h2{font-size:22px}#chapterNav{grid-template-columns:1fr}.scheduleCards{grid-template-columns:1fr}.fileNav{grid-template-columns:1fr}}
+
+#bridgeTable{overflow:auto;max-width:100%}
+#bridgeTable code{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
