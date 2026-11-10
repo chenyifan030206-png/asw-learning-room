@@ -2020,7 +2020,191 @@
         "why": "从索引1开始，到索引3之前结束。"
       },
       "original_id": "lists",
-      "details": []
+      "details": [
+        {
+          "name": "列表是什么：[]创建、索引0和负数下标",
+          "grammar": "values=[45,34,38]; values[0]; values[-1]",
+          "explanation": "list是可变、有序的对象集合。方括号[]创建列表，逗号隔开各元素。索引从0开始，-1指最后一项，-2指倒数第二项。len(values)计算列表元素数量。与C的固定数组不同，Python列表长度可以改变，但读取不存在的索引仍会报IndexError。",
+          "parts": [
+            [
+              "values",
+              "列表变量名"
+            ],
+            [
+              "[45,34,38]",
+              "创建3元素的列表"
+            ],
+            [
+              "values[0]",
+              "第一个元素"
+            ],
+            [
+              "values[-1]",
+              "最后一个元素"
+            ],
+            [
+              "len(values)",
+              "列表长度"
+            ]
+          ],
+          "example": "values = [45,34,38]\nprint(values[0])\nprint(values[-1])\nprint(len(values))",
+          "trace": [
+            "列表创建后索引0是45。",
+            "-1反向索引为38。",
+            "列表包含3项，所以len为3。"
+          ],
+          "expected": "45\n38\n3",
+          "errors": [
+            "values[3]会越界，抛IndexError。",
+            "列表索引不能想当然从1开始。"
+          ],
+          "practice": "写4帧距离列表并读出第二项和最后一项。"
+        },
+        {
+          "name": "切片[start:stop:step]完整语法",
+          "grammar": "values[1:3] / values[:2] / values[::2]",
+          "explanation": "切片不是一次取一个元素，而是取得一段新列表。start包含、stop不包含；省略start默认为开头，省略stop到结尾，step指定间隔。负step可倒序。直接values[1:3]读取下标1、2；values[:]浅复制整个列表。",
+          "parts": [
+            [
+              "start",
+              "第一个被包含的下标"
+            ],
+            [
+              "stop",
+              "不包含的终止位置"
+            ],
+            [
+              "step",
+              "取值的间隔，不能为0"
+            ],
+            [
+              "[:]",
+              "从头到尾浅复制"
+            ],
+            [
+              "[::-1]",
+              "逆序生成新列表"
+            ]
+          ],
+          "example": "a = [10,20,30,40,50]\nprint(a[1:4])\nprint(a[:2])\nprint(a[::2])\nprint(a[::-1])",
+          "trace": [
+            "a[1:4]取索引1、2、3得到20、30、40。",
+            "a[:2]取开头两项。",
+            "a[::2]隔一项取一次，得到10、30、50。",
+            "a[::-1]生成逆序新列表。"
+          ],
+          "expected": "[20, 30, 40]\n[10, 20]\n[10, 30, 50]\n[50, 40, 30, 20, 10]",
+          "errors": [
+            "切片stop不包含；step=0会抛ValueError。"
+          ],
+          "practice": "给定[0,1,2,3,4,5]，写出只取偶数下标项的切片。"
+        },
+        {
+          "name": "append、extend、insert：什么时候增加一个，什么时候增加多个",
+          "grammar": "a.append(x) / a.extend(xs) / a.insert(i,x)",
+          "explanation": "append把参数作为一个元素添加到末尾；extend从可迭代对象逐个添加元素；insert在指定位置插入元素。三个方法通常原地修改列表，返回None，而不是返回新列表。a=a.append(x)会错误地把a绑定到None，丢失原变量名。",
+          "parts": [
+            [
+              "append(x)",
+              "在末尾添加一个元素"
+            ],
+            [
+              "extend(xs)",
+              "逐个添加xs中的元素"
+            ],
+            [
+              "insert(i,x)",
+              "在下标i之前插入一个元素"
+            ],
+            [
+              "返回None",
+              "原地修改，不能把结果当新列表"
+            ]
+          ],
+          "example": "a=[1,2]\na.append(3)\na.extend([4,5])\na.insert(0,0)\nprint(a)",
+          "trace": [
+            "a初始[1,2]。",
+            "append增加3。",
+            "extend增加4、5。",
+            "insert在下标0插入0。"
+          ],
+          "expected": "[0, 1, 2, 3, 4, 5]",
+          "errors": [
+            "不要写a=a.append(3)。",
+            "append([4,5])会添加整个子列表，而不是把4和5分别添加。"
+          ],
+          "practice": "分别比较append([4,5])和extend([4,5])的结果。"
+        },
+        {
+          "name": "修改、删除、排序以及可变对象的别名",
+          "grammar": "a[0]=... / del a[i] / a.sort() / a.copy()",
+          "explanation": "列表可以通过下标改值、del删除位置、remove删除第一个匹配元素、pop取出并删除元素。sort()是原地排序，sorted(a)返回新排序结果。b=a只是引用同一个列表；b=a.copy()创建新列表，但内部嵌套对象仍可能共享。",
+          "parts": [
+            [
+              "a[0]=9",
+              "修改第一个元素"
+            ],
+            [
+              "del a[1]",
+              "按下标删除"
+            ],
+            [
+              "a.sort()",
+              "就地排序，返回None"
+            ],
+            [
+              "sorted(a)",
+              "返回排序后的新列表"
+            ],
+            [
+              "b=a.copy()",
+              "建立浅复制"
+            ]
+          ],
+          "example": "a=[3,1,2]\nb=a\nc=a.copy()\nb.append(4)\na.sort()\nprint(a)\nprint(c)",
+          "trace": [
+            "b和a指向同一列表，因此b.append(4)会让a包含4。",
+            "c是在append前浅复制的独立列表[3,1,2]。",
+            "a.sort对a原地排序成为[1,2,3,4]，c不受影响。"
+          ],
+          "expected": "[1, 2, 3, 4]\n[3, 1, 2]",
+          "errors": [
+            "不要假设b=a就复制了列表。",
+            "嵌套列表使用copy()只复制外层，内层仍可能共享。"
+          ],
+          "practice": "手动证明a=b和a=b.copy()对追加元素的不同影响。"
+        },
+        {
+          "name": "列表推导式：先会写for再读简写",
+          "grammar": "[表达式 for 变量 in 可迭代对象 if 条件]",
+          "explanation": "列表推导式可以看成一个浓缩版本的循环，它构建新的列表。先按for循环的取值顺序计算表达式，若有if过滤则先判断当前值是否满足条件；对新手更建议先用完整for+append写出来，再确认简写等价。",
+          "parts": [
+            [
+              "表达式",
+              "每个新元素如何计算"
+            ],
+            [
+              "for x in xs",
+              "从xs依次获取元素"
+            ],
+            [
+              "if 条件",
+              "可选筛选，满足条件才加入新列表"
+            ]
+          ],
+          "example": "values=[45,34,38,31]\nnear=[x for x in values if x<=35]\nprint(near)",
+          "trace": [
+            "for依次得到45、34、38、31。",
+            "只有34和31满足<=35。",
+            "表达式x把这两个值放入新列表。"
+          ],
+          "expected": "[34, 31]",
+          "errors": [
+            "推导式不代表在原values上删除元素。"
+          ],
+          "practice": "先用完整for+append实现，再改写成一行推导式。"
+        }
+      ]
     },
     {
       "id": "v2_10",
@@ -2056,7 +2240,179 @@
         "why": "赋值没有复制列表对象，a与b引用同一个可变列表。"
       },
       "original_id": "dict-tuple-set",
-      "details": []
+      "details": [
+        {
+          "name": "tuple元组：()和逗号究竟是什么",
+          "grammar": "point=(72.0,34.0); single=(1,)",
+          "explanation": "元组是有序、元素个数固定后不可通过下标更改的容器。创建元组的关键是逗号，(1)只是数字1的分组，(1,)才表示单元素元组。元组可解包赋给多个变量。与列表不同，tuple本身没有append方法。",
+          "parts": [
+            [
+              "(72,34)",
+              "两个元素的元组"
+            ],
+            [
+              "(1,)",
+              "单元素元组，逗号不可少"
+            ],
+            [
+              "x,y=pair",
+              "解包左右两个位置"
+            ],
+            [
+              "tuple不可变",
+              "不能执行pair[0]=99"
+            ]
+          ],
+          "example": "pair=(72.0,34.0)\nspeed,distance=pair\nprint(speed,distance)\nprint(type((1,)).__name__)",
+          "trace": [
+            "pair包含两个数。",
+            "解包把第0项交给speed、第1项交给distance。",
+            "(1,)的类型为tuple。"
+          ],
+          "expected": "72.0 34.0\ntuple",
+          "errors": [
+            "tuple元素不可重赋值，但tuple内部可包含可变对象。"
+          ],
+          "practice": "先试(1)，再试(1,)，打印type对照。"
+        },
+        {
+          "name": "dict字典：键值、方括号读取与get的区别",
+          "grammar": "row={'speed_kmh':72}; row['speed_kmh']; row.get('x')",
+          "explanation": "字典按键而不是位置存储数据，键必须可哈希。{键:值}中冒号是映射关系；row['speed_kmh']读取对应值，不是第0项索引。若键缺失，[]访问通常抛KeyError；get默认返回None，或可以提供第二个参数指定默认值。工程上字段缺失应明确报错，不能习惯性用get并把None当有效数字。",
+          "parts": [
+            [
+              "'speed_kmh'",
+              "字典字符串键"
+            ],
+            [
+              ":",
+              "分隔键和值"
+            ],
+            [
+              "row[key]",
+              "缺键时抛KeyError"
+            ],
+            [
+              "row.get(key)",
+              "缺键时通常返回None"
+            ],
+            [
+              "row.get(key,default)",
+              "缺键返回显式默认值"
+            ]
+          ],
+          "example": "row={'speed_kmh':72,'valid':True}\nprint(row['speed_kmh'])\nprint(row.get('distance_m'))\nprint(row.get('distance_m',-1))",
+          "trace": [
+            "通过键speed_kmh取得72。",
+            "distance_m未提供，get返回None。",
+            "指定默认-1后返回-1。"
+          ],
+          "expected": "72\nNone\n-1",
+          "errors": [
+            "不要把字典的key误当列表下标。",
+            "字段缺失时自动填0可能掩盖数据错误。"
+          ],
+          "practice": "构建time_ms、distance_m、radar_valid三个键，试着访问不存在的键。"
+        },
+        {
+          "name": "字典遍历：keys、values和items",
+          "grammar": "for key,value in row.items():",
+          "explanation": "直接for key in row默认遍历字典的键；row.keys()同样给键视图；row.values()给值视图；row.items()按键和值组合成(key,value)二元组。左边两个名字表示解包，与前面enumerate完全同一个概念。字典的迭代顺序在现代Python中保留插入顺序，但业务程序最好依赖明确字段而非随意顺序。",
+          "parts": [
+            [
+              "row.keys()",
+              "键的可迭代视图"
+            ],
+            [
+              "row.values()",
+              "值的视图"
+            ],
+            [
+              "row.items()",
+              "逐项给(key,value)对"
+            ],
+            [
+              "for k,v",
+              "将每次取得的二元组解包"
+            ]
+          ],
+          "example": "row={'speed':72,'valid':True}\nfor key,value in row.items():\n    print(key,value)",
+          "trace": [
+            "row按创建时的键顺序有speed与valid。",
+            "第一项是('speed',72)，解包打印。",
+            "第二项是('valid',True)，解包打印。"
+          ],
+          "expected": "speed 72\nvalid True",
+          "errors": [
+            "for k in row只拿到key，不能误以为直接拿到value。"
+          ],
+          "practice": "分别用keys、values、items遍历同一个字典。"
+        },
+        {
+          "name": "set集合：去重、成员检查和空集合",
+          "grammar": "set([0,1,1,2]) / set() / value in set",
+          "explanation": "集合不按位置保存有序索引，元素唯一，适合检查是否包含某个状态码。空集合写set()，空{}是字典；集合常用add添加元素、discard删除（缺失时不报错），也支持交集并集等数学集合运算。集合打印顺序不应视为稳定排序。",
+          "parts": [
+            [
+              "set(xs)",
+              "从元素建立集合，去重"
+            ],
+            [
+              "set()",
+              "空集合"
+            ],
+            [
+              "value in s",
+              "成员检查"
+            ],
+            [
+              "s.add(x)",
+              "添加元素"
+            ]
+          ],
+          "example": "states=set([0,1,1,2])\nprint(len(states))\nprint(1 in states)\nprint(3 in states)",
+          "trace": [
+            "重复的1只保留一次。",
+            "集合中有0、1、2共3种值。",
+            "成员1存在，3不存在。"
+          ],
+          "expected": "3\nTrue\nFalse",
+          "errors": [
+            "不要用states[0]读取集合，set不是索引序列。"
+          ],
+          "practice": "对[0,1,0,2,2]用set去重并统计不同状态个数。"
+        },
+        {
+          "name": "用数据结构组织帧：何时选list/dict/dataclass",
+          "grammar": "list[dict] / list[Frame]",
+          "explanation": "列表适合多条帧的有序集合；字典适合一次从文本读取的字段映射；dataclass类适合业务数据已经校验、字段协议固定时的结构化对象。最初不要直接用class掩盖类型问题，先把list/dict的实际内容看懂。",
+          "parts": [
+            [
+              "list",
+              "多条记录的顺序"
+            ],
+            [
+              "dict",
+              "字段名到值的映射"
+            ],
+            [
+              "dataclass",
+              "后续章节定义明确属性的数据类"
+            ]
+          ],
+          "example": "frames=[{'t':0,'distance':45},{'t':20,'distance':34}]\nprint(len(frames))\nprint(frames[1]['distance'])",
+          "trace": [
+            "frames是有两个字典元素的列表。",
+            "frames[1]取得第二个字典。",
+            "['distance']从该字典取距离34。"
+          ],
+          "expected": "2\n34",
+          "errors": [
+            "frames[1]['distance']两个[]含义不同：第一个按列表下标，第二个按字典键。"
+          ],
+          "practice": "画出一个list里装两个dict的结构图。"
+        }
+      ]
     },
     {
       "id": "v2_11",
@@ -2091,7 +2447,179 @@
         "why": "print负责副作用输出，不等于给调用者返回那个字符串。"
       },
       "original_id": "func",
-      "details": []
+      "details": [
+        {
+          "name": "def的每个字符：定义≠执行",
+          "grammar": "def function_name(parameter):\\n    body",
+          "explanation": "def开始函数定义，紧随其后的是函数名，圆括号列出参数名称，英文冒号开始缩进函数体。执行到def语句时会创建函数对象，不会正常执行函数体；只有调用function_name(value)时才进入函数。与C相似，参数传入时才有实际值。",
+          "parts": [
+            [
+              "def",
+              "创建函数定义的关键字"
+            ],
+            [
+              "function_name",
+              "由开发者命名的函数"
+            ],
+            [
+              "(parameter)",
+              "形参列表：调用时接收实际输入"
+            ],
+            [
+              ":",
+              "开启函数体"
+            ],
+            [
+              "缩进",
+              "函数体所属代码块"
+            ]
+          ],
+          "example": "def warning(distance):\n    print(\"进入函数\")\n    return distance<=35\nprint(\"定义结束\")\nprint(warning(34))",
+          "trace": [
+            "执行def时创建warning函数，不打印进入函数。",
+            "打印定义结束。",
+            "warning(34)被调用后才进入函数，打印进入函数并返回True。",
+            "外层print把True展示出来。"
+          ],
+          "expected": "定义结束\n进入函数\nTrue",
+          "errors": [
+            "def不等于调用。",
+            "同一个函数可以被多次调用，每次参数可不同。"
+          ],
+          "practice": "把warning分别用34与42调用，画出进入/返回顺序。"
+        },
+        {
+          "name": "形参、实参与返回值return",
+          "grammar": "def f(x): return x+1 / y=f(3)",
+          "explanation": "形参是函数定义时写的名字，实参是调用时传入的表达式。调用f(3)让函数内部的x在这次调用中绑定到3；return结束该次函数执行并将值交回调用者。return后的本分支语句不再执行。值的类型由return表达式实际产生的对象决定。",
+          "parts": [
+            [
+              "x",
+              "函数定义里的形式参数"
+            ],
+            [
+              "3",
+              "调用时的实际参数"
+            ],
+            [
+              "return",
+              "立即结束本次函数并交回对象"
+            ],
+            [
+              "y=f(3)",
+              "调用者用y接收函数返回值"
+            ]
+          ],
+          "example": "def add_one(x):\n    result=x+1\n    return result\ny=add_one(3)\nprint(y)",
+          "trace": [
+            "调用add_one(3)，函数内部x绑定3。",
+            "result计算为4。",
+            "return把4交回调用处，y绑定4。",
+            "print(y)展示4。"
+          ],
+          "expected": "4",
+          "errors": [
+            "return与print不同：print仅展示，通常返回None。"
+          ],
+          "practice": "写一个kmh_to_mps函数，接收72.0返回20.0。"
+        },
+        {
+          "name": "print与return区别：为什么调用者看到None",
+          "grammar": "没有return语句 → 默认返回None",
+          "explanation": "如果一个Python函数没有执行return带值，正常结束会得到None。print用于向终端输出，并不会自动成为函数的返回值。C中void函数不返回结果的直觉可以辅助理解，但Python每次函数调用作为表达式仍会产生一个返回对象，常见为None。",
+          "parts": [
+            [
+              "print(x)",
+              "输出x，函数自身通常返回None"
+            ],
+            [
+              "return x",
+              "把x交给调用者"
+            ],
+            [
+              "None",
+              "没有返回业务对象时的常见结果"
+            ]
+          ],
+          "example": "def show(x):\n    print(\"内部\",x)\na=show(3)\nprint(a)",
+          "trace": [
+            "调用show(3)后先执行内部print。",
+            "函数走到末尾，没有return，自动返回None。",
+            "a获得None，外层打印None。"
+          ],
+          "expected": "内部 3\nNone",
+          "errors": [
+            "不要写result=print(72)并以为result等于72。"
+          ],
+          "practice": "写一个只print和一个return相同数值的函数并对比调用结果。"
+        },
+        {
+          "name": "return多个值、元组解包与类型注解",
+          "grammar": "def f(...) -> tuple[int,bool]: return 0, True",
+          "explanation": "Python常用return a,b返回一个二元组，调用方可以写status,valid=f()按位置解包。与C返回结构体一样能够让一次调用产生多项结果，但Python使用tuple或dataclass组织。-> tuple[int,bool]是类型注解，帮助读代码，并不自动在运行时拒绝不匹配的对象。",
+          "parts": [
+            [
+              "->",
+              "函数返回类型注解"
+            ],
+            [
+              "tuple[int,bool]",
+              "注解为包含int和bool的元组"
+            ],
+            [
+              "return 0,True",
+              "返回两个值构成的tuple"
+            ],
+            [
+              "status,valid",
+              "调用处解包"
+            ]
+          ],
+          "example": "def check(speed)->tuple[int,bool]:\n    if speed<0:\n        return -2,False\n    return 0,True\nstatus,valid=check(72)\nprint(status,valid)",
+          "trace": [
+            "定义check时不执行函数体。",
+            "调用check(72)进入判断，72不是负数。",
+            "return (0,True)形式的二元组。",
+            "外层按位置解包赋给status和valid。"
+          ],
+          "expected": "0 True",
+          "errors": [
+            "返回两个值的本质是tuple，不是两个独立的return。"
+          ],
+          "practice": "让check(-1)返回错误状态，再解释调用者如何取到这两个值。"
+        },
+        {
+          "name": "局部作用域与可变对象参数",
+          "grammar": "def f(x): local=x",
+          "explanation": "函数中的局部名字通常只在本次调用作用域里使用，不等于外部同名名字。对int/str等不可变对象的参数重新绑定，不会修改调用者的变量；但若接收可变list并调用append，它可能修改传入对象本身。需要关注是“重新绑定名字”还是“修改同一对象”。",
+          "parts": [
+            [
+              "x=...",
+              "局部名字重新绑定"
+            ],
+            [
+              "items.append()",
+              "修改传入列表对象"
+            ],
+            [
+              "global",
+              "声明使用模块级绑定，初学项目中尽量避免滥用"
+            ]
+          ],
+          "example": "def change(x,items):\n    x=99\n    items.append(3)\na=5\nb=[1,2]\nchange(a,b)\nprint(a)\nprint(b)",
+          "trace": [
+            "调用change时局部x绑定整数5、items引用列表b。",
+            "x重新绑定99，不影响外部a。",
+            "items.append(3)修改共享列表对象b。",
+            "回到调用处打印a=5，b=[1,2,3]。"
+          ],
+          "expected": "5\n[1, 2, 3]",
+          "errors": [
+            "不能把Python参数传递简单当作C的指针值或结构体完全相同。"
+          ],
+          "practice": "写一个不会修改输入列表的新函数，使用copy后再append。"
+        }
+      ]
     },
     {
       "id": "v2_12",
@@ -2126,7 +2654,165 @@
         "why": "关键字参数允许指定unit名称，默认值也可以覆盖。"
       },
       "original_id": "params",
-      "details": []
+      "details": [
+        {
+          "name": "位置参数、关键字参数和冒号类型注解",
+          "grammar": "def f(speed:float,limit:float=35.0) -> bool",
+          "explanation": "定义中的参数顺序决定默认的位置实参如何对应；调用时也可以按名称传入关键字参数，例如limit=40。默认参数可省略，有利于明确单位和可选值。参数名后面的:float是类型注解，不会自动转换字符串；函数声明后的->bool也是返回类型提示。",
+          "parts": [
+            [
+              "speed:float",
+              "名为speed的参数，类型提示float"
+            ],
+            [
+              "limit=35.0",
+              "默认参数值"
+            ],
+            [
+              "->bool",
+              "返回值类型提示"
+            ],
+            [
+              "f(72,limit=40)",
+              "一个位置参数和一个关键字参数"
+            ]
+          ],
+          "example": "def exceed(value,limit=35.0):\n    return value>limit\nprint(exceed(40))\nprint(exceed(value=40,limit=45))",
+          "trace": [
+            "第一调用没给limit，因此使用35，40>35为True。",
+            "第二调用显式value=40、limit=45，40>45为False。"
+          ],
+          "expected": "True\nFalse",
+          "errors": [
+            "位置实参一般不能放在关键字实参之后。"
+          ],
+          "practice": "分别调用limit默认和limit=42的场景。"
+        },
+        {
+          "name": "默认参数与可变列表陷阱",
+          "grammar": "def collect(value, items=None):",
+          "explanation": "默认参数表达式在def执行时求值，后续调用可能共享同一个默认对象。如果写items=[]并在函数中append，列表会跨不同调用保留内容，这通常不是想要的。标准写法使用None作为默认值，进入函数后再创建新的列表。",
+          "parts": [
+            [
+              "items=None",
+              "安全地表示尚未提供列表"
+            ],
+            [
+              "if items is None",
+              "明确检查缺失"
+            ],
+            [
+              "items=[]",
+              "在本次调用内部创建新列表"
+            ]
+          ],
+          "example": "def collect(value,items=None):\n    if items is None:\n        items=[]\n    items.append(value)\n    return items\nprint(collect(1))\nprint(collect(2))",
+          "trace": [
+            "两次调用都没有传items。",
+            "每一次都因items is None建立独立列表。",
+            "所以先输出[1]，再输出[2]，不会累积成[1,2]。"
+          ],
+          "expected": "[1]\n[2]",
+          "errors": [
+            "def f(items=[])在这里常造成意外共享对象。"
+          ],
+          "practice": "故意将None改成[]并运行两次，比较变化。"
+        },
+        {
+          "name": "*args、**kwargs分别接收什么",
+          "grammar": "def f(*args, **kwargs):",
+          "explanation": "定义函数时*args把多余的位置实参收集为tuple，**kwargs把多余关键字实参收集为dict。它们不是特殊关键字名称，星号语法才是关键。初学阶段工程接口优先用明确固定的参数名；只在需要读懂通用工具函数时理解*和**。",
+          "parts": [
+            [
+              "*args",
+              "收集额外位置参数为tuple"
+            ],
+            [
+              "**kwargs",
+              "收集额外关键字参数为dict"
+            ],
+            [
+              "args",
+              "约定名字，可换名"
+            ],
+            [
+              "kwargs",
+              "约定名字，可换名"
+            ]
+          ],
+          "example": "def show(*args,**kwargs):\n    print(args)\n    print(kwargs)\nshow(72,34,valid=True)",
+          "trace": [
+            "调用show传两个位置实参和一个关键字实参。",
+            "args得到(72,34)元组。",
+            "kwargs得到{'valid':True}字典。"
+          ],
+          "expected": "(72, 34)\n{'valid': True}",
+          "errors": [
+            "调用时的*values是展开，而定义里的*args是收集；位置不同含义不同。"
+          ],
+          "practice": "分别只传位置参数和只传关键字参数运行。"
+        },
+        {
+          "name": "调用中的*、**是展开参数",
+          "grammar": "f(*values) / f(**mapping)",
+          "explanation": "调用函数时*list或*tuple把序列中的元素逐个当作位置实参，**dict把字符串键当作参数名传入对应值。这与函数定义中的收集方向相反：定义时收集，调用时展开。不要为了简洁在业务接口中随意展开未知键，否则可能出现TypeError。",
+          "parts": [
+            [
+              "*values",
+              "展开可迭代对象为多个位置实参"
+            ],
+            [
+              "**mapping",
+              "展开映射为关键字实参"
+            ],
+            [
+              "TypeError",
+              "参数数量、名称不匹配等错误"
+            ]
+          ],
+          "example": "def add(a,b):\n    return a+b\nvalues=[2,3]\nprint(add(*values))\nprint(add(**{\"a\":2,\"b\":3}))",
+          "trace": [
+            "第一个调用用*把[2,3]展开为add(2,3)。",
+            "第二个调用用**把字典展开为add(a=2,b=3)。",
+            "两个都返回5。"
+          ],
+          "expected": "5\n5",
+          "errors": [
+            "**字典中的键必须与函数参数名匹配。"
+          ],
+          "practice": "改掉字典键b，观察参数缺失或未知参数错误。"
+        },
+        {
+          "name": "位置专用/关键字专用参数，仅做识读",
+          "grammar": "def f(a, /, b, *, c):",
+          "explanation": "/在参数列表里表示前面的参数只能按位置传；*单独出现后面的参数必须按关键字传。这些是函数签名里的专用标记，不是普通除法或乘法。普通项目先学明确的参数和关键字调用，后续读库文档遇到/与*时再查。",
+          "parts": [
+            [
+              "/",
+              "函数定义参数列表中的位置专用分隔符"
+            ],
+            [
+              "*",
+              "关键字专用参数分隔符"
+            ],
+            [
+              "c=3",
+              "调用时明确给c的名字"
+            ]
+          ],
+          "example": "def f(a,/,b,*,c):\n    return a+b+c\nprint(f(1,2,c=3))",
+          "trace": [
+            "定义f：a只能通过位置传；c只能通过关键字传。",
+            "调用中1给a，2给b，c=3给c。",
+            "相加得到6。"
+          ],
+          "expected": "6",
+          "errors": [
+            "f(a=1,b=2,c=3)会报TypeError，因为a为位置专用。"
+          ],
+          "practice": "解释为何f(1,2,3)不符合c的参数要求。"
+        }
+      ]
     },
     {
       "id": "v2_13",
@@ -2162,7 +2848,178 @@
         "why": "def建立可调用函数，正常函数体在调用时执行。"
       },
       "original_id": "module",
-      "details": []
+      "details": [
+        {
+          "name": "模块是什么，import并不等于调用函数",
+          "grammar": "import math; math.sqrt(9)",
+          "explanation": "一个.py文件通常是一个模块。import math让当前模块得到名为math的模块对象；math.sqrt先取其sqrt属性，随后(9)调用函数。导入模块时会执行模块的顶层语句（一般首次导入一次并缓存），但不会自动调用里面定义的所有函数。",
+          "parts": [
+            [
+              "import",
+              "导入模块的语句"
+            ],
+            [
+              "math",
+              "当前命名空间中的模块名"
+            ],
+            [
+              ".",
+              "属性访问"
+            ],
+            [
+              "sqrt",
+              "math模块提供的函数名"
+            ],
+            [
+              "(9)",
+              "调用时传入实参9"
+            ]
+          ],
+          "example": "import math\nf=math.sqrt\nprint(f(9))",
+          "trace": [
+            "导入math模块，创建math这个名字。",
+            "访问math.sqrt得到函数对象f。",
+            "最后f(9)实际执行并返回3.0。"
+          ],
+          "expected": "3.0",
+          "errors": [
+            "import不是把所有函数自动执行一遍。"
+          ],
+          "practice": "分别打印math.sqrt和math.sqrt(9)，分析不同之处。"
+        },
+        {
+          "name": "from ... import ...与as别名",
+          "grammar": "from math import sqrt as root",
+          "explanation": "from模块import名字可直接把模块中的某个名称绑定到当前命名空间，之后可直接调用sqrt(9)；as可以起别名如root。模块名的选择要避开标准库同名文件。Python中用from math import sqrt不同于C的#include头文件文本包含。",
+          "parts": [
+            [
+              "from math",
+              "指定来源模块"
+            ],
+            [
+              "import sqrt",
+              "取得目标名称"
+            ],
+            [
+              "as root",
+              "建立当前文件里使用的别名"
+            ]
+          ],
+          "example": "from math import sqrt as root\nprint(root(16))",
+          "trace": [
+            "从math模块取到sqrt函数，绑定到root。",
+            "通过root(16)调用并得到4.0。"
+          ],
+          "expected": "4.0",
+          "errors": [
+            "把你自己的脚本命名为math.py可能遮蔽标准库math模块。"
+          ],
+          "practice": "对比import math与from math import sqrt写法。"
+        },
+        {
+          "name": "__name__== '__main__'为什么出现那么多下划线",
+          "grammar": "if __name__ == '__main__': main()",
+          "explanation": "__name__是Python为模块设置的特殊属性。直接通过python main.py执行脚本时，其值通常是'__main__'；作为其他模块被import时则是模块名称。==比较两个字符串是否相等。此语句的作用是避免“只是导入定义却意外启动完整程序”。两个双下划线前后是特殊命名约定的一部分，不是四个自定义运算符。",
+          "parts": [
+            [
+              "__name__",
+              "解释器设置的模块特殊属性"
+            ],
+            [
+              "==",
+              "比较两个值"
+            ],
+            [
+              "'__main__'",
+              "直接运行模块时的特殊名称"
+            ],
+            [
+              "main()",
+              "条件成立后才调用的自定义入口函数"
+            ]
+          ],
+          "example": "def main():\n    print(\"主程序运行\")\nif __name__ == \"__main__\":\n    main()",
+          "trace": [
+            "执行def只建立main函数，不运行函数体。",
+            "直接运行脚本时__name__为'__main__'。",
+            "if条件为True才调用main，打印文字。"
+          ],
+          "expected": "主程序运行",
+          "errors": [
+            "若别的模块import本模块，这段保护可阻止直接执行main。"
+          ],
+          "practice": "在本地另写一个文件import这个脚本，观察是否出现文字。"
+        },
+        {
+          "name": "跨文件函数调用链：实际何时进入reader.py",
+          "grammar": "main.py → from reader import load_frames → load_frames(path)",
+          "explanation": "以两文件为例：main.py导入reader里的函数定义，并不会自动执行函数体。main.py真正调用load_frames(path)时，才进入reader.py中的函数，直到return将结果交回调用处，然后main.py的下一行继续执行。调用栈与函数归属是理解大型项目的关键。",
+          "parts": [
+            [
+              "from reader import load_frames",
+              "从reader.py取得函数定义"
+            ],
+            [
+              "load_frames(path)",
+              "此时真正调用"
+            ],
+            [
+              "return rows",
+              "从被调用函数交回数据"
+            ],
+            [
+              "main.py继续",
+              "恢复调用点之后的语句"
+            ]
+          ],
+          "example": "# 这是逻辑说明：下列为单文件可运行的等价执行流程\ndef load_frames(path):\n    print(\"进入读取\",path)\n    return [45,34]\nprint(\"入口\")\nrows=load_frames(\"sample.csv\")\nprint(\"返回\",rows)",
+          "trace": [
+            "先建立函数定义，不打印“进入读取”。",
+            "打印入口。",
+            "调用函数，打印进入读取，并返回列表。",
+            "外层rows取得列表，再打印返回。"
+          ],
+          "expected": "入口\n进入读取 sample.csv\n返回 [45, 34]",
+          "errors": [
+            "真正的多文件工程请查看项目文件main.py与reader.py，不要把import当成执行所有函数。"
+          ],
+          "practice": "画出main→reader→main的三段调用顺序和每一步返回类型。"
+        },
+        {
+          "name": "模块路径、相对导入和循环依赖",
+          "grammar": "import module / from package import module",
+          "explanation": "Python在运行时根据导入搜索路径定位模块，通常包括脚本所在目录、标准库和安装位置。项目若多个文件相互import可能造成循环导入和初始化未完成。初学工程使用清晰的单向依赖：main调用reader/monitor，reader用models，monitor用models；models不要反过来import main。",
+          "parts": [
+            [
+              "sys.path",
+              "模块导入搜索路径列表"
+            ],
+            [
+              "__file__",
+              "脚本模块文件位置"
+            ],
+            [
+              "循环导入",
+              "A导入B而B又依赖尚未初始化完成的A"
+            ],
+            [
+              "单向依赖",
+              "更容易理解与验证的模块组织"
+            ]
+          ],
+          "example": "import sys\nprint(len(sys.path)>0)\nprint(isinstance(sys.path,list))",
+          "trace": [
+            "导入sys。",
+            "sys.path至少包含一些搜索路径，结果True。",
+            "sys.path是列表，输出True。"
+          ],
+          "expected": "True\nTrue",
+          "errors": [
+            "不要将脚本取名csv.py、json.py或typing.py。"
+          ],
+          "practice": "画出当前ASW练习工程模块依赖箭头，指出为什么models不应该import main。"
+        }
+      ]
     },
     {
       "id": "v2_14",
@@ -2198,7 +3055,180 @@
         "why": "对象保留跨帧状态；每轮新建会重置previous_alert。"
       },
       "original_id": "dataclass",
-      "details": []
+      "details": [
+        {
+          "name": "class定义类型，Monitor()创建实例",
+          "grammar": "class Monitor: ... ; monitor=Monitor()",
+          "explanation": "class语句定义一个类对象，缩进块中可以定义方法和数据。monitor=Monitor()在调用类时创建实例，并按类的初始化机制运行__init__。类型定义与实例创建不是同一动作，正如C的typedef struct定义类型不自动创建变量。",
+          "parts": [
+            [
+              "class",
+              "创建类定义的关键字"
+            ],
+            [
+              "Monitor",
+              "类名，常用首字母大写规范"
+            ],
+            [
+              "Monitor()",
+              "创建一个类实例"
+            ],
+            [
+              "monitor",
+              "持有该实例的变量名字"
+            ]
+          ],
+          "example": "class Monitor:\n    def __init__(self):\n        self.alert=False\nmonitor=Monitor()\nprint(monitor.alert)",
+          "trace": [
+            "定义Monitor类，不创建实例。",
+            "调用Monitor()创建实例，__init__设置alert=False。",
+            "monitor.alert通过点号读取实例成员。"
+          ],
+          "expected": "False",
+          "errors": [
+            "类的定义和实例的创建并不等价。"
+          ],
+          "practice": "创建两个Monitor对象，分别修改一个alert，观察另一个是否改变。"
+        },
+        {
+          "name": "self、点号和__init__逐部分解释",
+          "grammar": "def __init__(self): self.alert=False",
+          "explanation": "self是普通约定的实例形参名，实例调用方法时Python会把当前实例自动作为第一个实参传入。__init__是Python已有的特殊方法名，在实例被创建时用于初始化，不是返回对象的构造函数；它应该返回None。self.alert将状态放进实例，跨多次方法调用保留。",
+          "parts": [
+            [
+              "self",
+              "当前实例对象的参数名字"
+            ],
+            [
+              "__init__",
+              "实例初始化特殊方法"
+            ],
+            [
+              "self.alert",
+              "当前实例上的alert属性"
+            ],
+            [
+              "monitor.step(34)",
+              "调用方法时实例隐式作为self传入"
+            ]
+          ],
+          "example": "class Counter:\n    def __init__(self):\n        self.count=0\n    def step(self):\n        self.count+=1\n        return self.count\nc=Counter()\nprint(c.step())\nprint(c.step())",
+          "trace": [
+            "c=Counter()创建实例并把count初始化为0。",
+            "第一次调用c.step()，self指向c，count变1并返回1。",
+            "第二次仍是同一个c，count从1变2。"
+          ],
+          "expected": "1\n2",
+          "errors": [
+            "不要每帧重新Counter()，否则计数和跨帧状态都会清零。"
+          ],
+          "practice": "让c.step()连调三次，写出返回值变化。"
+        },
+        {
+          "name": "@dataclass为什么用于Frame和Decision",
+          "grammar": "@dataclass\\nclass Frame: ...",
+          "explanation": "dataclass是标准库提供的装饰器，它能够根据类的字段定义自动生成__init__、__repr__等方法，因此适合主要承载数据的类。@符号表示把下方类定义交给装饰器处理；这种写法不代表这里马上创建Frame实例。字段冒号后的float/bool是类型注解，普通dataclass不会自动拒绝传入字符串。",
+          "parts": [
+            [
+              "@",
+              "装饰器语法"
+            ],
+            [
+              "dataclass",
+              "数据类装饰器，先从dataclasses导入"
+            ],
+            [
+              "class Frame",
+              "声明数据类的名称"
+            ],
+            [
+              "speed:float",
+              "字段与类型提示"
+            ],
+            [
+              "Frame(72.0)",
+              "创建实际数据对象"
+            ]
+          ],
+          "example": "from dataclasses import dataclass\n@dataclass\nclass Frame:\n    speed_kmh:float\nf=Frame(72.0)\nprint(f.speed_kmh)",
+          "trace": [
+            "导入dataclass函数。",
+            "定义Frame数据类，装饰器自动生成初始化方法。",
+            "Frame(72.0)创建实例，speed_kmh字段赋值。",
+            "通过点号读取72.0。"
+          ],
+          "expected": "72.0",
+          "errors": [
+            "dataclass不是运行时输入检查器，外部CSV仍需显式float()及范围检查。"
+          ],
+          "practice": "增加distance_m字段，分别创建两个不同Frame对象。"
+        },
+        {
+          "name": "返回一个对象 vs 返回C结构体值",
+          "grammar": "return Decision(...)",
+          "explanation": "Python函数可以return一个Decision实例，调用者拿到对该对象的引用，再用result.valid访问属性。C中函数返回MonitorResult结构体通常按值返回；两种语言在内存语义上不同，但从业务逻辑看都能返回一组带字段的结果。注意不要因为函数返回一个对象就以为它已经打印或写文件；发布结果是调用者后续执行的操作。",
+          "parts": [
+            [
+              "Decision(...)",
+              "创建数据类实例"
+            ],
+            [
+              "return",
+              "结束本次函数并把对象交给调用者"
+            ],
+            [
+              "result.valid",
+              "通过属性读取有效标志"
+            ],
+            [
+              "print(result)",
+              "仅显示结果，不自动进行业务发布"
+            ]
+          ],
+          "example": "from dataclasses import dataclass\n@dataclass\nclass Decision:\n    valid:bool\n    alert:bool\ndef step():\n    return Decision(True,False)\nresult=step()\nprint(result.valid,result.alert)",
+          "trace": [
+            "定义Decision并定义step函数。",
+            "执行step时构建Decision(True,False)实例。",
+            "return将实例对象引用交回result。",
+            "result.valid和result.alert分别取得两个属性。"
+          ],
+          "expected": "True False",
+          "errors": [
+            "不要将Python对象返回与C struct按值返回的内存语义混为一谈。"
+          ],
+          "practice": "为Decision加入status字段，再一次返回三个信息。"
+        },
+        {
+          "name": "跨帧状态为什么必须在循环外创建实例",
+          "grammar": "monitor=Monitor(); for frame in frames: monitor.step(frame)",
+          "explanation": "如果在for内部每帧重新构建Monitor实例，__init__每轮都会把previous_alert重置为False。这样当34m打开告警后、下一帧38m进入滞环保持区时，程序不记得上一帧已经告警，结果会错误。先用一个实例跨帧保存状态，再将它传给多次step方法。",
+          "parts": [
+            [
+              "创建一次",
+              "Monitor()放在for之前"
+            ],
+            [
+              "反复调用",
+              "每轮使用同一实例对象"
+            ],
+            [
+              "self.previous_alert",
+              "实例级可变状态"
+            ]
+          ],
+          "example": "class Monitor:\n    def __init__(self): self.alert=False\n    def step(self,d):\n        if d<=35: self.alert=True\n        elif d>=41: self.alert=False\n        return self.alert\nm=Monitor()\nfor d in [45,34,38,42]:\n    print(m.step(d))",
+          "trace": [
+            "创建一次m，alert初始False。",
+            "45不改变；34触发True。",
+            "38保留上一帧True；42达到关闭阈值变False。"
+          ],
+          "expected": "False\nTrue\nTrue\nFalse",
+          "errors": [
+            "本例只是教学阈值，非真实ACC控制逻辑。"
+          ],
+          "practice": "把m=Monitor()暂放for内，先预测结果再运行。"
+        }
+      ]
     },
     {
       "id": "v2_15",
