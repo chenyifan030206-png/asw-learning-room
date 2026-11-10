@@ -7,6 +7,8 @@ on:
       - 'python-foundation.css'
       - 'python-foundation.js'
       - 'python-foundation-content.json'
+      - 'python-foundation-v2-content.json'
+      - 'tests/python_foundation_v2_examples.py'
       - 'python-foundation-project/**'
       - 'tests/python_foundation_browser.py'
       - 'index.html'
@@ -19,6 +21,8 @@ on:
       - 'python-foundation.css'
       - 'python-foundation.js'
       - 'python-foundation-content.json'
+      - 'python-foundation-v2-content.json'
+      - 'tests/python_foundation_v2_examples.py'
       - 'python-foundation-project/**'
       - 'tests/python_foundation_browser.py'
       - 'index.html'
@@ -58,13 +62,14 @@ jobs:
               assert f'第{line}行' in p.stdout,(name,p.stdout)
           print('PASS actual Python project output + exact error line numbers')
           PY
-      - name: Verify source count, 20-chapter textbook, 24 syntax categories and references
+      - name: Verify 21-chapter grammar-first textbook and actually execute its 102 examples
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          j=json.loads(Path('python-foundation-content.json').read_text(encoding='utf-8'))
-          assert len(j['chapters'])==20
+          j=json.loads(Path('python-foundation-v2-content.json').read_text(encoding='utf-8'))
+          assert len(j['chapters'])==21
+          assert sum(len(x['details']) for x in j['chapters'])>=100
           assert len(j['syntaxAtlas'])>=24 and len(j['cBridge'])==20
           assert len(j['resources'])>=10
           assert len(j['projectFiles'])==9
@@ -76,8 +81,10 @@ jobs:
           for file in j['projectFiles']:
               assert Path('python-foundation-project',file).exists(),file
           assert 'python-foundation.html' in Path('index.html').read_text(encoding='utf-8')
-          print('PASS 20 independent lessons, 24 syntax entries, C bridge and all project assets')
+          print('PASS 21 chapters, 100+ detailed grammar examples and unchanged project assets')
           PY
+          python tests/python_foundation_v2_examples.py
+
       - name: Check JavaScript syntax and existing D15 runtime remains intact
         run: |
           node --check python-foundation.js
