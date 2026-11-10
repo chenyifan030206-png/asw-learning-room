@@ -95,6 +95,7 @@ function showPanel(type){
   $('bridgePanel').hidden=type!=='bridge';
   $('resourcesPanel').hidden=type!=='resources';
   $('finalPanel').hidden=type!=='final';
+  $('legacyPanel').hidden=type!=='legacy';
   for(const b of $('chapterNav').querySelectorAll('[data-chapter]')){
     b.classList.toggle('selected',type==='chapter' && b.dataset.chapter===activeChapter);
   }
@@ -103,6 +104,62 @@ function showPanel(type){
   if(type==='resources') renderResources();
   if(type==='project') renderProject();
   if(type==='final') renderFinal();
+  if(type==='legacy') renderLegacyNotes();
+}
+function renderDetailedKnowledge(card,chapter){
+  const details=chapter.details||[];
+  if(!details.length)return;
+  heading(card,'从语法形式开始：本章逐项完整讲解（'+details.length+'个知识点）');
+  paragraph(card,'先看写法，再读符号拆解表，然后逐行推演、预测输出，最后到本地Python运行。本页代码可复制；浏览器不会执行Python。');
+  const menu=node('div',undefined,'topicMenu');
+  for(const [index,item] of details.entries()){
+    const btn=node('button',String(index+1).padStart(2,'0')+' · '+item.name);
+    btn.type='button';
+    btn.onclick=()=>document.getElementById('topic-'+chapter.id+'-'+index)?.scrollIntoView({block:'start',behavior:'smooth'});
+    menu.append(btn);
+  }
+  card.append(menu);
+  for(const [index,item] of details.entries()){
+    const section=node('section',undefined,'syntaxDetail');
+    section.id='topic-'+chapter.id+'-'+index;
+    section.append(node('h4',String(index+1).padStart(2,'0')+' · '+item.name));
+    const signature=node('pre',item.grammar,'syntaxSignature');
+    section.append(node('p','基本语法写法：','topicSmallTitle'),signature);
+    paragraph(section,item.explanation,'detailedExplain');
+    const label=node('h5','逐项拆解：每个符号在这里负责什么');
+    section.append(label);
+    const table=node('table'),thead=node('thead'),head=node('tr');
+    head.append(node('th','代码符号 / 写法'),node('th','实际含义'));
+    thead.append(head);table.append(thead);
+    const tbody=node('tbody');
+    for(const part of item.parts||[]){
+      const row=node('tr'),name=node('td'),meaning=node('td');
+      name.append(node('code',part[0]));meaning.append(quoteMarks(part[1]));
+      row.append(name,meaning);tbody.append(row);
+    }
+    table.append(tbody);
+    const wrap=node('div',undefined,'syntaxTable');wrap.append(table);section.append(wrap);
+    const top=node('div',undefined,'codeTop');
+    top.append(node('span','完整小例子：先预测输出，再复制到本地Python运行'));
+    const copy=node('button','复制本例');
+    copy.onclick=()=>copyText(item.example).then(ok=>{if(ok)copy.textContent='已复制';});
+    top.append(copy);section.append(top);
+    const snippet=node('pre',item.example,'topicCode');
+    snippet.tabIndex=0;section.append(snippet);
+    section.append(node('h5','程序真正按照什么顺序执行'));
+    const trace=node('ol',undefined,'trace');
+    for(const step of item.trace||[])trace.append(node('li',step));
+    section.append(trace);
+    section.append(node('h5','期望输出 / 运行结果'));
+    section.append(node('pre',item.expected,'expected'));
+    const errors=node('div',undefined,'topicErrors');
+    errors.append(node('strong','容易出错的地方'));
+    for(const err of item.errors||[])paragraph(errors,'· '+err);
+    section.append(errors);
+    section.append(node('h5','自己独立修改并验证'));
+    paragraph(section,item.practice,'task');
+    card.append(section);
+  }
 }
 function renderChapterNav(filter=''){
   $('chapterNav').replaceChildren();
@@ -135,7 +192,8 @@ function openChapter(id){
   paragraph(card,'本节要能做到：'+chapter.goal,'goal');
   heading(card,'先把问题和场景讲清楚');
   for(const p of chapter.story)paragraph(card,p,'explain');
-  heading(card,'完整示例 · 先预测再看结果');
+  renderDetailedKnowledge(card,chapter);
+  heading(card,'本章综合示例 · 将刚学的语法连在一起');
   const toolbar=node('div',undefined,'codeTop');
   toolbar.append(node('span','逐行中文注释 · 复制后到本地Python执行'));
   const copy=node('button','复制本节代码');
@@ -236,6 +294,7 @@ $('chapterNote').addEventListener('input',()=>{
 });
 $('chapterSearch').addEventListener('input',()=>renderChapterNav($('chapterSearch').value));
 $('startFirst').onclick=()=>openChapter(book.chapters[0].id);
+$('openLegacy').onclick=()=>{showPanel('legacy');$('legacyPanel').scrollIntoView({block:'start'});};
 $('openBridge').onclick=()=>{showPanel('bridge');$('bridgePanel').scrollIntoView({block:'start'});};
 $('openAtlas').onclick=()=>{showPanel('atlas');$('atlasPanel').scrollIntoView({block:'start'});};
 $('openProject').onclick=()=>{showPanel('project');$('projectPanel').scrollIntoView({block:'start'});};
@@ -379,6 +438,25 @@ $('downloadProject').onclick=async()=>{
   }catch(error){alert('下载失败：'+error.message);}
   finally{b.disabled=false;b.textContent=original;}
 };
+function renderLegacyNotes(){
+  const root=$('legacyNotes');root.replaceChildren();
+  const keep=Object.entries(state.notes||{}).filter(([key,value])=>!key.startsWith('v2_')&&typeof value==='string'&&value.trim());
+  const oldAnnotations=(state.annotations||[]).filter(x=>!String(x.chapter||'').startsWith('v2_'));
+  root.append(node('p','发现旧版章节笔记'+keep.length+'条、旧版划线批注'+oldAnnotations.length+'条。以下只读显示，内容仍在浏览器存储中，完整备份可用顶部“导出学习笔记JSON”。'));
+  if(!keep.length&&!oldAnnotations.length){
+    root.append(node('p','没有发现旧版笔记；如果以前在另一台设备学习，请先用上方JSON导入。'));
+  }
+  for(const [key,text] of keep){
+    const block=node('div',undefined,'legacyNote');
+    block.append(node('h4','旧版章节标识：'+key),node('pre',text,'legacyText'));
+    root.append(block);
+  }
+  for(const a of oldAnnotations){
+    const block=node('div',undefined,'legacyNote');
+    block.append(node('h4','旧版批注 · '+a.chapter),node('p',a.quote),node('p',a.note||''));
+    root.append(block);
+  }
+}
 function renderFinal(){
   const root=$('finalChecklist');root.replaceChildren();
   for(const [i,label] of book.finalChecklist.entries()){
@@ -436,18 +514,18 @@ $('importNotes').onchange=async()=>{
        !payload.data.fileNotes)throw Error('不是本导学页的正确笔记格式');
     if(!confirm('恢复这份备份会替换当前导学页的本地笔记，是否继续？'))return;
     state=Object.assign(stateDefault(),payload.data);saveState();
-    hasOpenedChapter=false;renderChapterNav();openChapter(state.lastChapter||book.chapters[0].id);
+    hasOpenedChapter=false;renderChapterNav();openChapter(book.chapters.some(x=>x.id===state.lastChapter)?state.lastChapter:book.chapters[0].id);
     alert('笔记已恢复。原D15课程笔记未受到修改。');
   }catch(error){alert('无法导入：'+error.message);}
   finally{input.value='';}
 };
 async function init(){
   try{
-    const response=await fetch('./python-foundation-content.json?v=20261110-v1',{cache:'no-store'});
+    const response=await fetch('./python-foundation-v2-content.json?v=20261110-v2',{cache:'no-store'});
     if(!response.ok)throw Error('教程教材数据未能加载');
     book=await response.json();
-    if(book.chapters.length!==20)throw Error('教材章节不完整');
-    $('heroIntro').textContent='20章中文逐步讲解、24类语法地图、官方/开源资源、一套可下载的完整多文件ASW工程；每天都能回来查阅，不必一次记住所有高级语法。';
+    if(book.chapters.length!==21||book.chapters.reduce((n,x)=>n+(x.details?.length||0),0)<100)throw Error('新版教材内容不完整');
+    $('heroIntro').textContent='新版21章、102个逐项拆解的语法点：先认_ . () [] :等符号；将for/while/range/enumerate集中讲透；再由数字、字符串、列表逐步走向函数、模块与ASW工程。完整示例、逐行追踪、错误分析、个人笔记和ZIP一并保留。';
     for(const t of book.principles)$('principles').append(node('p',t));
     for(const item of book.schedule){
       const card=node('div',undefined,'scheduleCard');
@@ -455,7 +533,7 @@ async function init(){
         node('div',item.outcome));$('scheduleCards').append(card);
     }
     state=loadState();renderChapterNav();
-    openChapter(book.chapters.some(x=>x.id===state.lastChapter)?state.lastChapter:'start');
+    openChapter(book.chapters.some(x=>x.id===state.lastChapter)?state.lastChapter:book.chapters[0].id);
     document.body.dataset.foundationReady='yes';
   }catch(error){
     $('heroIntro').textContent='页面加载失败：'+error.message+'。请刷新页面或查看GitHub Pages部署状态。';

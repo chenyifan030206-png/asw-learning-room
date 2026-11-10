@@ -33,3 +33,9 @@ D15原计划为CSV日志读取、NumPy shape/标量/向量，输出速度（km/h
 已新增`python-foundation.html`：面向完全没系统学过Python的学习者，20章详细中文解释、完整执行链、C→Python20项对照、24项未来语法索引、11个官方/开源资源。提供`python-foundation-project/`全套原创标准库工程，网页可读源码/下载完整ZIP，含8帧ASW离线监视、两类坏CSV和unittest。导学页支持浏览器本地自动保存章节笔记、划线批注、逐文件代码理解、导出/导入JSON；补充页与D15原主课进度相互独立。要私有云同步导学页总结，可复制到D15原笔记框继续同步；不将补充页保存机制冒充原私有同步。
 
 所有D01–D15既有课程、试题、代码旁注和本地真实C/Python验收规则保留。参考资料与教学选择详见`docs/python-foundation/RESOURCE_AUDIT_AND_TEACHING_DESIGN.md`。
+
+## Python 零基础工程导学 V2（2026-11-10）
+
+依据学员反馈重排独立先修：先运行环境、字母/标点（`_`、`.`、`()`、`[]`、`{}`、`:`、`=`/`==`、缩进），再变量、数值、字符串、if。将 `for`、`while`、`range`、`enumerate`、`zip`、`break`、`continue`、嵌套循环与loop-else集中在第08章逐项说明，再学习列表、字典、函数、模块、类、CSV、异常、测试和ASW工程。新版教材`python-foundation-v2-content.json`包含21章/102组具备语法结构、逐符号说明、完整小代码、执行追踪、预期输出、常见错误和修改任务的知识点。旧版内容`python-foundation-content.json`原样留存。新版章节标识`v2_*`，旧版笔记与批注通过专用只读面板查阅，不覆盖个人浏览器记录，更不修改既有D15的课程记录/私有同步。
+
+资源比较和调整依据见`docs/python-foundation/RESOURCE_AUDIT_AND_TEACHING_DESIGN.md`。CI使用真实Python执行新教程的小示例、验证输出，并保留完整工程及真实浏览器回归。
