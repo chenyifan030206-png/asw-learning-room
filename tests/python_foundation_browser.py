@@ -21,9 +21,24 @@ def main() -> None:
         page.goto(URL, wait_until="networkidle")
         page.locator("#chapterNav button[data-chapter]").first.wait_for()
 
-        # 20章节和对照表是网站实际呈现，不只检查JSON文件中的声明。
-        assert page.locator("#chapterNav button[data-chapter]").count() == 20
+        # 23章节和对照表是网站实际呈现，不只检查JSON文件中的声明。
+        assert page.locator("#chapterNav button[data-chapter]").count() == 23
         assert "01 · Python到底如何运行" in page.locator("#chapterPanel").inner_text()
+
+        # 新增的语法详解必须真实渲染，而非只在JSON里藏着。
+        assert page.locator("#chapterPanel .grammarUnit").count() >= 4
+        page.locator("#chapterNav button[data-chapter='symbols']").click()
+        assert page.locator("#chapterPanel .grammarUnit").count() >= 8
+        assert "点号" in page.locator("#chapterPanel").inner_text()
+        assert "__init__" in page.locator("#chapterPanel").inner_text()
+        page.locator("#chapterNav button[data-chapter='loops']").click()
+        assert page.locator("#chapterPanel .grammarUnit").count() >= 8
+        assert "for" in page.locator("#chapterPanel").inner_text()
+        assert "while" in page.locator("#chapterPanel").inner_text()
+        page.locator("#chapterNav button[data-chapter='iteration-tools']").click()
+        assert "enumerate" in page.locator("#chapterPanel").inner_text()
+        assert "zip" in page.locator("#chapterPanel").inner_text()
+        page.locator("#chapterNav button[data-chapter='start']").click()
 
         # 保存本章笔记，然后离开再回来必须保持一致。
         page.locator("#chapterNote").fill("我理解了main()的入口以及函数调用与定义的区别。")
@@ -44,7 +59,7 @@ def main() -> None:
 
         # 逐章理解检测、掌握标记和笔记导出。
         page.get_by_role("button", name="标记本章已完成").click()
-        assert "1 / 20" in page.locator("#progressLine").inner_text()
+        assert "1 / 23" in page.locator("#progressLine").inner_text()
         with page.expect_download() as info:
             page.get_by_role("button", name="导出学习笔记 JSON").click()
         notes = info.value
