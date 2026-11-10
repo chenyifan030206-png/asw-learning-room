@@ -98,3 +98,24 @@ footer{text-align:center;font-size:13px;color:var(--muted);padding-bottom:38px}
 
 #bridgeTable{overflow:auto;max-width:100%}
 #bridgeTable code{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
+
+/* 第2版：每个语法点按照写法/符号/运行/错误/实作分组，超长内容易于检索。 */
+.topicMenu{display:flex;flex-wrap:wrap;gap:7px;background:#f4f7fc;border:1px solid var(--stroke);border-radius:10px;padding:12px;margin:14px 0 24px}
+.topicMenu button{font-size:12px;line-height:1.45;padding:6px 9px;max-width:100%;white-space:normal;text-align:left}
+.syntaxDetail{border:1px solid var(--stroke);border-radius:12px;padding:18px 20px;margin:21px 0 28px;scroll-margin-top:12px}
+.syntaxDetail h4{font-size:18px;color:var(--ink);margin:0 0 12px;line-height:1.55}
+.syntaxDetail h5{font-size:15px;margin:21px 0 9px;color:var(--ink)}
+.syntaxDetail .topicSmallTitle{font-size:13px;font-weight:700;margin:5px 0}
+.syntaxSignature{white-space:pre-wrap;overflow-wrap:anywhere;background:#ecf3fc;border-radius:9px;color:#123a69;padding:13px;font:14px/1.8 Consolas,"Microsoft YaHei",monospace;max-height:none}
+.syntaxDetail p.detailedExplain{background:#fbfcff;border-left:3px solid #6a96d7;padding:11px 14px;line-height:1.95;margin:10px 0}
+.syntaxTable{max-width:100%;overflow:auto}
+.syntaxTable code{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 Consolas,monospace}
+.topicCode{max-height:none;margin:0 0 13px}
+.topicErrors{background:#fff9ef;border-left:3px solid #cc9a53;border-radius:5px;padding:12px 15px;margin:15px 0}
+.topicErrors strong{font-size:14px}
+.topicErrors p{margin:3px 0;font-size:14px}
+.legacyNote{margin-top:18px;padding:16px;border:1px solid var(--stroke);border-radius:10px}
+.legacyNote h4{font-size:15px}
+.legacyText{max-height:300px;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:810px){.syntaxDetail{padding:13px}.syntaxTable table{min-width:420px}.topicMenu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.topicMenu{grid-template-columns:1fr}.syntaxDetail h4{font-size:16px}}
