@@ -62,3 +62,24 @@
 - GitHub Actions：真实Python 3.11运行单元测试、8帧输出、损坏CSV行号；Playwright真实浏览器验证页面跳转、笔记切换/刷新自动保存、20章节导航、源码文件显示、下载ZIP的CRC、手机端布局。
 - 学员仍须在自己的WSL/电脑实际运行Python并留存输出；浏览器上显示理解检测正确不能当作本地真实Python或C通关。
 - 本页是离线教学模拟，既没有实际汽车接口也没有真实20ms调度，更不能输出真实车控命令。
+
+
+## 2026-11-10 进一步审核：从“课目简介”改成“语法精讲”
+
+学员指出V1虽然有20章，但每章讲解只有几百字、十几行代码，符号没有前置说明，`for`被混在list章节、`while`另占一章，`enumerate`在未学解包前直接出现，跨文件ASW工程过早。这些问题通过检查`python-foundation-content.json`属实。
+
+实际阅读了以下GitHub公开教程的目录与章节正文：
+
+- 骆昊`jackfrued/Python-100-Days`当前`Day01-20/03.Python语言中的变量.md`：先程序、变量与类型、命名，配用法；`Day01-20/06.循环结构.md`同一章有`for-in循环`、`while循环`、`break和continue`、嵌套循环与练习；`Day01-20/14.函数和模块.md`有`def`、参数、返回、模块导入等。从其组织方式借鉴“一个主题内部讲全”；未复制原有正文或代码。
+- `mraza007/Python-for-beginners/course/07-loops/README.md`：顺序为for→range→while→break/continue→常见错误→练习，明确for和while不同的控制方式；`course/13-functions/README.md`先定义与调用，再参数和return，再默认值与作用域，适合按颗粒度学习。
+- Python官方控制流教程 https://docs.python.org/3/tutorial/controlflow.html ：明确Python `for` 遍历元素，`range`终点不包含，通常可用`enumerate`取得序号；语言参考 https://docs.python.org/3/reference/expressions.html#primaries 对`.`属性访问与`()`调用、`[]`索引作严格区分。
+- Python官方 PEP 8 https://peps.python.org/pep-0008/ ：`lower_case_with_underscores`的常见命名风格、`_single_leading_underscore`的约定用途、`__double_leading_and_trailing_underscore__`特殊协议名称；课程没有把单前导`_`误写成强制私有。
+- 对照了`mraza007/Python-for-beginners/course`完整目录和`jackfrued/Python-100-Days/Day01-20`前20天，决定将学习顺序改为代码符号→类型→运算→字符串→条件→完整循环→容器→函数→模块→类→文件/异常→测试→工程，避免让ASW应用本身变成最初的认知障碍。
+
+### V2具体交付与验收
+
+- 独立新版`python-foundation-v2-content.json`：21章、102个`details`语法小节，每节包含写法、解说、符号表、可复制代码、执行追踪、预期输出、常见错误与修改任务。第03章11种标点/特殊符号，第08章12种完整循环语法。
+- 原教材文件不删除；新的v2章节key独立分配，不将旧笔记错误挂到改变顺序的章节。
+- `python-foundation.html`的知识点结构直接渲染在正文中；保留现有C→Python对照、个人笔记、逐文件代码注释、划线批注、下载项目ZIP及后续原D15链接。
+- `tests/python_foundation_v2_examples.py`在GitHub Actions中以真实Python实际执行教材例子，核对输出；`tests/python_foundation_browser.py`在浏览器里验证章节跳转、旧笔记可见、新笔记保存/刷新后保留、完整源码及ZIP。
+- 所有案例仍是离线ASW教学背景，首次涉及某语法时尽量使用简单数字/列表；后来才做输入校验、状态与模块调用。视频类资源只查阅官方大纲/资源介绍，不声称逐帧看完视频。
