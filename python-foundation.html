@@ -42,6 +42,7 @@
         <input id="chapterSearch" placeholder="搜索章节标题或阶段" aria-label="搜索章节">
         <nav id="chapterNav" aria-label="教程章节"></nav>
         <div class="asideActions">
+          <button id="openBridge">C语言 → Python 对照表</button>
           <button id="openAtlas">全部语法索引</button>
           <button id="openProject">完整工程与执行链</button>
           <button id="openResources">参考资料与视频</button>
@@ -66,6 +67,11 @@
             <p class="smalltext" id="fileSaveStatus"></p>
           </div>
         </div>
+      </section>
+      <section id="bridgePanel" class="panel" hidden>
+        <h2>C语言 → Python 工程语法对照</h2>
+        <p>你已经学习过C的main、结构体、函数、数组、跨文件调用，所以这里先抓住相同的程序思路，再区分Python对象、引用、返回值和模块导入的不同运行机制。</p>
+        <div id="bridgeTable"></div>
       </section>
       <section id="atlasPanel" class="panel" hidden>
         <h2>未来 Python 语法全景索引</h2>
