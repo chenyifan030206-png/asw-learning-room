@@ -34,7 +34,8 @@ def main() -> None:
 
         # 刷新后依然保留，且不会自动给原D15标记完成。
         page.reload(wait_until="networkidle")
-        page.locator("#chapterNav button[data-chapter]").first.wait_for()
+        page.wait_for_function("document.body.dataset.foundationReady === 'yes'")
+        print("Reloaded browser note:", repr(page.locator("#chapterNote").input_value()))
         assert "我理解了main()" in page.locator("#chapterNote").input_value()
         local_stored = page.evaluate("localStorage.getItem('asw-python-foundation-v1:' + location.pathname)")
         assert local_stored and json.loads(local_stored)["notes"]["start"].startswith("我理解了")
