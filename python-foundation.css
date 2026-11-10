@@ -119,3 +119,17 @@ footer{text-align:center;font-size:13px;color:var(--muted);padding-bottom:38px}
 .legacyText{max-height:300px;white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:810px){.syntaxDetail{padding:13px}.syntaxTable table{min-width:420px}.topicMenu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.topicMenu{grid-template-columns:1fr}.syntaxDetail h4{font-size:16px}}
+
+/* 移动端保证网格单元可缩至可视区，长语法表达式在自身容器内滚动。 */
+.workspace,.content,.chapter,.syntaxDetail,.sidebar,.notebook,.hero,.principles{min-width:0;max-width:100%}
+.workspace>*{min-width:0}
+.chapter,.syntaxDetail,.topicErrors{overflow-wrap:anywhere}
+@media(max-width:810px){
+  .workspace,.hero{grid-template-columns:minmax(0,1fr)}
+  .scheduleCards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:480px){
+  .scheduleCards{grid-template-columns:minmax(0,1fr)}
+  .topicMenu,.topicMenu button{min-width:0}
+  .syntaxTable,.codeTop,pre{max-width:100%}
+}
