@@ -32,7 +32,7 @@ def main() -> None:
         page.locator("#chapterNav button[data-chapter]").first.wait_for()
         page.wait_for_function("document.body.dataset.foundationReady === 'yes'")
 
-        # 23章和144项语法内容真实渲染，旧笔记只读视图继续可用。
+        # 23章和156项语法内容真实渲染，旧笔记只读视图继续可用。
         assert page.locator("#chapterNav button[data-chapter]").count() == 23
         assert "01｜Python到底如何运行" in page.locator("#chapterPanel").inner_text()
         assert page.locator("#chapterPanel .syntaxDetail").count() >= 4
@@ -70,6 +70,10 @@ def main() -> None:
 
         # for与while放同一章，range/enumerate/zip紧邻下一章而不是提前调用。
         page.locator("#chapterNav button[data-chapter='v2_08']").click()
+        assert page.locator('#chapterPanel .syntaxDetail').count() >= 17
+        assert page.locator('#chapterPanel .syntaxTable').count() >= 4
+        assert 'enumerate' in page.locator('#chapterPanel').inner_text()
+        assert 'while' in page.locator('#chapterPanel').inner_text()
         loop = page.locator("#chapterPanel")
         assert loop.locator(".syntaxDetail").count() >= 9
         assert "for 变量 in 可迭代对象" in loop.inner_text()
@@ -81,6 +85,7 @@ def main() -> None:
         assert "enumerate" in iteration.inner_text()
         assert "zip" in iteration.inner_text()
         page.locator("#chapterNav button[data-chapter='v2_02']").click()
+        assert page.locator('[data-role="symbol-guide"] tbody tr').count() == 32
         assert page.locator("#chapterPanel .syntaxDetail").count() >= 9
         assert "下划线" in page.locator("#chapterPanel").inner_text()
         assert "点号" in page.locator("#chapterPanel").inner_text()
