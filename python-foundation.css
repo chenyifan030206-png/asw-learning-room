@@ -98,3 +98,28 @@ footer{text-align:center;font-size:13px;color:var(--muted);padding-bottom:38px}
 
 #bridgeTable{overflow:auto;max-width:100%}
 #bridgeTable code{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
+
+.chapterPrerequisites{margin:24px 0;padding:13px 17px;background:#f8f9fc;border:1px solid var(--stroke);border-radius:9px}
+.chapterPrerequisites strong{font-size:14px}.chapterPrerequisites p{margin:5px 0;font-size:14px}
+.miniIndex{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 12px;background:var(--soft);border-radius:10px;padding:13px 16px;margin:10px 0 28px}
+.miniIndex a{font-size:13px;line-height:1.5;text-decoration:none;overflow-wrap:anywhere}
+.miniIndex a:hover{text-decoration:underline}
+.grammarUnit{border:1px solid var(--stroke);border-radius:12px;padding:21px;margin:21px 0 28px;background:var(--paper);scroll-margin-top:18px}
+.grammarUnit h3{font-size:19px;line-height:1.5;margin:7px 0 15px}
+.grammarCounter{font-size:12px;color:var(--blue);font-weight:750}
+.grammarSyntax{background:#eff5ff;border:1px solid #d3e2fd;padding:9px 12px;border-radius:9px;margin:12px 0}
+.grammarSyntax strong{display:block;font-size:13px;color:#2053a1}
+.grammarSyntax pre{padding:9px 11px;margin:4px 0 0;border-radius:6px;background:#eff5ff;color:#173c70;white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.7 Consolas,monospace}
+.grammarExplain{line-height:1.92;max-width:none!important}
+.grammarColumns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.8fr);gap:13px;align-items:start;margin:16px 0}
+.grammarCodePanel,.grammarTracePanel{min-width:0}
+.grammarCodePanel pre{margin:0;max-height:none;min-height:110px}
+.grammarTracePanel h3{font-size:15px;margin:0 0 7px}
+.grammarTracePanel .trace li{padding:7px 7px 7px 38px;font-size:13px;margin-bottom:4px}
+.grammarTracePanel .trace li::before{left:8px;top:7px;width:22px;height:22px}
+.grammarUnit .expected{margin-top:6px;font-size:13px}
+.grammarUnit .task{margin-top:15px}
+.chapterConclusion{background:#e9f7f1;border:1px solid #d1e8df;padding:14px 18px;border-radius:10px;margin:28px 0}
+.chapterConclusion h3{margin:0 0 5px;font-size:16px}
+@media(max-width:1150px){.grammarColumns{grid-template-columns:1fr}}
+@media(max-width:810px){.miniIndex{grid-template-columns:1fr}.grammarUnit{padding:13px;margin:16px 0}.grammarUnit h3{font-size:17px}}
