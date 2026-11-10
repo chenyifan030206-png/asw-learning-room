@@ -46,7 +46,7 @@
       "id": "start",
       "phase": "起步",
       "title": "01 · Python到底如何运行：从终端到main",
-      "minutes": 25,
+      "minutes": 52,
       "goal": "理解脚本入口、解释器、文件路径与执行次序，不把import和调用混在一起。",
       "story": [
         "假设你要检查车速传感器日志。先不要接触NumPy：Python可以直接运行一个.py文件，让计算机按顺序执行顶部语句。与C工程先编译再运行不同，常见的Python使用方式是让Python解释器执行脚本；导入模块时也会执行模块的顶层语句一次。",
@@ -74,16 +74,73 @@
         "answer": 0,
         "why": "Python解释器按程序规则执行脚本；CSV只是数据。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "什么是“解释器执行脚本”",
+          "syntax": "终端：python3 hello.py；脚本：print('Hello')",
+          "explain": "命令行中的python3是解释器程序，hello.py是输入的源文件路径。终端按回车后，解释器读取文件，编译为字节码并执行相应操作；它并非像典型C工作流那样先交给GCC生成一个独立的可执行文件。文件里顶层语句从上向下执行。Python源码里的print不是英文说明，而是一个可调用的内置函数；圆括号表示调用，括号中的文字是实参。",
+          "code": "print('第一行')\nprint('第二行')",
+          "output": "第一行\n第二行",
+          "trace": [
+            "第1条调用print，把字符串交给它输出。",
+            "第2条调用print执行完成后，文件结束。"
+          ],
+          "mistake": "把“python3 hello.py”写进hello.py；这是终端命令，不是Python语句。",
+          "exercise": "在本地保存hello.py，交换两行顺序，预测和观察输出。"
+        },
+        {
+          "title": "三种常见输入方式：REPL、.py文件、VS Code运行",
+          "syntax": "python3；python3 demo.py；python3 -m unittest",
+          "explain": "在终端只输入python3会进入交互式提示符>>>，可以输入一行表达式立即看结果；exit()退出。写在.py文件中的表达式不会自动显示结果，通常要print。VS Code的运行按钮本质上调用选定的Python解释器执行文件，必须确认选择的是哪个环境；python3 -m 后跟模块名，表示作为模块运行而不是读取同名普通文件路径。",
+          "code": "a = 72\nprint(a)\nprint(a / 3.6)",
+          "output": "72\n20.0",
+          "trace": [
+            "解释器先将名字a绑定到整数72。",
+            "读取a并输出72；读取a做除法并打印20.0。"
+          ],
+          "mistake": "把交互式>>>提示符也复制进.py文件会报SyntaxError。",
+          "exercise": "分别在交互式解释器和脚本中输入1+2，解释为什么一个会直接显示3另一个不会。"
+        },
+        {
+          "title": "程序何时开始、何时结束：入口是调用",
+          "syntax": "if __name__ == '__main__': main()",
+          "explain": "Python运行文件时，会执行文件顶层语句。函数def被执行时创建函数定义，函数体通常要等调用才执行。为了让一个文件既能独立运行又能被import复用，常写if __name__ == '__main__'。此时__name__是Python提供的特殊模块变量，并不是你随意取的变量名。直接运行文件时是'__main__'，被另一个文件导入时通常是模块名。现阶段只需理解它让真正入口清晰，后面会拆解下划线与模块名。",
+          "code": "def main():\n    print('执行main')\n\nprint('定义已经完成')\nif __name__ == '__main__':\n    main()",
+          "output": "定义已经完成\n执行main",
+          "trace": [
+            "执行def语句创建main这个函数对象，但不进入函数体。",
+            "打印“定义已经完成”。",
+            "条件成立，main()调用函数体并打印。"
+          ],
+          "mistake": "不要以为def下面的缩进代码“定义时立即执行”。",
+          "exercise": "将main()调用删掉后再运行，解释为什么只打印第一句。"
+        },
+        {
+          "title": "错误信息如何读：从异常类型回到出错行",
+          "syntax": "SyntaxError / NameError / TypeError / FileNotFoundError",
+          "explain": "SyntaxError说明源代码不符合Python语法，例如缺引号或冒号；NameError常是名字没有定义；TypeError可能是对不兼容类型执行操作；FileNotFoundError是路径错误或文件不存在。看到Traceback先从最后的异常类型读起，再沿上方文件和行号定位调用链。不要把所有异常都归为“解释器坏了”。",
+          "code": "speed = 72\nprint(speed)\n# print(sped)  # 如果取消注释：拼错名字，出现NameError。",
+          "output": "72",
+          "trace": [
+            "正常两行无异常。",
+            "取消注释并运行第三行时，解释器寻找sped这个名字。",
+            "找不到对应绑定，会抛出NameError并显示所在行。"
+          ],
+          "mistake": "缺冒号导致SyntaxError，拼错变量导致NameError；原因和修复方法不同。",
+          "exercise": "先故意把speed拼成speeed，保存报错，再改回正确。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "已经掌握什么是终端和文本文件即可"
+      ],
+      "chapterSummary": "能区分终端命令和Python语句；能说出.py中哪一行先执行，理解函数定义不等于函数调用。"
     },
     {
       "id": "symbols",
       "phase": "语言符号",
       "title": "02 · 标点、下划线、点号和代码块：先学会读Python",
-      "minutes": 40,
+      "minutes": 117,
       "goal": "读懂每一个重要符号：_、.、:、()、[]、{}、=、==、#、@、->、缩进和换行。",
       "story": [
         "本章先掌握语言符号和基本执行过程，再看汽车数据示例。每一个新写法在下面的详解中拆成独立的语法部件。",
@@ -109,16 +166,148 @@
         "answer": 1,
         "why": "先掌握最小语法单位，才能准确阅读组合表达式和工程调用。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "Python标点总览：先给符号分工",
+          "syntax": "=  ==  .  _  :  ()  []  {}  #  @  ->  //  **",
+          "explain": "这些不是装饰。=用于赋值；==用于比较；.访问属性、方法或模块成员；_既能组成普通名字，也可作为约定性占位名字；:在if/for/def/class后开始缩进语句块，还能出现在字典、切片及类型注解中；()常表示调用或分组；[]表示列表或下标/切片；{}用于字典和集合；#开始注释；@引出装饰器；->通常是函数返回类型注解。不要在看到任何点号时都当小数点，更不能把所有冒号当作相同用途。",
+          "code": "speed_kmh = 72.0\nprint(speed_kmh == 72.0)\nprint(type(speed_kmh).__name__)",
+          "output": "True\nfloat",
+          "trace": [
+            "=把名字speed_kmh绑定72.0。",
+            "==对比两个浮点值，结果为True。",
+            "type(speed_kmh)返回类型对象，.__name__读取类型名称，print输出float。"
+          ],
+          "mistake": "speed_kmh == 72.0不会给speed_kmh赋新值；print本身也不会把值写回变量。",
+          "exercise": "逐字符解释print(type(speed_kmh).__name__)，写出两个括号分别在调用什么。"
+        },
+        {
+          "title": "下划线_：普通名字中的连接符",
+          "syntax": "speed_kmh = 72.0；radar_valid = True",
+          "explain": "单个下划线在speed_kmh里只是名字的一部分，用于连接多个英文单词，称snake_case。变量名大小写敏感，speed_kmh与Speed_kmh不同。数字可在名称中但不能开头，例如frame2合法，2frame非法。Python名字通常用字母、数字、下划线等，不能是for、class、if等关键字。命名附上单位，是ASW工程里避免速度单位混淆的重要做法。",
+          "code": "speed_kmh = 72.0\nspeed_mps = speed_kmh / 3.6\nradar_valid = True\nprint(speed_mps, radar_valid)",
+          "output": "20.0 True",
+          "trace": [
+            "speed_kmh是一个完整名字，不是speed减kmh。",
+            "speed_mps是第二个名字，/3.6做单位换算。",
+            "radar_valid是布尔标志，打印True。"
+          ],
+          "mistake": "speed-kmh会被当成表达式speed - kmh，不是变量名。",
+          "exercise": "列出6个合法、4个非法的变量名，并标出速度、距离、时间戳对应单位。"
+        },
+        {
+          "title": "单独的_、前导_、末尾_分别是什么意思",
+          "syntax": "for _ in range(3): ...；_cache；class_",
+          "explain": "当循环变量无需使用时，习惯写for _ in range(3)，表达“我不关心这个值”。请记住_仍然是一个普通有效变量名，Python不会因此忽略赋值。_cache单前导下划线是一种“内部使用”约定，并非强制访问限制；class_末尾下划线常用于避开关键字。双下划线与单下划线不同，放在类名内部可能触发名称改写机制，暂不要借此模仿C中的private访问控制。",
+          "code": "for _ in range(3):\n    print('检查一次')\nname_ = 'radar'\nprint(name_)",
+          "output": "检查一次\n检查一次\n检查一次\nradar",
+          "trace": [
+            "range(3)依次产生0、1、2。",
+            "_分别绑定这些值，但循环体未读取它。",
+            "print运行3次。",
+            "name_作为普通变量名保存'radar'。"
+          ],
+          "mistake": "不要写“_是Python关键字”或“_永远无法读取”；_可以在作用域内正常读取。",
+          "exercise": "改成for i in range(3)，打印i；比较为什么原写法不用i。"
+        },
+        {
+          "title": "双下划线__init__和__name__不是两个减号",
+          "syntax": "__name__；__main__；__init__；__file__",
+          "explain": "名称两端各两个下划线是Python规定的特殊名称风格，常称dunder（double underscore）。__name__表示模块名；__file__通常提供模块文件路径；__init__是类实例初始化时调用的特殊方法。它们是一整个名字，不是__、init、__三个运算符。不能随意更改拼写或把两个下划线减为一个。",
+          "code": "print(__name__)\nprint(__file__)",
+          "output": "第一行直接运行脚本时为__main__；第二行依文件所在路径而变化。",
+          "trace": [
+            "__name__值取决于这个文件是入口还是被import。",
+            "__file__是在脚本/模块执行场景中可用的文件路径变量。"
+          ],
+          "mistake": "交互式REPL里__file__通常未定义；此处代码应保存为.py再执行。",
+          "exercise": "写一个special_names.py并运行，观察两行结果，列出两个名称各有几条下划线。"
+        },
+        {
+          "title": "点号.：模块成员、对象属性和方法调用",
+          "syntax": "math.isfinite(x)、frame.speed_kmh、rows.append(x)",
+          "explain": "点号左边通常是某个对象，右边是它的属性或方法名字。在math.isfinite(x)中math是模块对象，isfinite是模块提供的函数；在frame.speed_kmh中，frame是数据对象，speed_kmh是属性；在rows.append(x)中，rows是列表对象，append是方法，紧随其后的()才表示真正调用。点号是“取成员”，圆括号才是“调用”。在72.5这种数值里，点号是小数点，而不是对象成员访问。",
+          "code": "import math\nvalues = [20, 30]\nvalues.append(40)\nprint(values)\nprint(math.isfinite(72.5))",
+          "output": "[20, 30, 40]\nTrue",
+          "trace": [
+            "import math让模块名math可用。",
+            "values.append定位列表的append方法，(40)调用它。",
+            "math.isfinite定位模块函数，用72.5作为参数得到True。"
+          ],
+          "mistake": "把values.append(40)写成values.append，会得到方法对象，但不会追加元素。",
+          "exercise": "写出print(values.append)和print(values)的差异，说明为什么前者不会增加元素。"
+        },
+        {
+          "title": "圆括号()、方括号[]、花括号{}、逗号与冒号",
+          "syntax": "print(x) / [1,2] / a[0] / {'x':1} / if x:",
+          "explain": "圆括号用于函数调用print(x)、表达式分组(1+2)*3，也可表示空元组()。方括号可创建列表[1,2]，也能索引a[0]或切片a[1:3]；这几种写法含义不同，需要结合左边对象看。花括号常用于字典{'x':1}或者集合{1,2}，而空{}创建字典不是空集合（空集合用set()）。逗号在列表、参数及元组中分隔值。冒号能作为if分支的语法、字典键值分隔和切片范围，语境决定意义。",
+          "code": "values = [45, 34, 42]\nprint(values[1])\nframe = {'speed': 72.0}\nprint(frame['speed'])\nprint((2 + 3) * 4)",
+          "output": "34\n72.0\n20",
+          "trace": [
+            "[]创建包含3个值的列表。",
+            "values[1]用方括号读取下标1。",
+            "字典的冒号分隔'speed'键和72.0值，frame['speed']按键取值。",
+            "算术圆括号先做2+3，再乘4。"
+          ],
+          "mistake": "误写frame.speed访问字典键通常报AttributeError；dict读取键用['speed']。",
+          "exercise": "分别写一组列表、一组字典、一组元组，解释三者括号差别。"
+        },
+        {
+          "title": "冒号:与缩进：Python的代码块边界",
+          "syntax": "if valid:\\n    print('ok')",
+          "explain": "在if、for、while、def、class后写冒号，下一行缩进表示这条复合语句管辖的代码块。通常使用4个空格，不要在同一块混用Tab和空格。与C的{}不同，同样的视觉缩进不仅影响美观，也会改变程序执行。上一层缩进结束后，程序才回到外层。",
+          "code": "valid = True\nif valid:\n    print('这是if内部')\n    print('第二条也在内部')\nprint('这是if之外')",
+          "output": "这是if内部\n第二条也在内部\n这是if之外",
+          "trace": [
+            "赋值valid为True。",
+            "if条件成立，执行两条相同缩进的print。",
+            "最后一条不缩进，因此不属于if，正常执行。"
+          ],
+          "mistake": "if valid后忘记冒号是SyntaxError；同一块缩进不一致可触发IndentationError。",
+          "exercise": "把valid改False，预测输出；再将最后一行缩进到if内部，比较差别。"
+        },
+        {
+          "title": "等号=、双等号==与is不是一回事",
+          "syntax": "x = 1；x == 1；x is None",
+          "explain": "单=表示赋值，不会产生“是否相等”的布尔判断；==比较两个值是否相等，返回True/False；is比较对象身份是否为同一对象，最常见的是x is None或x is not None。不要用is比较普通整数、字符串或浮点内容是否相等。Python不使用C的&&或||，分别写and/or/not。",
+          "code": "a = 72\nprint(a == 72)\nmissing = None\nprint(missing is None)\nprint(a != 73)",
+          "output": "True\nTrue\nTrue",
+          "trace": [
+            "a=72为赋值。",
+            "a==72比较值，得到True。",
+            "missing is None判断是否为单例None。",
+            "!=表示不相等，72和73不同。"
+          ],
+          "mistake": "if a = 72:非法；应写if a == 72:。",
+          "exercise": "写出x赋值、x等于某值的比较以及x不是None的判断，逐个说明。"
+        },
+        {
+          "title": "注释#、字符串引号、@、->的边界",
+          "syntax": "'#'字符串 vs #注释；@dataclass；def f()->int",
+          "explain": "#在字符串外面表示本行后面的注释，不会作为程序指令执行；引号包起来的'#'只是字符串中的字符。@前缀通常用于装饰器，如@dataclass修改后面类定义的创建行为；先识别它的语法位置，后面的类章再彻底解释。->写在def(...)后表示返回类型注解，它不是C的指针成员访问操作符，Python没有同样的指针箭头含义。",
+          "code": "message = '#不是注释'\nprint(message)  # 真正的行内注释。\ndef add(a: int, b: int) -> int:\n    return a + b\nprint(add(2, 3))",
+          "output": "#不是注释\n5",
+          "trace": [
+            "message保存包含#字符的字符串。",
+            "第2行print(message)输出字符串，后面的#注释不执行。",
+            "def add建立函数；: int和-> int是类型提示。",
+            "最后调用add(2,3)，返回5。"
+          ],
+          "mistake": "把->理解为“指针解引用”是把C语法误套到Python；这里表示注解。",
+          "exercise": "改为def speed_mps(x:float)->float: return x/3.6，解释两个:的用途。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "01：能运行.py文件；只需要认得print和数字"
+      ],
+      "chapterSummary": "不必掌握对象理论，就能从左到右拆开speed_kmh、obj.method(x)、for _ in range(3)、__init__、a[1:3]等常见写法；符号不再是黑箱。"
     },
     {
       "id": "environment",
       "phase": "起步",
       "title": "03 · 工作目录、VS Code、虚拟环境和包",
-      "minutes": 25,
+      "minutes": 52,
       "goal": "明白解释器、命令行、目录、库安装的关系。",
       "story": [
         "在WSL/Linux，python3 --version查看当前解释器；which python3检查路径。在Windows PowerShell通常使用py -3 --version或python --version。终端的工作目录决定相对路径从哪里寻找，而__file__指向脚本文件所在位置。",
@@ -146,16 +335,75 @@
         "answer": 1,
         "why": "标准库csv、json、dataclasses等随Python提供；NumPy是第三方库。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "在Windows/WSL里到底输入什么命令",
+          "syntax": "python --version / python3 --version / py -3 --version",
+          "explain": "命令行是向操作系统的shell发出指令，不是Python源文件。Windows如果装了Python Launcher，可用py -3；WSL/Linux常见python3。若用VS Code，先确认右下角选中的解释器与终端python -c所显示的一致。Python版本建议使用项目支持的3.11+；本页工程只依赖标准库，不需为了刚入门立刻学包管理。",
+          "code": "import sys\nprint(sys.version.split()[0])\nprint(sys.executable)",
+          "output": "输出当前解释器版本号及可执行文件路径；各电脑值不同。",
+          "trace": [
+            "在终端运行脚本。",
+            "import sys导入标准库模块。",
+            "通过sys.version获取版本文本，split分离第一项。",
+            "sys.executable指出当前解释器路径。"
+          ],
+          "mistake": "在WSL安装的Python和Windows安装的Python是两个环境，不能默认pip包彼此共享。",
+          "exercise": "记录python3 --version、which python3及对应C语言gcc --version，区分两种工具。"
+        },
+        {
+          "title": "工作目录和.py文件所在目录不同",
+          "syntax": "Path.cwd() vs Path(__file__).resolve().parent",
+          "explain": "Path.cwd()反映终端当前所在目录；Path(__file__).resolve().parent得到脚本的所在目录。你在另一目录运行脚本时，这两个路径可能不同；写文件读取工程时，应确定路径是相对于当前目录还是相对于脚本目录。不要在读文件错误时直接怪CSV格式。",
+          "code": "from pathlib import Path\nprint('工作目录:', Path.cwd())\nprint('脚本目录:', Path(__file__).resolve().parent)",
+          "output": "两个目录路径；在其他路径启动时可能不同。",
+          "trace": [
+            "导入标准库pathlib中的Path类。",
+            "Path.cwd()读取shell当前工作目录。",
+            "__file__是模块文件名，resolve转为绝对路径，parent取它所在文件夹。"
+          ],
+          "mistake": "在REPL或Notebook里__file__可能不存在；这个示例要保存成脚本文件运行。",
+          "exercise": "将脚本放到子目录，从上级目录运行它，对比两个目录。"
+        },
+        {
+          "title": "venv到底隔离了什么",
+          "syntax": "python3 -m venv .venv；source .venv/bin/activate",
+          "explain": "虚拟环境主要隔离解释器使用的依赖安装位置，便于一个项目用一套版本。创建.venv目录后，激活会调整shell环境使python指向虚拟环境；不激活也能显式调用.venv/bin/python。Windows激活命令不同。D15要用NumPy、Matplotlib时才安装requirements；本基础工程可用系统Python 3.11+直接运行。",
+          "code": "import sys\nprint('执行的解释器:', sys.executable)\nprint('是否在venv:', sys.prefix != sys.base_prefix)",
+          "output": "路径因机器而异；环境激活后通常第二行是True。",
+          "trace": [
+            "Python从sys取当前环境相关路径。",
+            "虚拟环境的sys.prefix通常不同于sys.base_prefix。",
+            "比较得到布尔值，用来判断自己是否在虚拟环境中。"
+          ],
+          "mistake": "不要把“在项目目录里有.venv文件夹”和“当前shell已经激活.venv”混为一回事。",
+          "exercise": "分别在激活前后运行两行，记录变化并解释。"
+        },
+        {
+          "title": "pip、requirements和包名/模块名",
+          "syntax": "python -m pip install -r requirements.txt",
+          "explain": "pip是包安装工具；requirements.txt用于记录要安装的外部依赖。python -m pip保证用当前python对应的pip执行安装，通常比直接敲pip更不容易装错环境。一个安装包名称可能与import时的模块名称不完全一致；项目开头仍以本课无外部依赖为主。",
+          "code": "import csv\nimport json\nprint('标准库CSV/JSON已可导入')",
+          "output": "标准库CSV/JSON已可导入",
+          "trace": [
+            "import csv和json是导入Python标准库。",
+            "无需pip安装即可正常使用。"
+          ],
+          "mistake": "不能对Python标准库模块一律运行pip install csv；它已经包含在标准库中。",
+          "exercise": "试着import math、csv、json，查官方文档它们分别用于什么。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "01、02：能区别终端命令与Python代码，认识import和点号"
+      ],
+      "chapterSummary": "能在本地正确运行.py；能排查“命令在哪敲、当前目录是什么、解释器是谁、第三方库是否安装”。"
     },
     {
       "id": "types",
       "phase": "基础语法",
       "title": "04 · 变量、类型、动态类型与单位",
-      "minutes": 30,
+      "minutes": 52,
       "goal": "认识int、float、str、bool、None和type，理解类型提示并非自动校验。",
       "story": [
         "变量可以理解为给一个对象起名字。speed_kmh=72.0会把名字speed_kmh绑定到一个浮点数对象，Python一般无需像C那样先写float speed_kmh，但这种灵活性也意味着错误类型可能在运行到某行时才暴露。",
@@ -183,16 +431,76 @@
         "answer": 1,
         "why": "类型注解是给开发者与检查工具看的，不是通用运行时验证机制。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "Python变量并非C式提前分配的固定类型槽",
+          "syntax": "name = value；type(name)",
+          "explain": "在常见Python代码中x=72把名字x绑定到整数对象72。之后写x='radar'也有效，x现在引用字符串对象；这叫动态类型，而不是C里int x一经声明就保持int的语法。推荐工程中仍遵循稳定的字段类型约定，便于调试和类型检查；不要为了灵活就随意混用同一变量名。",
+          "code": "x = 72\nprint(type(x).__name__)\nx = 'radar'\nprint(type(x).__name__)",
+          "output": "int\nstr",
+          "trace": [
+            "首先给x绑定整数72。",
+            "type(x)显示int。",
+            "x重新绑定到字符串'radar'。",
+            "再看类型为str。"
+          ],
+          "mistake": "写speed:float='fast'普通运行时仍可绑定字符串；类型注解并非输入验证。",
+          "exercise": "定义speed_kmh=72.0和name='radar'，逐个打印类型。"
+        },
+        {
+          "title": "int、float、bool、str、None分别表示什么",
+          "syntax": "int=整数；float=浮点；bool=True/False；str=字符串",
+          "explain": "int用于计数、周期号、毫秒整数；float用于车速、距离等带小数的量；bool表示雷达有效/使能；str表示状态名称或文件路径；None表示尚无结果。True与False首字母必须大写，None也大写；'True'仍是字符串而非布尔True。注意bool是int的子类，bool(True)为真而int(True)==1，但不能因此把布尔当作所有数值验证的替代品。",
+          "code": "frame_id = 3\nspeed = 72.5\nvalid = True\nstatus = 'ACTIVE'\nlast_result = None\nfor x in [frame_id,speed,valid,status,last_result]:\n    print(type(x).__name__)",
+          "output": "int\nfloat\nbool\nstr\nNoneType",
+          "trace": [
+            "各变量分别引用不同类型的对象。",
+            "for依次取列表里的5个对象；for的详细语法在后续循环章展开。",
+            "每轮打印对象类型名称。"
+          ],
+          "mistake": "这个例子出现的for是用来浏览类型；当前只需看每个名字与类型对应，循环语法会专章详解。",
+          "exercise": "将True替换为'True'，观察类型改变；将None替换为0，解释意义差异。"
+        },
+        {
+          "title": "类型转换与外部文本：float('72')不是魔法",
+          "syntax": "int('3')、float('72.0')、str(72)、bool('0')",
+          "explain": "CSV是文本，因此'72.5'是字符串，必须经过float解析才成为可参与数值运算的对象。int('3')得到整数3；float('72.5')得到浮点72.5；str(72)得到字符串'72'。需要特别注意bool('0')是True，因为非空字符串按真值规则视为真，并非按字符串里的数字0转换。读取雷达标志时应显式判断raw=='1'，而不是用bool(raw)。",
+          "code": "raw = '0'\nprint(bool(raw))\nprint(raw == '1')\nprint(float('72.5'))",
+          "output": "True\nFalse\n72.5",
+          "trace": [
+            "bool('0')检查非空字符串的真值，得到True。",
+            "raw=='1'是文本相等比较，得到False。",
+            "float('72.5')把文本解析成浮点值。"
+          ],
+          "mistake": "把bool('0')作为雷达valid标志会严重误判；必须按接口协议显式解析。",
+          "exercise": "写parse_flag(raw)，只允许'0'或'1'并返回相应布尔值，其他输入抛出ValueError。"
+        },
+        {
+          "title": "类型提示、单位命名和真实检查的层次",
+          "syntax": "speed_kmh: float = 72.0；math.isfinite(speed_kmh)",
+          "explain": "类型提示写在变量名称后冒号位置，用于沟通设计意图、IDE自动完成和静态类型检查。它不负责校验网络、CSV或传感器数据。速度公里每小时转米每秒需要除3.6，不能只改字段名字；车速上限、距离范围和数值是否为NaN也需要独立检查。在ASW数据接口上，类型、单位、取值范围、时间戳与有效标志是不同维度的约束。",
+          "code": "import math\nspeed_kmh: float = 72.0\nspeed_mps = speed_kmh / 3.6\nvalid = math.isfinite(speed_kmh) and 0 <= speed_kmh <= 250\nprint(speed_mps, valid)",
+          "output": "20.0 True",
+          "trace": [
+            "先定义速度变量并标注类型意图。",
+            "除3.6得到20.0 m/s。",
+            "isfinite与范围比较一起得到True。"
+          ],
+          "mistake": "“类型是float”不代表“值一定有限合法”；NaN和inf同样是float。",
+          "exercise": "为浮点变量加入math.isfinite，并解释为什么除了单位还需要数据质量检查。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02：能区分变量名、下划线、赋值；05运算符章可交叉查"
+      ],
+      "chapterSummary": "能区分名称绑定、运行时类型、类型提示与实际范围校验，并能正确解析速度单位和布尔标志。"
     },
     {
       "id": "operators",
       "phase": "基础语法",
       "title": "05 · 运算符、比较、逻辑和数值边界",
-      "minutes": 30,
+      "minutes": 78,
       "goal": "认识/、//、%、**、==、and/or/not与NaN问题。",
       "story": [
         "Python的/即使两个数都是整数，通常也得到浮点结果；//表示向下取整，不是C中的整数除法在负数上向零截断。%为取余，**为乘方。比较相等用==，赋值用=。",
@@ -220,10 +528,98 @@
         "answer": 0,
         "why": "Python支持链式比较和and逻辑运算。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "加减乘除和取整：一行一行看运算顺序",
+          "syntax": "+ - * / // % **",
+          "explain": "Python + - * /分别是加减乘除；/通常产生浮点商；//是向负无穷方向取整的商（负数时与C整型除法向零截断不同）；%求余；**是乘方。括号改变优先级。汽车单位换算一般保留浮点值，不应把速度结果误用//截断。",
+          "code": "print(7 / 2)\nprint(7 // 2)\nprint(-7 // 2)\nprint(7 % 2)\nprint(2 ** 3)",
+          "output": "3.5\n3\n-4\n1\n8",
+          "trace": [
+            "7/2得到3.5。",
+            "7//2得到3；-7//2向下取整得到-4。",
+            "7%2得到1；2**3得到8。"
+          ],
+          "mistake": "C中的整数/与Python的//对于负数的取整行为不同，不能直接照搬。",
+          "exercise": "预测-7/2、-7//2、-7%2，运行后解释差异。"
+        },
+        {
+          "title": "赋值与累加：=和+=的区别",
+          "syntax": "x = 0；x += 1；x *= 2",
+          "explain": "x=0绑定一个初始值。x+=1大致表示取出当前值、加1、再把结果绑定到x；x*=2大致表示加倍。对int/float等不可变数值，适合这样理解；对list等可变对象，+=可能原地修改，后面会单独分析别名。一个函数里要累计帧数，应先给计数器一个初始值。",
+          "code": "count = 0\ncount += 1\ncount += 1\nprint(count)\ncount *= 2\nprint(count)",
+          "output": "2\n4",
+          "trace": [
+            "count先为0。",
+            "第一次+=1变1；第二次变2。",
+            "打印2。",
+            "*=2变4，再打印4。"
+          ],
+          "mistake": "count +=1之前没有定义count会引发NameError（若该名字尚未绑定）。",
+          "exercise": "写出frame_count=0并模拟5次累计，逐行计算值。"
+        },
+        {
+          "title": "比较表达式返回的是bool",
+          "syntax": "== != > >= < <=",
+          "explain": "比较不会改变被比较对象。a==b是相等；a!=b是不等；> >= < <=比较大小。Python支持0<=distance<=500这样的链式比较，语义相当于同时满足两个条件，但只会按Python规则对中间表达式求值。对浮点结果不能默认所有运算都精确相等，做数值测试可使用math.isclose。",
+          "code": "distance = 34.0\nprint(distance <= 35)\nprint(0 <= distance <= 500)\nprint(distance == 41)",
+          "output": "True\nTrue\nFalse",
+          "trace": [
+            "34<=35成立。",
+            "0<=34以及34<=500都成立。",
+            "34==41不成立。"
+          ],
+          "mistake": "if distance = 35:是语法错误；判断相等应使用==。",
+          "exercise": "自己写车速范围0～250、数据年龄<=100ms的条件。"
+        },
+        {
+          "title": "and / or / not及短路求值",
+          "syntax": "a and b；a or b；not a",
+          "explain": "and要求两边条件成立才使布尔结果为真；or只要一边真即可；not取反。Python会短路：a为假时a and b不再求b，a为真时a or b不再求b。注意and/or本身返回的未必是bool对象（可能返回操作数），在写业务有效性判断时应让条件本身明确是布尔表达式。",
+          "code": "sample = None\nprint(sample is not None and sample > 0)\nvalid = True\nenable = False\nprint(valid and enable)\nprint(valid or enable)",
+          "output": "False\nFalse\nTrue",
+          "trace": [
+            "sample is not None为False，and直接短路，不执行sample>0。",
+            "valid and enable为False。",
+            "valid or enable为True。"
+          ],
+          "mistake": "从C迁移时误写&&、||、!，在Python中分别用and/or/not。",
+          "exercise": "令valid=False、enable=True，预测3个逻辑表达式。"
+        },
+        {
+          "title": "is/in、运算优先级和括号",
+          "syntax": "x is None；v in values；(a and b) or c",
+          "explain": "is用于比较对象身份，常见于is None；in检查元素是否在集合/列表或键是否在字典；not in是相反判断。写复杂条件时先加括号表达意图，避免and优先于or造成意外。例如故障或雷达无效时禁止警告，应先写not sensor_valid或fault_present，再进入业务判断。",
+          "code": "modes = [0, 1, 2]\nmode = 1\nprint(mode in modes)\nprint(mode not in [3, 4])\nvalue = None\nprint(value is None)",
+          "output": "True\nTrue\nTrue",
+          "trace": [
+            "模式1存在于modes中。",
+            "1不属于[3,4]。",
+            "value为None单例，身份判断成立。"
+          ],
+          "mistake": "不能把mode in [0,1]写成mode == 0 or 1；后者在Python里往往意外恒为真。",
+          "exercise": "用in实现mode只允许0/1/2，不允许3。"
+        },
+        {
+          "title": "数值异常：math.isfinite、NaN与除零",
+          "syntax": "math.isfinite(x)；try/except ZeroDivisionError",
+          "explain": "除数为零通常抛ZeroDivisionError；NaN、inf等特殊浮点值不是有效的车辆物理信号。isfinite既排除NaN也排除正负无穷；范围比较与非有限检查一起使用更明确。在C里isfinite来自math.h，Python里通常写math.isfinite，点号表示模块成员访问。",
+          "code": "import math\nvalues = [72.0, float('nan'), float('inf')]\nfor value in values:\n    print(math.isfinite(value))",
+          "output": "True\nFalse\nFalse",
+          "trace": [
+            "依次读取列表中的72、NaN、inf。",
+            "math.isfinite逐一判断。",
+            "只有72是有限数。"
+          ],
+          "mistake": "NaN的比较行为特殊，不要仅凭x<0或x>250两种比较就断言NaN已被拒绝。",
+          "exercise": "创建包含-1、72、nan、inf的速度数据，逐项输出是否有效。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02：符号、赋值、比较；04：变量类型"
+      ],
+      "chapterSummary": "能独立写速度范围和使能逻辑判断，明确/与//、=与==、and/or与短路的区别。"
     },
     {
       "id": "strings",
