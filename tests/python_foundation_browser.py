@@ -19,7 +19,7 @@ def main() -> None:
         issues = []
         page.on("pageerror", lambda error: issues.append(str(error)))
         # 模拟上一版在同一浏览器保存过的笔记：必须能找回来，不能按新章节误挂。
-        page.add_init_script("""() => {
+        page.add_init_script("""(() => {
           const k='asw-python-foundation-v1:'+location.pathname;
           if(!localStorage.getItem(k))localStorage.setItem(k,JSON.stringify({
             schema:1,done:['start'],answers:{},
@@ -27,7 +27,7 @@ def main() -> None:
             annotations:[{id:'legacy-a',chapter:'start',quote:'旧版划线内容',note:'旧版批注'}],
             fileNotes:{},checklist:{},lastChapter:'start'
           }));
-        }""")
+        })();""")
         page.goto(URL, wait_until="networkidle")
         page.locator("#chapterNav button[data-chapter]").first.wait_for()
         page.wait_for_function("document.body.dataset.foundationReady === 'yes'")
