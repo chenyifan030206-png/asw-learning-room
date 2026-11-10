@@ -624,8 +624,8 @@
     {
       "id": "strings",
       "phase": "基础语法",
-      "title": "06 · 字符串、f-string、输入与类型转换",
-      "minutes": 25,
+      "title": "06 · 字符串、引号、索引和格式化：读懂每个字符",
+      "minutes": 84,
       "goal": "知道文本和数值必须区分，掌握格式化、strip、split与显式转换。",
       "story": [
         "日志既有数字也有文本。读取CSV或命令行时，拿到的往往是str。'72' + '3'会得到'723'，而72+3等于75。把外部文本变成数字用float(text)或int(text)，失败时会抛ValueError。",
@@ -653,16 +653,118 @@
         "answer": 1,
         "why": "从文本文件读取的是文本，不保证一定可转换为合法数值。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "字符串是什么：'文本'与数字不是一类数据",
+          "syntax": "'72' / \"72\" / 72",
+          "explain": "引号把文本包起来形成字符串str。'72'表示两个字符'7'、'2'，数值72则是整数，两者不能直接加在一起计算。单引号、双引号在一般文本中都能定义字符串；遇到引号包含时可用不同引号或转义。中文同样可以出现在字符串中，保存.py文件时统一采用UTF-8更方便。",
+          "code": "text = '72'\nnumber = 72\nprint(type(text).__name__)\nprint(type(number).__name__)\nprint(text + '3')\nprint(number + 3)",
+          "output": "str\nint\n723\n75",
+          "trace": [
+            "text引用两个字符组成的字符串。",
+            "number引用整数72。",
+            "字符串相加执行拼接，得到723。",
+            "数值相加得到75。"
+          ],
+          "mistake": "CSV读取获得的字符串不能直接按数值大小比较；例如'9'>'10'是按字符串字典序规则，不是数字9>10。",
+          "exercise": "把'72'与72逐个print和type输出，说明差异。"
+        },
+        {
+          "title": "长度、正向/负向索引和切片",
+          "syntax": "s[0]、s[-1]、s[1:4]",
+          "explain": "字符串是字符序列，可以len(s)获取字符数。s[0]为第一个字符，s[-1]为最后一个；s[1:4]取索引1、2、3，不包括4。字符串不可变，不能s[0]='x'来直接修改，只能创建新字符串。切片完整形式[start:stop:step]，后面列表章也使用同样思想。",
+          "code": "signal = 'radar'\nprint(len(signal))\nprint(signal[0])\nprint(signal[-1])\nprint(signal[1:4])",
+          "output": "5\nr\nr\nada",
+          "trace": [
+            "len('radar')返回5。",
+            "索引0读取第一字符r。",
+            "索引-1读取最后一个r。",
+            "切片1:4读取索引1、2、3。"
+          ],
+          "mistake": "signal[5]越界会抛IndexError，signal[1:99]切片通常只取到结尾不报错，两者不要混淆。",
+          "exercise": "尝试signal[:2]、signal[::2]、signal[::-1]，写出预期并验证。"
+        },
+        {
+          "title": "字符串方法：点号后名字和圆括号",
+          "syntax": "raw.strip()、raw.split(',')、','.join(parts)",
+          "explain": "字符串对象自带许多方法。raw.strip()去除两端空白；split(',')按照逗号分拆，返回字符串列表；','.join(parts)使用逗号作为连接符，把一组字符串拼成一个字符串。这里的点号取方法，()才执行；返回的结果通常是新的对象，原字符串自身不改变。先学会分别运行各步骤，不要一开始就嵌套十层方法调用。",
+          "code": "raw = ' 72.5,34.0 '\nclean = raw.strip()\nparts = clean.split(',')\nprint(clean)\nprint(parts)\nprint('|'.join(parts))",
+          "output": "72.5,34.0\n['72.5', '34.0']\n72.5|34.0",
+          "trace": [
+            "strip返回去掉空格的新字符串。",
+            "split返回两个文本元素组成的列表。",
+            "'|'.join把这两个文本连接成新字符串。"
+          ],
+          "mistake": "写raw.strip而不是raw.strip()不会真正执行去空白。",
+          "exercise": "增加replace('72.5','73.0')，解释是修改旧字符串还是返回新的字符串。"
+        },
+        {
+          "title": "转义字符、反斜线、原始字符串与路径",
+          "syntax": "'a\\nb'、'\\t'、r'C:\\data'",
+          "explain": "反斜线在普通字符串中可引入转义序列。\\n表示换行、\\t表示制表符、\\\\表示一个反斜线。Windows路径若写'C:\\new'可能把\\n解析成换行，因此可用原始字符串r'C:\\new'，或pathlib.Path来处理路径。r前缀不是一个变量名，也不是把字符串转换成原始字节；原始字符串也不能简单以单个反斜线结尾。",
+          "code": "print('a\\nb')\nprint('a\\tb')\nprint(r'C:\\new')",
+          "output": "a\nb\na\\tb\nC:\\new",
+          "trace": [
+            "第一个print中的\\n表示换行，输出占两行。",
+            "第二个print中的\\t表示水平制表符。",
+            "r原始字符串中的反斜线不被作为普通转义序列解析。"
+          ],
+          "mistake": "普通Windows路径中反斜线可能形成未知或已有转义。建议实际文件路径使用pathlib.Path。",
+          "exercise": "自己解释为什么r'C:\\new'与'C:\\new'表示不同内容。"
+        },
+        {
+          "title": "f-string：f前缀、花括号和格式说明",
+          "syntax": "f'{speed:.1f} km/h'",
+          "explain": "f放在引号前表示格式化字符串。花括号{speed}在字符串内部表示“计算表达式并放到这里”；{speed:.1f}中的冒号后为格式规范，.1f是浮点保留一位小数格式，与对象成员访问的点号不是一回事。f'{count:03d}'把整数以至少3位显示并补零。输出中的单位要明确写成普通文本部分。",
+          "code": "speed = 72.56\ncount = 7\nprint(f'speed={speed:.1f} km/h')\nprint(f'frame={count:03d}')",
+          "output": "speed=72.6 km/h\nframe=007",
+          "trace": [
+            "f字符串计算speed值72.56并按小数一位显示为72.6。",
+            "count按3位十进制整数格式补零成007。"
+          ],
+          "mistake": "f'{speed}'不会自动带单位；写出单位是工程日志格式约定，不能依赖浮点变量名。",
+          "exercise": "格式化time_ms=20，显示为'00020 ms'；解释:05d的含义。"
+        },
+        {
+          "title": "input()读入的都是字符串；转换必须明确",
+          "syntax": "raw=input('请输入速度：')",
+          "explain": "input()打印提示并等待用户键盘输入，返回str，即使输入72也只是文本'72'。你必须明确float(raw)，并处理非法值。交互式输入适合初学练习；持续自动处理日志不应每轮都阻塞等待用户输入。没有终端交互时使用input还可能遇到EOFError。",
+          "code": "raw = input('车速km/h：')\nspeed = float(raw)\nprint(f'换算为 {speed / 3.6:.2f} m/s')",
+          "output": "例如输入72后显示“换算为 20.00 m/s”。",
+          "trace": [
+            "input等待用户输入并返回文本。",
+            "float把合法的文本解析为浮点数。",
+            "除3.6并通过f字符串显示两位小数。"
+          ],
+          "mistake": "若输入'abc'，float失败而抛ValueError；不要把这当成正常速度0。",
+          "exercise": "实际输入72、90、abc各一次，保存观察结果。"
+        },
+        {
+          "title": "字符串中的in、比较、编码与CSV解析边界",
+          "syntax": "'rad' in 'radar'；encode('utf-8')",
+          "explain": "in可判断一段文本是否包含在字符串中，如'rad' in 'radar'为True。文本与字节序列不同：str保存Unicode文本，bytes保存字节，.encode('utf-8')将文本编码为字节，.decode('utf-8')可以恢复。CSV是文本格式，但它有引号、转义、逗号等规则，后续不能仅靠split(',')处理所有真实CSV；正式读取应使用标准库csv.DictReader。",
+          "code": "name = 'radar'\nprint('rad' in name)\nraw = '车速'\ndata = raw.encode('utf-8')\nprint(isinstance(data, bytes))\nprint(data.decode('utf-8'))",
+          "output": "True\nTrue\n车速",
+          "trace": [
+            "子字符串'rad'出现在'radar'里。",
+            "encode将Unicode文本编码为UTF-8字节。",
+            "isinstance(data,bytes)为True；decode恢复中文字符串。"
+          ],
+          "mistake": "不要把二进制bytes与文本str混用，也不要随意用str(bytes)当成解码。",
+          "exercise": "把'雷达'保存为bytes后解码，理解为什么文本文件需要明确encoding。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02：引号、点号、圆括号和索引；04：str/float类型"
+      ],
+      "chapterSummary": "会逐步从原始字符串到合法数值，并能解释strip/split、索引、f-string、编码与CSV正式解析的区别。"
     },
     {
       "id": "conditions",
       "phase": "基础语法",
-      "title": "07 · if / elif / else：缩进决定程序边界",
-      "minutes": 30,
+      "title": "07 · if、elif、else：从条件真假到代码块执行",
+      "minutes": 72,
       "goal": "分清条件判断、分支优先级及缩进的意义。",
       "story": [
         "在C里大括号包住代码块；Python用冒号后面的缩进划分。if条件为真就执行对应缩进块，elif尝试其他条件，else处理剩下的情况。通常一层缩进4个空格。",
@@ -690,16 +792,104 @@
         "answer": 1,
         "why": "第一个if命中后，其余elif/else不执行。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "if的最小语法：冒号、缩进与条件",
+          "syntax": "if 条件表达式:\\n    语句",
+          "explain": "if后面是能按Python真值规则判断的条件表达式，后面的冒号表示将进入一个新的缩进代码块。缩进4个空格是惯例；如果条件为True就执行缩进块，否则跳过。if不要求像C那样用小括号包住条件，也不使用大括号包围代码块。条件里最好显式比较，例如if distance <= 35比if distance更清楚。",
+          "code": "distance = 34\nif distance <= 35:\n    print('距离较近')\nprint('检查结束')",
+          "output": "距离较近\n检查结束",
+          "trace": [
+            "distance赋值34。",
+            "判断34<=35得到True。",
+            "执行缩进的一行print；之后退出代码块。",
+            "不缩进的最后一行无论条件如何都执行。"
+          ],
+          "mistake": "把if后冒号遗漏会引发SyntaxError；误缩进会改变控制范围。",
+          "exercise": "将distance改为40，输出应只剩“检查结束”。"
+        },
+        {
+          "title": "if...else二选一与完整的真值",
+          "syntax": "if c:\\n    A\\nelse:\\n    B",
+          "explain": "else表示上一组if条件均未命中时执行另一个分支。两个分支不会在同一次if/else判断里都执行。Python真值规则中0、0.0、空字符串''、空列表[]、None通常是假，非空字符串'0'是真。对于传感器使能，应尽量使用明确布尔字段，而不是让任意文本隐式决定真伪。",
+          "code": "enable = False\nif enable:\n    print('ACTIVE')\nelse:\n    print('OFF')",
+          "output": "OFF",
+          "trace": [
+            "条件enable为False。",
+            "跳过第一个分支。",
+            "执行else中的OFF。"
+          ],
+          "mistake": "if '0'会当作True，因为它是非空文本，不等价于布尔False。",
+          "exercise": "分别使用enable=0、enable='0'和enable=False测试，记录差异。"
+        },
+        {
+          "title": "if/elif/else多分支按顺序匹配",
+          "syntax": "if c1: A\\nelif c2: B\\nelse: C",
+          "explain": "elif是else if的合写，表示第一个条件失败后才试第二个。Python会依次检查直到遇到命中的分支，之后同一条条件链的剩余elif/else不执行。多个条件可以有覆盖关系，先判断非法/故障再判断正常；把正常条件放在最前面可能遮蔽需要优先处理的故障。",
+          "code": "radar_valid = False\nenable = False\nif not radar_valid:\n    state = 'INVALID'\nelif not enable:\n    state = 'OFF'\nelse:\n    state = 'ACTIVE'\nprint(state)",
+          "output": "INVALID",
+          "trace": [
+            "第一个条件not radar_valid为True。",
+            "赋state为INVALID；不再检查enable分支。",
+            "打印INVALID。"
+          ],
+          "mistake": "把elif误写成另一个独立if会让两次条件块都可能执行，甚至覆盖先前故障状态。",
+          "exercise": "交换两个条件的顺序并验证两者都是False时为什么结果改变。"
+        },
+        {
+          "title": "嵌套if和and条件什么时候用",
+          "syntax": "if valid:\\n    if enable: ...",
+          "explain": "if中还可以写if，层级由缩进确定。可以用and把两个条件合并成同一if，但需要清楚什么时候短路，以及各个不通过分支如何报告原因。对于ASW需求追踪，分开写故障/使能/数据年龄检查往往更方便定位具体拒绝理由。",
+          "code": "valid = True\nenable = True\nif valid:\n    if enable:\n        print('允许监视')\n    else:\n        print('未启用')\nelse:\n    print('输入无效')",
+          "output": "允许监视",
+          "trace": [
+            "外层检查valid=True。",
+            "进入外层块后检查enable=True。",
+            "执行内层的允许监视分支。"
+          ],
+          "mistake": "不要在视觉上对齐错误：内层else必须与对应内层if对齐。",
+          "exercise": "用valid=False、enable=True和valid=True、enable=False测试所有分支。"
+        },
+        {
+          "title": "条件里的身份、成员和缺失值",
+          "syntax": "is None、is not None、in、not in",
+          "explain": "对可能缺失的值，应先判断is not None再做数值比较。成员检查in适合判断模式码是否属于允许集合，例如mode in (0,1,2)。逻辑短路可以防止None参与浮点比较；但它不能替代数值范围/NaN检查。",
+          "code": "sample = None\nif sample is not None and sample > 0:\n    print('有效')\nelse:\n    print('无输入')\nmode = 2\nprint(mode in (0, 1, 2))",
+          "output": "无输入\nTrue",
+          "trace": [
+            "sample不是非None，因此and短路。",
+            "进入else报告无输入。",
+            "成员检查2属于tuple中的0/1/2。"
+          ],
+          "mistake": "把sample == None虽然有时有效，但规范上建议is None；不要把is用于普通数字的相等比较。",
+          "exercise": "编写一个带None处理的validate_age(age)，缺失时输出MISSING。"
+        },
+        {
+          "title": "工程化条件顺序：优先拒绝错误再给有效输出",
+          "syntax": "先校验类型/范围/有效性→再计算业务结果",
+          "explain": "当输入已经无效时，不应先算距离提示再去补valid=False。这不仅影响可读性，也可能让错误值穿过代码路径。较易维护的方式是先验证radar_valid和数据年龄，再检查enable，最后再检查距离。每条分支给出明确的状态，让测试用例能一一对应。",
+          "code": "age_ms = 101\nradar_valid = True\nenable = True\nif not radar_valid or age_ms > 100:\n    status = 'INVALID'\nelif not enable:\n    status = 'OFF'\nelse:\n    status = 'ACTIVE'\nprint(status)",
+          "output": "INVALID",
+          "trace": [
+            "radar_valid为True，所以not radar_valid为False。",
+            "age_ms>100为True，or整体为True。",
+            "直接进入INVALID分支，后续不进行业务状态判断。"
+          ],
+          "mistake": "这只是教学规则，不等于真实ACC安全需求或实时安全实现。",
+          "exercise": "把age分别改为100、101、-1，并补充未来时间戳的拒绝规则。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02：冒号和缩进；05：比较与逻辑运算"
+      ],
+      "chapterSummary": "会完整解释if/elif/else的语法、顺序和嵌套关系，并正确区分无效信号、未启用和有效业务判断。"
     },
     {
       "id": "loops",
       "phase": "数据组织",
-      "title": "08 · while、break、continue和列表推导式",
-      "minutes": 25,
+      "title": "08 · 循环基础完整讲：for 与 while、break、continue、嵌套",
+      "minutes": 108,
       "goal": "分清迭代条件、跳过本轮、结束整个循环、创建新列表。",
       "story": [
         "for适合逐项处理已有序列；while适合满足某个条件就重复执行，例如模拟重试最多3次。循环本身不会保证实时周期：在Python里for循环七次不等于每20ms精准运行。",
@@ -727,16 +917,148 @@
         "answer": 1,
         "why": "break退出循环；continue跳过当前迭代的剩余部分。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "为什么需要循环：循环体与重复次数",
+          "syntax": "for 变量 in 可迭代对象:\\n    循环体",
+          "explain": "循环表示对某段代码重复执行。Python有for和while两类：for从一个“可迭代对象”依次取得元素，例如list、str、range；while每次先检查条件是否为真，再决定是否执行循环体。两者都通过冒号和缩进规定循环体的边界。不要把“Python执行循环”误解成真实20ms周期调度，离线模拟仅按顺序执行。",
+          "code": "print('开始')\nfor i in [0, 1, 2]:\n    print('帧', i)\nprint('结束')",
+          "output": "开始\n帧 0\n帧 1\n帧 2\n结束",
+          "trace": [
+            "先打印开始。",
+            "for从列表逐一取出0、1、2，依次绑定到i。",
+            "每拿到一个值，就执行一次缩进的print。",
+            "列表耗尽后，退出循环，打印结束。"
+          ],
+          "mistake": "for循环并非每次启动新的.py程序；只是本程序内重复执行一个代码块。",
+          "exercise": "将列表扩展为[0,1,2,3]，预测输出有几行。"
+        },
+        {
+          "title": "for语法逐词拆解：for、变量、in、冒号",
+          "syntax": "for i in [10,20,30]:",
+          "explain": "for是关键字，表示循环；i是本轮取得元素的变量名，不需要写int；in是循环结构的连接关键字，意思是依次从右侧可迭代对象取得值；[10,20,30]是列表；冒号表示后面开始缩进循环体。for不包含C风格的初始化;条件;递增三段，迭代的结束由右侧对象是否还有元素决定。",
+          "code": "for distance in [45, 34, 41]:\n    print(distance <= 35)",
+          "output": "False\nTrue\nFalse",
+          "trace": [
+            "第一次distance=45，比较45<=35得到False。",
+            "第二次distance=34，得到True。",
+            "第三次distance=41，得到False。",
+            "列表没有下一个值，循环自然结束。"
+          ],
+          "mistake": "Python不写for (int i=0; i<3; i++)，那是C风格语法。",
+          "exercise": "将变量改名d，说明变量名如何影响数据而不改变循环次数。"
+        },
+        {
+          "title": "while逐词拆解：条件在哪里更新",
+          "syntax": "while 条件表达式:\\n    循环体",
+          "explain": "while每轮开始前重新判断条件；条件为True时执行缩进块，结束后返回顶部再次检查，条件为False时退出。典型用途包括明确的重试上限、尚未获得结束信号的状态循环。计数器应在循环体内正确更新，否则可能进入无限循环。与for不同，while不直接从列表取一个新元素。",
+          "code": "i = 0\nwhile i < 3:\n    print('帧', i)\n    i += 1\nprint('结束', i)",
+          "output": "帧 0\n帧 1\n帧 2\n结束 3",
+          "trace": [
+            "首先i=0。",
+            "0<3为True，打印帧0，i增加为1。",
+            "1<3和2<3仍为True，分别打印，递增。",
+            "当i=3时条件False，退出循环打印结束3。"
+          ],
+          "mistake": "把i+=1删掉会无限打印帧0，须用Ctrl+C终止。",
+          "exercise": "将while i<3改成while i<=3，预测多执行几轮。"
+        },
+        {
+          "title": "相同任务分别用for和while写出",
+          "syntax": "for i in range(3) ≈ i=0; while i<3: ...",
+          "explain": "同一个“输出3次”的需求，for用range(3)自动提供0、1、2；while需自己初始化i、检查条件、递增i。for更适合已知范围或逐帧列表，while更适合条件式等待/重试。这里range(3)的结束点不包含3，下一章单独解释三种参数形式。",
+          "code": "for i in range(3):\n    print('for', i)\ni = 0\nwhile i < 3:\n    print('while', i)\n    i += 1",
+          "output": "for 0\nfor 1\nfor 2\nwhile 0\nwhile 1\nwhile 2",
+          "trace": [
+            "第一条for从range依次获取0、1、2。",
+            "while从i=0开始，每轮执行后显式i+=1。",
+            "两种写法都执行3次，但循环控制机制不同。"
+          ],
+          "mistake": "不要用while模仿真实任务周期，循环体没有时间控制，不会保证20ms。",
+          "exercise": "用两种循环计算0+1+2+3+4，验证结果一致。"
+        },
+        {
+          "title": "range不是变量也不是神秘函数：从0到stop前",
+          "syntax": "range(stop)、range(start,stop)、range(start,stop,step)",
+          "explain": "range(3)产生0、1、2供for依次访问；range(1,4)产生1、2、3；range(0,6,2)产生0、2、4，末端stop永远不包含。range对象不是完整的列表，想看所有数可list(range(...))；Python语法for只要求右边可迭代，并不强制使用range。下一章会详讲步长、负数和zero step异常。",
+          "code": "print(list(range(3)))\nprint(list(range(1, 4)))\nprint(list(range(0, 6, 2)))",
+          "output": "[0, 1, 2]\n[1, 2, 3]\n[0, 2, 4]",
+          "trace": [
+            "range(3)从0开始，到3前停止。",
+            "range(1,4)从1开始，到4前停止。",
+            "第三种每轮步进2，在6前停止。"
+          ],
+          "mistake": "range(1,4)并不包含4；不要把range误以为一组“同时执行”的函数调用。",
+          "exercise": "预测range(2,10,3)和range(5,0,-2)，再运行验证。"
+        },
+        {
+          "title": "break与continue：终止循环和跳过本轮",
+          "syntax": "break；continue",
+          "explain": "break会立即退出最近的一层for/while循环；continue会跳过本轮循环体剩余的语句，开始下一轮。两者都不表示结束整个函数：循环之后仍可能执行其他语句。处理日志时，如果某条数据必须判定为非法，不应因为continue方便就无声丢弃它，除非需求明确允许过滤。",
+          "code": "for i in range(5):\n    if i == 1:\n        continue\n    if i == 4:\n        break\n    print(i)\nprint('循环外')",
+          "output": "0\n2\n3\n循环外",
+          "trace": [
+            "i=0打印0。",
+            "i=1命中continue，不执行下面print。",
+            "i=2、3正常打印。",
+            "i=4命中break，退出for，再打印循环外。"
+          ],
+          "mistake": "break只退出所在的最内层循环；continue也只作用于当前循环。",
+          "exercise": "把break条件改成i==3，重新预测输出。"
+        },
+        {
+          "title": "嵌套循环：外层一轮包含内层多轮",
+          "syntax": "for i in range(2):\\n    for j in range(3):",
+          "explain": "循环体里面还能有另一个循环。外层i每取一个值，就会完整执行内层j的所有轮次；只有内层结束，外层才能取得下一个i。对于D12的二维场景数据，可以把i理解为场景编号，j理解为该场景里的帧编号。总组合数是外层2乘内层3等于6；如果内层break，只退出内层。",
+          "code": "for scenario in range(2):\n    for frame in range(3):\n        print(scenario, frame)",
+          "output": "0 0\n0 1\n0 2\n1 0\n1 1\n1 2",
+          "trace": [
+            "scenario=0时，内层frame依次为0、1、2。",
+            "内层完成后，scenario=1并重新执行frame=0、1、2。"
+          ],
+          "mistake": "不要把内层for缩进到外层之外，否则只会在外层结束后执行一次内层。",
+          "exercise": "把场景数改为3、每场景4帧，先列出前后几条组合。"
+        },
+        {
+          "title": "for/while上的else：为何和if的else不同",
+          "syntax": "for ...:\\n    ...\\nelse:\\n    ...",
+          "explain": "Python允许在循环后写else：循环正常耗尽（for）或条件变False（while）时运行else；若被break提前退出，循环else不会执行。初学时它容易与if/else混淆，因此应先理解break和正常结束的区别。查找数据的代码中可用循环else表示“遍历完整列表仍未找到”。",
+          "code": "distances = [45, 42, 40]\nfor d in distances:\n    if d <= 35:\n        print('发现近距离')\n        break\nelse:\n    print('都没有触发')",
+          "output": "都没有触发",
+          "trace": [
+            "依次检查45、42、40，均不满足<=35。",
+            "没有执行break，for自然耗尽。",
+            "执行for对应的else。"
+          ],
+          "mistake": "循环else并非“if条件为假时执行”，而是“循环没有被break打断时执行”。",
+          "exercise": "改为[45,34,40]并预测输出。"
+        },
+        {
+          "title": "循环变量与计数器的作用域/陷阱",
+          "syntax": "for i in ...；total += x",
+          "explain": "Python的for不会自动建立新的块级变量作用域，在函数内部，循环结束后i通常仍可访问其最后一次绑定值。for空序列时变量可能从未被赋值。因此不要依赖循环外的最后一个索引，最好显式初始化结果变量。累计总和常写total=0，在for里total+=d，退出循环再打印total；print若缩进在for里，则每轮打印中间值。",
+          "code": "values = [1, 2, 3]\ntotal = 0\nfor v in values:\n    total += v\nprint(total)",
+          "output": "6",
+          "trace": [
+            "total先初始化0。",
+            "逐轮加1、2、3，变为1、3、6。",
+            "最后的print不缩进，在整个循环结束后只执行一次。"
+          ],
+          "mistake": "不要在for循环内部每次重新写total=0，否则只留下最后一帧的贡献。",
+          "exercise": "把print(total)缩进到for中，解释输出从一行变成三行。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02：冒号和缩进；05：比较逻辑；07：if条件"
+      ],
+      "chapterSummary": "能逐词解释for与while并手动模拟迭代顺序；会区分break、continue、循环else和嵌套缩进。"
     },
     {
       "id": "iteration-tools",
       "phase": "循环进阶",
-      "title": "09 · range / enumerate / zip：它们究竟返回什么，for又怎样读取",
-      "minutes": 40,
+      "title": "09 · range、enumerate、zip：循环索引与多信号配对",
+      "minutes": 96,
       "goal": "已会for/while后，再读懂range、enumerate、zip、索引与元素双变量循环以及嵌套循环。",
       "story": [
         "本章先掌握语言符号和基本执行过程，再看汽车数据示例。每一个新写法在下面的详解中拆成独立的语法部件。",
@@ -762,16 +1084,131 @@
         "answer": 1,
         "why": "先掌握最小语法单位，才能准确阅读组合表达式和工程调用。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "range三种调用形式，start/stop/step分清",
+          "syntax": "range(stop) / range(start,stop) / range(start,stop,step)",
+          "explain": "range(5)是0到4；range(2,5)是2到4；range(2,9,3)是2、5、8。start是起点，stop是**不包含的终点**，step是每次增加的步长；默认start=0、step=1。range不直接返回list，而是返回一个支持迭代的range对象，通常供for使用。",
+          "code": "print(list(range(4)))\nprint(list(range(2, 5)))\nprint(list(range(2, 9, 3)))",
+          "output": "[0, 1, 2, 3]\n[2, 3, 4]\n[2, 5, 8]",
+          "trace": [
+            "第一种生成0、1、2、3。",
+            "第二种从2开始，5之前停止。",
+            "第三种按步长3从2走到8。"
+          ],
+          "mistake": "range(1,1)是空序列；range(...,0)会报ValueError，因为步长不能为0。",
+          "exercise": "预测list(range(5,0,-2))与list(range(4,0))。"
+        },
+        {
+          "title": "从列表本身迭代：for value in values",
+          "syntax": "for value in values:",
+          "explain": "不需要索引时，for直接从列表取得每个值，比先range(len(values))再values[i]简单。Python for不是C式计数循环，而是不断从可迭代对象取得元素。values中的元素类型决定value得到什么；例如列表里是Frame实例，value就是Frame对象。",
+          "code": "speeds = [72, 73, 74]\nfor speed in speeds:\n    print(speed / 3.6)",
+          "output": "20.0\n20.27777777777778\n20.555555555555554",
+          "trace": [
+            "speed先绑定72，再绑定73，最后74。",
+            "每轮进行单位换算并打印。"
+          ],
+          "mistake": "如果不需要下标，不要为了使用range而人为创建索引；直接for元素更易读。",
+          "exercise": "写for distance in [40,34,45]：打印distance是否小于等于35。"
+        },
+        {
+          "title": "enumerate逐词拆解：把索引和元素一起取出",
+          "syntax": "for i, value in enumerate(values):",
+          "explain": "enumerate(values)创建枚举迭代器，每轮给出一个**二元组(index, value)**；前面的i,value是元组解包：i接收下标，value接收元素。不是for自己会生成两个值，而是enumerate负责构造它们；例如values=[45,34]，每轮分别得到(0,45)、(1,34)。当你要打印“第几帧、这一帧数据”时才需要enumerate。",
+          "code": "distances = [45, 34, 42]\nfor index, distance in enumerate(distances):\n    print('第', index, '帧距离', distance)",
+          "output": "第 0 帧距离 45\n第 1 帧距离 34\n第 2 帧距离 42",
+          "trace": [
+            "第1轮enumerate产生元组(0,45)，解包到index=0、distance=45。",
+            "第2轮产生(1,34)。",
+            "第3轮产生(2,42)。",
+            "序列耗尽后结束。"
+          ],
+          "mistake": "不能把enumerate理解成“生成数列”；它是在现有序列上附加索引；把for item in enumerate(...)时item会是二元组。",
+          "exercise": "把循环写成for pair in enumerate(distances): print(pair)，比较输出。"
+        },
+        {
+          "title": "enumerate(..., start=1)：显示编号与真实数组下标",
+          "syntax": "enumerate(items,start=1)",
+          "explain": "enumerate的start参数控制产生的编号从几开始，常用于给用户展示1、2、3；它**不会修改列表的真实索引**。如果你同时用生成的编号访问values[编号]，start=1时可能错位甚至越界。ASW日志的帧数组本身通常仍按下标0开始，UI想从1开始展示就用enumerate(...,start=1)并只把编号作为展示。",
+          "code": "values = [45, 34]\nfor number, distance in enumerate(values, start=1):\n    print(number, distance)\nprint(values[0])",
+          "output": "1 45\n2 34\n45",
+          "trace": [
+            "enumerate先生成(1,45)与(2,34)。",
+            "values真正第一个元素仍是下标0、值45。"
+          ],
+          "mistake": "不能因为number=1就推断distance来自values[1]；start只改变编号起点。",
+          "exercise": "同一列表分别用start=0和start=1输出，解释显示编号和数组下标的关系。"
+        },
+        {
+          "title": "zip：两组信号按位置配对",
+          "syntax": "for speed, distance in zip(speeds, distances):",
+          "explain": "zip接受两个或多个可迭代对象，每轮从各组各取一个元素，打包成元组，然后由for进行解包。它适合已确认一一对应的速度与距离演示数据。默认zip在最短序列结束时停止，长度不相等的尾部会被忽略；数据质量要求严格时应先检查长度，或在支持的版本中使用zip(...,strict=True)来拒绝长度不一致。位置相同不代表时间戳一致，ASW还需要周期号/时间戳校验。",
+          "code": "speeds = [72, 73, 74]\ndistances = [45, 34, 40]\nfor speed, distance in zip(speeds, distances):\n    print(speed, distance)",
+          "output": "72 45\n73 34\n74 40",
+          "trace": [
+            "zip第一次给出(72,45)。",
+            "第二次给出(73,34)，第三次(74,40)。",
+            "for对每一个元组解包到两个变量。"
+          ],
+          "mistake": "zip并不会根据时间戳自动匹配信号；它只按迭代顺序配对。",
+          "exercise": "将distances缩短为两个值，观察默认zip只输出2行。"
+        },
+        {
+          "title": "zip(strict=True)：长度不一致怎么发现",
+          "syntax": "zip(speeds, distances, strict=True)",
+          "explain": "Python 3.10+的strict=True要求所有传入序列长度一致，否则遍历过程中抛ValueError。它适合必须完全对齐长度的数据组合，但仍不能检查物理采样周期是否一致。例如同为3帧、速度和距离对应的cycle不同，zip仍会按位置配对，必须有后续校验。",
+          "code": "speeds = [72, 73]\ndistances = [45]\ntry:\n    print(list(zip(speeds, distances, strict=True)))\nexcept ValueError:\n    print('两组数据长度不匹配')",
+          "output": "两组数据长度不匹配",
+          "trace": [
+            "第一次迭代可能形成合法配对。",
+            "继续获取下一项时发现distance已耗尽而speed还有值。",
+            "抛ValueError，except捕获并报告。"
+          ],
+          "mistake": "strict=True只能检查长度相等，不能证明时间戳/周期相等。",
+          "exercise": "写出两个长度相同但周期号不同的数组，解释为什么还需检查cycle。"
+        },
+        {
+          "title": "同时需要索引和两个信号：enumerate(zip(...))",
+          "syntax": "for i, (speed, distance) in enumerate(zip(a,b)):",
+          "explain": "组合写法可以从里到外拆：zip(a,b)逐次生成(speed,distance)元组；enumerate(...)再给每个元组加索引，形成(i,(speed,distance))；for左边的i,(speed,distance)是嵌套解包。它不是一条新的语法魔法，只是两个已知函数和元组解包的组合。初学时可以先拆成两层变量再简写。",
+          "code": "speeds = [72, 73]\ndistances = [45, 34]\nfor i, (speed, distance) in enumerate(zip(speeds, distances)):\n    print(i, speed, distance)",
+          "output": "0 72 45\n1 73 34",
+          "trace": [
+            "zip先给出(72,45)。",
+            "enumerate加上编号0，形成(0,(72,45))。",
+            "for左边i接收0，括号里的两个变量接收72、45。",
+            "第二轮分别为1、73、34。"
+          ],
+          "mistake": "不要在尚未懂tuple解包时背这个组合式；读不懂就先写for pair in zip(...),再逐项取。",
+          "exercise": "先用两层普通变量改写这段程序，验证结果相同。"
+        },
+        {
+          "title": "itertools与迭代器：知道“惰性取得数据”的概念",
+          "syntax": "iter(values) / next(iterator)",
+          "explain": "range、enumerate、zip返回的是可迭代/迭代相关对象，并不要求先构造全部输出列表。iter(values)创建迭代器，next(it)取下一个值，没有下一个值会引发StopIteration；for在内部按照迭代协议取得元素并在耗尽时停止。初学阶段不必自己实现__iter__/__next__，理解for背后的“逐次取值”就足够了。",
+          "code": "values = [45, 34]\nit = iter(values)\nprint(next(it))\nprint(next(it))",
+          "output": "45\n34",
+          "trace": [
+            "iter创建指向列表遍历过程的迭代器。",
+            "第一次next返回45；第二次返回34。",
+            "再调用next将因耗尽而抛StopIteration。"
+          ],
+          "mistake": "不要把iterator当成能够无限重复读取的列表；多数迭代器一旦消耗就会向后前进。",
+          "exercise": "把第三次next放到try/except StopIteration中，打印“遍历结束”。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "08：for与while全章；10：列表章节可来回参考"
+      ],
+      "chapterSummary": "能逐层手工展开range、enumerate、zip和enumerate(zip(...))，区分索引、显示序号、二元组解包与真实时间戳对应关系。"
     },
     {
       "id": "lists",
       "phase": "数据组织",
-      "title": "10 · list列表、索引、切片和for循环",
-      "minutes": 35,
+      "title": "10 · 列表list：创建、读写、切片、方法与多帧结构",
+      "minutes": 84,
       "goal": "把多帧日志变成数据序列，理解0下标和遍历。",
       "story": [
         "在C中你学过固定数组STEPS[5][3]。Python的list是可变化长度的有序序列，索引从0开始，可append追加。列表元素可以是数字，也可以是Frame实例。列表可以包含不同类型，但工程中的同一信号列表通常保持一致类型。",
@@ -799,10 +1236,110 @@
         "answer": 1,
         "why": "从索引1开始，到索引3之前结束。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "list是什么：保存一组有序元素",
+          "syntax": "values = [45, 34, 42]",
+          "explain": "方括号创建列表，元素按顺序排列并可以重复。与C固定大小数组不同，list长度可动态变化；它可以保存不同类型，但同一工程字段列表最好保持类型一致。列表名字如distances用复数更易理解。len(values)得到元素数，而不是最后一个索引。",
+          "code": "distances = [45, 34, 42]\nprint(len(distances))\nprint(distances)",
+          "output": "3\n[45, 34, 42]",
+          "trace": [
+            "[]包住3个逗号分隔的元素。",
+            "len返回元素个数3。"
+          ],
+          "mistake": "list的长度3，有效正向索引是0、1、2，不存在distances[3]。",
+          "exercise": "创建5帧速度列表，写出长度和第一帧。"
+        },
+        {
+          "title": "正向/负向索引与IndexError",
+          "syntax": "a[0]、a[2]、a[-1]",
+          "explain": "索引0开始，a[-1]表示最后一项，a[-2]表示倒数第二项；负数索引不是“负的元素值”。当索引超出有效范围时会抛IndexError，不是返回None。读取一帧前先确认列表长度或通过for直接迭代。",
+          "code": "a = [45, 34, 42]\nprint(a[0])\nprint(a[-1])\nprint(a[-2])",
+          "output": "45\n42\n34",
+          "trace": [
+            "0指向第一项45。",
+            "-1从末尾数第一项42。",
+            "-2从末尾数第二项34。"
+          ],
+          "mistake": "a[3]越界；a[-4]也越界。",
+          "exercise": "用try/except IndexError读取a[99]并输出“下标非法”。"
+        },
+        {
+          "title": "切片是新序列的一段：start、stop、step",
+          "syntax": "a[start:stop:step]",
+          "explain": "a[1:3]从索引1开始，取到3之前的元素；a[:2]省略起点，a[2:]省略终点；a[::2]每隔2个索引取一个；a[::-1]倒序得到一个新的列表。切片与单元素索引不同：单元素返回对象，切片返回list。列表切片通常创建新列表（浅拷贝），但内部如果包含可变对象并不是深复制。",
+          "code": "a = [10, 20, 30, 40, 50]\nprint(a[1:4])\nprint(a[:2])\nprint(a[::2])\nprint(a[::-1])",
+          "output": "[20, 30, 40]\n[10, 20]\n[10, 30, 50]\n[50, 40, 30, 20, 10]",
+          "trace": [
+            "1:4取下标1、2、3。",
+            "省略起点意味着从开头取。",
+            "::2为步长2；::-1反转遍历。"
+          ],
+          "mistake": "a[2]是一个元素30，a[2:3]是只包含30的列表[30]。",
+          "exercise": "预测a[-3:-1]、a[4:1:-1]并运行。"
+        },
+        {
+          "title": "append、extend、insert：添加内容的方式",
+          "syntax": "a.append(x)、a.extend(xs)、a.insert(i,x)",
+          "explain": "append把一个对象作为一项追加；extend把一个可迭代对象中的元素逐个追加；insert(i,x)在指定位置前插入x。append([3,4])会追加一个内层列表，extend([3,4])追加两个数值。操作通常原地修改现有列表，返回值是None，不能写a = a.append(3)。",
+          "code": "a = [1, 2]\na.append(3)\nprint(a)\na.extend([4, 5])\nprint(a)\na.insert(0, 0)\nprint(a)",
+          "output": "[1, 2, 3]\n[1, 2, 3, 4, 5]\n[0, 1, 2, 3, 4, 5]",
+          "trace": [
+            "append追加3。",
+            "extend追加4与5。",
+            "insert在索引0前插入0，原有项右移。"
+          ],
+          "mistake": "a.append(3)本身返回None；把a绑定到这个返回值会丢掉列表引用。",
+          "exercise": "分别尝试append([3,4])与extend([3,4])，说明len为何不同。"
+        },
+        {
+          "title": "remove、pop、del与排序、查找",
+          "syntax": "a.remove(x)、a.pop(i)、del a[i]、sorted(a)",
+          "explain": "remove按值删除**第一次出现**的项；pop按索引删除并返回被删除项（不传索引默认末尾）；del可以删除指定位置或切片；sort()原地排序，而sorted(a)返回新的排序列表。index(x)找到首次出现位置，不存在时抛ValueError；count(x)统计出现次数。对于有序时间日志，不应未经说明就排序原始帧顺序。",
+          "code": "a = [3, 1, 2, 1]\nprint(a.count(1))\nprint(a.pop())\nprint(sorted(a))\nprint(a)",
+          "output": "2\n1\n[1, 2, 3]\n[3, 1, 2]",
+          "trace": [
+            "count找到2个1。",
+            "pop删除末尾1并把其值返回。",
+            "sorted创建新排好序的列表。",
+            "a仍保持剩余原始顺序。"
+          ],
+          "mistake": "a.sort()返回None；a= a.sort()会令a失去列表值。",
+          "exercise": "创建包含重复距离值的列表，使用count、index、sorted逐项验证。"
+        },
+        {
+          "title": "二维嵌套列表：场景和帧不是魔法",
+          "syntax": "scenarios[scenario][frame]",
+          "explain": "一个列表的元素还可以是列表。scenarios[0]取得第一个内层列表，对应一个场景；scenarios[0][1]先取场景0再取这个场景的帧1。与C的STEPS[5][3]看起来很像，但Python的各内层列表长度可以不同。不要用[[0]*3]*5制作彼此独立的二维可变列表，它会重复引用同一个内层列表，修改一行可能影响所有行。",
+          "code": "scenarios = [[45, 34, 42], [50, 40, 30]]\nprint(scenarios[0])\nprint(scenarios[1][2])",
+          "output": "[45, 34, 42]\n30",
+          "trace": [
+            "scenarios[0]取第一内层列表。",
+            "scenarios[1]取第二内层列表，再[2]得到30。"
+          ],
+          "mistake": "[[0]*3]*5包含多个相同内层列表的引用，独立矩阵可写[[0]*3 for _ in range(5)]。",
+          "exercise": "构造3个场景×4帧的二维列表，输出第二场景第三帧。"
+        },
+        {
+          "title": "可变对象与别名：b=a不复制内容",
+          "syntax": "b = a；b = a.copy()",
+          "explain": "list是可变对象。b=a让两个名字引用同一个列表，b.append会影响通过a看到的内容；b=a.copy()创建一个新的外层列表（浅复制）。函数参数传递列表时同样要考虑是否原地修改；Python并不是C式按值复制整个数组。带嵌套结构的真正独立复制需根据情况使用copy.deepcopy。",
+          "code": "a = [1, 2]\nb = a\nb.append(3)\nprint(a)\nc = a.copy()\nc.append(4)\nprint(a)\nprint(c)",
+          "output": "[1, 2, 3]\n[1, 2, 3]\n[1, 2, 3, 4]",
+          "trace": [
+            "b与a共享同一list，所以b追加3后a也有3。",
+            "a.copy创建新外层list。",
+            "c追加4不修改a。"
+          ],
+          "mistake": "a.copy()是浅拷贝，不保证嵌套元素都独立。",
+          "exercise": "打印id(a)、id(b)、id(c)，解释对象身份差异。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02：方括号/逗号；08–09：for、range与索引"
+      ],
+      "chapterSummary": "会创建/遍历/修改列表，理解索引切片、原地方法、二维列表和引用共享；为后面的NumPy二维数组奠定基础。"
     },
     {
       "id": "dict-tuple-set",
