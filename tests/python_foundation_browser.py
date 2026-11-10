@@ -34,7 +34,7 @@ def main() -> None:
 
         # 23章和144项语法内容真实渲染，旧笔记只读视图继续可用。
         assert page.locator("#chapterNav button[data-chapter]").count() == 23
-        assert "01｜Python如何运行" in page.locator("#chapterPanel").inner_text()
+        assert "01｜Python到底如何运行" in page.locator("#chapterPanel").inner_text()
         assert page.locator("#chapterPanel .syntaxDetail").count() >= 4
         page.get_by_role("button",name="旧版笔记与批注（保留）").click()
         assert "旧版入口章节学习笔记" in page.locator("#legacyPanel").inner_text()
