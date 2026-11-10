@@ -126,19 +126,21 @@ function renderDetailedKnowledge(card,chapter){
     const signature=node('pre',item.grammar,'syntaxSignature');
     section.append(node('p','基本语法写法：','topicSmallTitle'),signature);
     paragraph(section,item.explanation,'detailedExplain');
-    const label=node('h5','逐项拆解：每个符号在这里负责什么');
-    section.append(label);
-    const table=node('table'),thead=node('thead'),head=node('tr');
-    head.append(node('th','代码符号 / 写法'),node('th','实际含义'));
-    thead.append(head);table.append(thead);
-    const tbody=node('tbody');
-    for(const part of item.parts||[]){
-      const row=node('tr'),name=node('td'),meaning=node('td');
-      name.append(node('code',part[0]));meaning.append(quoteMarks(part[1]));
-      row.append(name,meaning);tbody.append(row);
+    if((item.parts||[]).length){
+      const label=node('h5','逐项拆解：各符号或写法在这里的作用');
+      section.append(label);
+      const table=node('table'),thead=node('thead'),head=node('tr');
+      head.append(node('th','代码符号 / 写法'),node('th','实际含义'));
+      thead.append(head);table.append(thead);
+      const tbody=node('tbody');
+      for(const part of item.parts){
+        const row=node('tr'),name=node('td'),meaning=node('td');
+        name.append(node('code',part[0]));meaning.append(quoteMarks(part[1]));
+        row.append(name,meaning);tbody.append(row);
+      }
+      table.append(tbody);
+      const wrap=node('div',undefined,'syntaxTable');wrap.append(table);section.append(wrap);
     }
-    table.append(tbody);
-    const wrap=node('div',undefined,'syntaxTable');wrap.append(table);section.append(wrap);
     const top=node('div',undefined,'codeTop');
     top.append(node('span','完整小例子：先预测输出，再复制到本地Python运行'));
     const copy=node('button','复制本例');
@@ -165,7 +167,7 @@ function renderChapterNav(filter=''){
   $('chapterNav').replaceChildren();
   const term=filter.trim().toLowerCase();
   for(const chapter of book.chapters){
-    if(term && !(chapter.title+' '+chapter.phase+' '+chapter.goal).toLowerCase().includes(term))continue;
+    if(term && !(chapter.title+' '+chapter.phase+' '+chapter.goal+' '+(chapter.details||[]).map(x=>x.name+' '+x.grammar).join(' ')).toLowerCase().includes(term))continue;
     const b=node('button',chapter.title);
     b.type='button';b.dataset.chapter=chapter.id;
     b.onclick=()=>openChapter(chapter.id);
@@ -521,11 +523,11 @@ $('importNotes').onchange=async()=>{
 };
 async function init(){
   try{
-    const response=await fetch('./python-foundation-v2-content.json?v=20261110-v2',{cache:'no-store'});
+    const response=await fetch('./python-foundation-v3-content.json?v=20261110-v3',{cache:'no-store'});
     if(!response.ok)throw Error('教程教材数据未能加载');
     book=await response.json();
-    if(book.chapters.length!==21||book.chapters.reduce((n,x)=>n+(x.details?.length||0),0)<100)throw Error('新版教材内容不完整');
-    $('heroIntro').textContent='新版21章、102个逐项拆解的语法点：先认_ . () [] :等符号；将for/while/range/enumerate集中讲透；再由数字、字符串、列表逐步走向函数、模块与ASW工程。完整示例、逐行追踪、错误分析、个人笔记和ZIP一并保留。';
+    if(book.chapters.length!==23||book.chapters.reduce((n,x)=>n+(x.details?.length||0),0)!==144)throw Error('新版23章144节教材内容不完整');
+    $('heroIntro').textContent='新版23章、144个逐项详解语法点：从_ . () [] :等标点开始；for与while放在同一章，随后单独讲range、enumerate与zip，再从列表、函数、返回值、对象、模块深入完整ASW工程。每节有代码、执行链、预期输出、错误提示和修改练习；旧笔记与ZIP保留。';
     for(const t of book.principles)$('principles').append(node('p',t));
     for(const item of book.schedule){
       const card=node('div',undefined,'scheduleCard');

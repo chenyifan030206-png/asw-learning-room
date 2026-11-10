@@ -8,6 +8,8 @@ on:
       - 'python-foundation.js'
       - 'python-foundation-content.json'
       - 'python-foundation-v2-content.json'
+      - 'python-foundation-v3-content.json'
+      - 'tests/python_foundation_v3_examples.py'
       - 'tests/python_foundation_v2_examples.py'
       - 'python-foundation-project/**'
       - 'tests/python_foundation_browser.py'
@@ -22,6 +24,8 @@ on:
       - 'python-foundation.js'
       - 'python-foundation-content.json'
       - 'python-foundation-v2-content.json'
+      - 'python-foundation-v3-content.json'
+      - 'tests/python_foundation_v3_examples.py'
       - 'tests/python_foundation_v2_examples.py'
       - 'python-foundation-project/**'
       - 'tests/python_foundation_browser.py'
@@ -85,6 +89,22 @@ jobs:
           PY
           python tests/python_foundation_v2_examples.py
 
+      - name: Verify new 23-chapter 144-topic V3 and execute code examples
+        run: |
+          python tests/python_foundation_v3_examples.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('python-foundation-v3-content.json').read_text(encoding='utf-8'))
+          assert len(j['chapters'])==23
+          assert sum(len(x['details']) for x in j['chapters'])==144
+          assert len(j['syntaxAtlas'])>=26
+          assert len(j['resources'])>=14
+          assert len([x for x in j['chapters'] if x['id'].startswith('v2_')])==21
+          assert j['chapters'][7]['id']=='v2_08'
+          assert j['chapters'][8]['id']=='v3_iteration_tools'
+          print('PASS: preserved all 21 V2 note IDs; 23 deep chapters and 144 topics')
+          PY
       - name: Check JavaScript syntax and existing D15 runtime remains intact
         run: |
           node --check python-foundation.js

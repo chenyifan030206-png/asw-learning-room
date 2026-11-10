@@ -39,3 +39,7 @@ D15原计划为CSV日志读取、NumPy shape/标量/向量，输出速度（km/h
 依据学员反馈重排独立先修：先运行环境、字母/标点（`_`、`.`、`()`、`[]`、`{}`、`:`、`=`/`==`、缩进），再变量、数值、字符串、if。将 `for`、`while`、`range`、`enumerate`、`zip`、`break`、`continue`、嵌套循环与loop-else集中在第08章逐项说明，再学习列表、字典、函数、模块、类、CSV、异常、测试和ASW工程。新版教材`python-foundation-v2-content.json`包含21章/102组具备语法结构、逐符号说明、完整小代码、执行追踪、预期输出、常见错误和修改任务的知识点。旧版内容`python-foundation-content.json`原样留存。新版章节标识`v2_*`，旧版笔记与批注通过专用只读面板查阅，不覆盖个人浏览器记录，更不修改既有D15的课程记录/私有同步。
 
 资源比较和调整依据见`docs/python-foundation/RESOURCE_AUDIT_AND_TEACHING_DESIGN.md`。CI使用真实Python执行新教程的小示例、验证输出，并保留完整工程及真实浏览器回归。
+
+## Python导学 V3（2026-11-10）
+
+在已发布的 V2（21章、102节、旧笔记迁移）基础上整合更细致的语法讲解，新增独立迭代工具和列表推导式章节，合计 **23章、144个小节**。保持既有 v2_01–v2_21 章节ID、页面本地笔记键及旧版只读笔记查看面板，防止先前批注错位。新教材文件为 python-foundation-v3-content.json，原V1/V2教材原样保留。内容从标点、变量、if、for与while同章、range/enumerate/zip、列表、函数参数与返回、模块调用到CSV、异常、测试及ASW综合工程；每个知识点有语法形式、详细解释、独立代码、执行过程、预期结果、常见错误和动手修改。原D15、原D16规划及私人学习记录不变。本次审查依据详见 docs/python-foundation/PYTHON_V3_SYLLABUS_AUDIT.md。
