@@ -9,6 +9,8 @@ on:
       - 'python-foundation-content.json'
       - 'python-foundation-v2-content.json'
       - 'python-foundation-v3-content.json'
+      - 'python-foundation-v4-content.json'
+      - 'tests/python_foundation_v4_examples.py'
       - 'tests/python_foundation_v3_examples.py'
       - 'tests/python_foundation_v2_examples.py'
       - 'python-foundation-project/**'
@@ -25,6 +27,8 @@ on:
       - 'python-foundation-content.json'
       - 'python-foundation-v2-content.json'
       - 'python-foundation-v3-content.json'
+      - 'python-foundation-v4-content.json'
+      - 'tests/python_foundation_v4_examples.py'
       - 'tests/python_foundation_v3_examples.py'
       - 'tests/python_foundation_v2_examples.py'
       - 'python-foundation-project/**'
@@ -88,6 +92,28 @@ jobs:
           print('PASS 21 chapters, 100+ detailed grammar examples and unchanged project assets')
           PY
           python tests/python_foundation_v2_examples.py
+
+      - name: Validate V4 complete grammar and execute real Python examples
+        run: |
+          python tests/python_foundation_v4_examples.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('python-foundation-v4-content.json').read_text(encoding='utf-8'))
+          assert len(j['chapters'])==23
+          assert sum(len(c['details']) for c in j['chapters'])==156
+          assert len(j['symbolGuide'])==32
+          assert len(j['chapters'][7]['walkthroughs'])==4
+          assert len(j['chapters'][7]['details'])==17
+          assert len(j['projectFiles'])==9
+          assert len(j['resources'])>=14
+          html=Path('python-foundation.html').read_text(encoding='utf-8')
+          script=Path('python-foundation.js').read_text(encoding='utf-8')
+          assert '20261110-v4' in html
+          assert 'python-foundation-v4-content.json' in script
+          assert 'asw-python-foundation-v1:' in script
+          print('PASS V4 integration without erasing notes or changing original D15')
+          PY
 
       - name: Verify new 23-chapter 144-topic V3 and execute code examples
         run: |
