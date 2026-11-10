@@ -8,6 +8,7 @@ on:
       - 'python-foundation.js'
       - 'python-foundation-content.json'
       - 'python-foundation-project/**'
+      - 'tests/validate_python_foundation_snippets.py'
       - 'tests/python_foundation_browser.py'
       - 'index.html'
       - 'app.js'
@@ -88,6 +89,8 @@ jobs:
           assert 'python-foundation.html' in Path('index.html').read_text(encoding='utf-8')
           print('PASS 23 chapters, 144 detailed grammar sections, 26 syntax entries and original ASW files')
           PY
+      - name: Execute real Python examples from all beginner chapters
+        run: python tests/validate_python_foundation_snippets.py
       - name: Check JavaScript syntax and existing D15 runtime remains intact
         run: |
           node --check python-foundation.js
