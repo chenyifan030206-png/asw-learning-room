@@ -694,8 +694,8 @@
       "id": "v2_08",
       "phase": "数据组织",
       "title": "08｜循环完整专题：for、while、range、enumerate、break等",
-      "minutes": 25,
-      "goal": "分清迭代条件、跳过本轮、结束整个循环、创建新列表。",
+      "minutes": 120,
+      "goal": "完整掌握Python的for与while语法、取值次序、退出条件、range/enumerate/zip、break/continue、嵌套循环及常见陷阱。",
       "story": [
         "本章把for、while放在一起讲。for每轮从一个可迭代对象取元素，while每轮先求条件真假；这两者都依靠冒号和缩进指定循环体。你不必先懂类、NumPy或ASW工程。",
         "按顺序从for item in items的每个词与符号开始，再学range(终点)、range(起点,终点,步长)，再学while的初始化/更新/退出，随后讲break、continue、嵌套循环、enumerate、zip。",
@@ -723,7 +723,454 @@
         "why": "break退出循环；continue跳过当前迭代的剩余部分。"
       },
       "original_id": "loops",
-      "details": []
+      "details": [
+        {
+          "name": "① for循环究竟是什么：先学最原始语法",
+          "grammar": "for 变量 in 可迭代对象:\\n    循环体语句",
+          "explanation": "for是Python的循环关键字。它不是C中for(初始化;条件;更新)的写法。每一轮从右边的可迭代对象取得下一个值，交给左边的循环变量，然后执行一次相同缩进的循环体。取完所有值后退出循环。列表、字符串、range对象等都可作为可迭代对象。当前只要记住for从序列里依次拿值，而不是自动每20ms执行。",
+          "parts": [
+            [
+              "for",
+              "说明这是for循环语句头"
+            ],
+            [
+              "distance",
+              "当前轮拿到元素后绑定的名字，可以改名如value"
+            ],
+            [
+              "in",
+              "从右边可迭代对象里依次取元素"
+            ],
+            [
+              "[45,34,38]",
+              "有顺序的三个整数列表"
+            ],
+            [
+              ":",
+              "冒号结束语句头，下一行进入循环体"
+            ],
+            [
+              "四个空格",
+              "缩进定义每轮重复执行的语句块"
+            ]
+          ],
+          "example": "distances = [45, 34, 38]\nfor distance in distances:\n    print(distance)\nprint(\"遍历结束\")",
+          "trace": [
+            "第1行创建3个元素的列表distances。",
+            "进入for时，从列表拿第一项45，赋给distance。执行循环体print，输出45。",
+            "第二轮拿34并打印；第三轮拿38并打印。",
+            "第四次尝试获取下一个元素时已到列表末尾，退出循环，打印遍历结束。"
+          ],
+          "expected": "45\n34\n38\n遍历结束",
+          "errors": [
+            "for后面必须有in与英文冒号；没有冒号是SyntaxError。",
+            "print若与for对齐，只在循环结束后运行一次；缩进后才是每轮执行。",
+            "循环过程中改变被遍历列表的长度可能产生意外行为。"
+          ],
+          "practice": "把列表改成[42,35,31,47]，先写出打印顺序，再运行。"
+        },
+        {
+          "name": "② C语言for与Python for：为什么没有i++",
+          "grammar": "C: for(int i=0;i<3;i++)  →  Python: for i in range(3):",
+          "explanation": "C的for把变量初始化、继续循环的条件、每轮更新都写在同一个语句头。Python的for重心是“每轮从右边取一个值”，如果希望像C那样生成0、1、2这些整数，才使用range(3)提供这些值。循环变量i在每轮被赋给新整数。Python不使用i++，可在需要时写i += 1，但for i in range(3)通常不需要自己更新i。",
+          "parts": [
+            [
+              "for i",
+              "名字i接收每轮的整数"
+            ],
+            [
+              "in",
+              "遍历右侧值序列"
+            ],
+            [
+              "range(3)",
+              "生成可迭代的整数范围0、1、2，不包含3"
+            ],
+            [
+              ":",
+              "开启循环体"
+            ],
+            [
+              "print(i)",
+              "每一轮输出当前i"
+            ]
+          ],
+          "example": "for i in range(3):\n    print(i)",
+          "trace": [
+            "range(3)提供0、1、2这三个整数。",
+            "第1轮i=0，打印0。",
+            "第2轮i=1，打印1；第3轮i=2，打印2。",
+            "没有3这个值，因此不再执行第四轮。"
+          ],
+          "expected": "0\n1\n2",
+          "errors": [
+            "range(3)不是1、2、3。",
+            "不要写for i=0;i<3;i++：这是C的语法，不属于Python。"
+          ],
+          "practice": "把C的for(int i=1;i<=4;i++)翻译为Python，并验证输出。"
+        },
+        {
+          "name": "③ range()三个常见调用形式全部讲透",
+          "grammar": "range(stop) / range(start, stop) / range(start, stop, step)",
+          "explanation": "range是Python内置类，调用后得到range对象，它表示一个按固定步长产生整数的范围；通常不会事先创建完整列表。只传一个stop时从0开始、步长为1；两个参数时从start开始到stop之前结束；三个参数时最后一个step控制步长，不能是0。负步长可倒序。重点记住“包含起点，不包含终点”，方向与步长必须一致。",
+          "parts": [
+            [
+              "range(4)",
+              "0、1、2、3；数量4"
+            ],
+            [
+              "range(1,4)",
+              "1、2、3；不含4"
+            ],
+            [
+              "range(1,7,2)",
+              "1、3、5；每次加2"
+            ],
+            [
+              "range(5,0,-2)",
+              "5、3、1；每次减2"
+            ],
+            [
+              "range(1,4,0)",
+              "非法，步长不能为0"
+            ]
+          ],
+          "example": "print(list(range(4)))\nprint(list(range(1, 4)))\nprint(list(range(1, 7, 2)))\nprint(list(range(5, 0, -2)))",
+          "trace": [
+            "第1次从0开始，停止在4之前。",
+            "第2次明确从1开始，在4之前结束。",
+            "第3次每轮增加2，依次是1、3、5。",
+            "第4次向下减2，得到5、3、1，下一步为-1已越过下界0。"
+          ],
+          "expected": "[0, 1, 2, 3]\n[1, 2, 3]\n[1, 3, 5]\n[5, 3, 1]",
+          "errors": [
+            "range(1,5)包含1、不包含5。",
+            "range(0)不会进入循环；range(3,0)默认正步长也没有元素。"
+          ],
+          "practice": "分别在本地验证range(2,10,3)、range(4,-1,-1)，手写每个整数。"
+        },
+        {
+          "name": "④ while语法的初始化、条件、循环体、更新与退出",
+          "grammar": "while 条件表达式:\\n    循环体\\n    更新状态",
+          "explanation": "while在每轮开始时先计算右侧条件是否为真。真就进入缩进循环体，执行完再回到条件；假就退出。这和C的while语义很接近。若没有让条件最终变假的更新语句，循环可能无限重复。while适用于“尚未达到退出条件就继续”这种场景，例如最多3次尝试，而不是精准调度周期。",
+          "parts": [
+            [
+              "attempt = 0",
+              "循环开始前初始化状态变量"
+            ],
+            [
+              "while",
+              "循环关键字"
+            ],
+            [
+              "attempt < 3",
+              "每一轮进入前重新判断"
+            ],
+            [
+              ":",
+              "开始缩进循环体"
+            ],
+            [
+              "attempt += 1",
+              "每轮更新，以保证最终退出"
+            ]
+          ],
+          "example": "attempt = 0\nwhile attempt < 3:\n    print(\"第\", attempt + 1, \"次\")\n    attempt += 1\nprint(\"结束\")",
+          "trace": [
+            "初始化attempt=0。",
+            "检查0<3，True，打印第1次，然后更新attempt=1。",
+            "检查1<3，True，打印第2次；更新为2。",
+            "检查2<3，True，打印第3次；更新为3。",
+            "再检查3<3，False，跳出循环；打印结束。"
+          ],
+          "expected": "第 1 次\n第 2 次\n第 3 次\n结束",
+          "errors": [
+            "把attempt += 1漏掉会陷入无限循环。",
+            "while不代表“等20ms再执行”，也不能用它替代操作系统任务调度。"
+          ],
+          "practice": "把上面的while改成最多2次并打印循环变量每轮的值。"
+        },
+        {
+          "name": "⑤ 同一个任务分别用for和while实现",
+          "grammar": "for i in range(3): / i=0; while i<3:",
+          "explanation": "在迭代次数已知、右侧有列表或范围时，优先用for，更少忘记更新变量的风险。在条件驱动、次数未知或需要等待某种明确状态的场景使用while。两种写法都必须有清楚的终止逻辑。不要因为C的for很熟就把一切Python循环都写成while。",
+          "parts": [
+            [
+              "for",
+              "每轮从可迭代对象取下一个元素"
+            ],
+            [
+              "range(3)",
+              "产生0、1、2三项"
+            ],
+            [
+              "while",
+              "每轮先判断表达式真假"
+            ],
+            [
+              "i += 1",
+              "while显式维护计数进度"
+            ]
+          ],
+          "example": "for i in range(3):\n    print(\"for\", i)\ni = 0\nwhile i < 3:\n    print(\"while\", i)\n    i += 1",
+          "trace": [
+            "for由range自动提供0、1、2，三次执行后自然结束。",
+            "while先创建i=0，每轮判断后需要人工写i+=1。",
+            "两个循环都输出3行，但它们维护循环进度的机制不同。"
+          ],
+          "expected": "for 0\nfor 1\nfor 2\nwhile 0\nwhile 1\nwhile 2",
+          "errors": [
+            "不能简单把while i<3里的i+=1挪出去：循环体内没有更新就无法退出。"
+          ],
+          "practice": "将上面两种写法改成遍历0、1、2、3、4，说明哪一种更容易出错。"
+        },
+        {
+          "name": "⑥ break和continue：结束循环与跳过一轮",
+          "grammar": "break / continue",
+          "explanation": "break会立即退出当前最内层循环；continue会跳过这一轮后面的语句，转而开始下一轮。它们不是return：return会结束整个函数。嵌套循环中break只退出它所在的那一层。日志分析中若碰到数据损坏，是否可以continue跳过，必须由数据处理协议明确决定；本课程的损坏CSV要求报错，不允许悄悄删除。",
+          "parts": [
+            [
+              "break",
+              "退出所在的最内层for/while"
+            ],
+            [
+              "continue",
+              "跳过当前这一轮剩余语句"
+            ],
+            [
+              "return",
+              "结束函数，循环章先作区分"
+            ],
+            [
+              "if",
+              "通常先判断条件再决定是否break/continue"
+            ]
+          ],
+          "example": "for value in [1, 2, 3, 4]:\n    if value == 2:\n        continue\n    if value == 4:\n        break\n    print(value)\nprint(\"循环外\")",
+          "trace": [
+            "value=1，两个if都假，打印1。",
+            "value=2命中continue，本轮跳过print，下一轮取3。",
+            "value=3打印3。",
+            "value=4命中break，离开for循环，随后打印循环外。"
+          ],
+          "expected": "1\n3\n循环外",
+          "errors": [
+            "continue不会退出整个for；break不会退出函数外层的所有循环。",
+            "while中若continue发生在状态更新之前，容易无限循环。"
+          ],
+          "practice": "自己写for遍历0到6，跳过2、4，遇到6时提前退出。"
+        },
+        {
+          "name": "⑦ enumerate()逐字符拆解：同时得到下标和元素",
+          "grammar": "for index, value in enumerate(values, start=0):",
+          "explanation": "enumerate是内置函数，接收一个可迭代对象，并在遍历时依次提供(索引,元素)二元组。默认索引从0开始；start=1可改为从1开始展示序号。它通常没有事先把所有二元组保存成list，而是按需产生。for左边写index, value表示“解包”：把每次收到的二元组的两个位置分别交给两个变量。enumerate不是Python的关键字，也不是C式for的组成部分。",
+          "parts": [
+            [
+              "enumerate",
+              "内置函数名字；把元素配上计数"
+            ],
+            [
+              "values",
+              "第一个参数：要遍历的对象"
+            ],
+            [
+              "start=0",
+              "第二个可选参数：编号起始值，默认0"
+            ],
+            [
+              "index, value",
+              "左侧两个变量：对每次的二元组解包"
+            ],
+            [
+              "in",
+              "从右侧依次取一个二元组"
+            ],
+            [
+              ":",
+              "循环体开始"
+            ]
+          ],
+          "example": "distances = [45, 34, 38]\nfor index, distance in enumerate(distances):\n    print(index, distance)\nprint(list(enumerate([\"A\", \"B\"], start=1)))",
+          "trace": [
+            "enumerate(distances)第一次给出(0,45)，所以index=0、distance=45，打印0 45。",
+            "第二轮给(1,34)，第三轮给(2,38)，依次打印。",
+            "最后list将enumerate对象的两项转换成列表，start=1使其编号为1和2。"
+          ],
+          "expected": "0 45\n1 34\n2 38\n[(1, 'A'), (2, 'B')]",
+          "errors": [
+            "如果for index in enumerate(values):只有一个变量，那么index每轮得到的是整个二元组，例如(0,45)，而不是索引0。",
+            "enumerate不会修改原列表的元素。"
+          ],
+          "practice": "分别用for value in values、for i in range(len(values))、for i,value in enumerate(values)实现相同打印，对照区别。"
+        },
+        {
+          "name": "⑧ zip()两组等长数据怎样配对",
+          "grammar": "for a, b in zip(xs, ys):",
+          "explanation": "zip是内置函数，它按位置从两个或多个可迭代对象各取一个值，组合成元组。默认在最短的输入耗尽时结束；因此来自不同传感器、长度或周期可能不同的数据，不能不检查就简单zip，否则可能丢失尾部数据。Python 3.10+的zip(strict=True)可以在长度不等时抛ValueError。本课只用等长字符串列表理解解包。",
+          "parts": [
+            [
+              "zip(xs,ys)",
+              "按位置配对两个序列的元素"
+            ],
+            [
+              "a,b",
+              "逐次解包为两个名字"
+            ],
+            [
+              "strict=True",
+              "要求长度一致，不一致抛ValueError（Python3.10+）"
+            ]
+          ],
+          "example": "times = [0, 20, 40]\ndistances = [45, 34, 38]\nfor time_ms, distance_m in zip(times, distances):\n    print(time_ms, distance_m)",
+          "trace": [
+            "zip第一轮得到(0,45)，两个变量分别取得0和45。",
+            "第二轮得到(20,34)；第三轮得到(40,38)。",
+            "两个序列同时结束，循环退出。"
+          ],
+          "expected": "0 45\n20 34\n40 38",
+          "errors": [
+            "zip默认会截断到最短长度，不能代替完整性验证。",
+            "两源同长度并不证明时间戳或采样周期一致。"
+          ],
+          "practice": "故意删掉distances最后一项，观察zip默认结果；再用zip(times, distances, strict=True)验证异常。"
+        },
+        {
+          "name": "⑨ 嵌套循环：内层为何会重复多次",
+          "grammar": "for row in rows:\\n    for value in row:",
+          "explanation": "嵌套循环是一个循环体内部再写一个循环，缩进每深一层就多一层控制范围。假设外层有2行、每行3列，那么内层总共执行6次。每次外层换到新行，内层都从该行的第一个元素重新开始。与C嵌套for的总体算法思路一致，但Python迭代的是元素本身。",
+          "parts": [
+            [
+              "rows",
+              "包含多个列表的列表"
+            ],
+            [
+              "row",
+              "外层当前行"
+            ],
+            [
+              "value",
+              "内层当前行的元素"
+            ],
+            [
+              "两层缩进",
+              "内层print属于两个循环的共同控制"
+            ]
+          ],
+          "example": "rows = [[10, 20], [30, 40]]\nfor row in rows:\n    for value in row:\n        print(value)",
+          "trace": [
+            "外层第一次取得[10,20]。",
+            "内层打印10、20，然后内层结束。",
+            "外层第二次取得[30,40]。",
+            "内层打印30、40；两个循环都结束。"
+          ],
+          "expected": "10\n20\n30\n40",
+          "errors": [
+            "两层循环变量不能随便起同名，否则容易覆盖并造成逻辑错误。",
+            "嵌套循环不是自动二维数组，元素可以是任意可迭代对象。"
+          ],
+          "practice": "以2×3列表为例，手算总共进入内层多少次。"
+        },
+        {
+          "name": "⑩ for-else与while-else：else什么时候执行",
+          "grammar": "for item in items:\\n    ...\\nelse:\\n    ...",
+          "explanation": "这是容易和if-else混淆的语法。循环上的else在循环正常结束、没有被break提前打断时执行；即使循环0次也可以执行。若break离开循环，则跳过对应else。实际项目中可以用来表示“全部检查过了，没发现需要提前退出的目标”，但简单代码也可以用布尔标志实现，不能一开始过度依赖。",
+          "parts": [
+            [
+              "for/while",
+              "循环头"
+            ],
+            [
+              "else:",
+              "循环正常结束时执行的代码块"
+            ],
+            [
+              "break",
+              "会阻止同一循环的else运行"
+            ],
+            [
+              "continue",
+              "不会单独阻止else，除非最终又触发break"
+            ]
+          ],
+          "example": "for distance in [45, 34, 38]:\n    if distance < 0:\n        break\nelse:\n    print(\"全部距离均未为负\")",
+          "trace": [
+            "依次检查45、34、38。",
+            "三个distance都不小于0，所以没有break。",
+            "循环把元素耗尽后进入else。"
+          ],
+          "expected": "全部距离均未为负",
+          "errors": [
+            "循环的else并不等于“只要if失败就执行”，而是与break行为有关。"
+          ],
+          "practice": "把第2个距离改成-1，预测else是否执行。"
+        },
+        {
+          "name": "⑪ 累计器、计数器与避免漏帧",
+          "grammar": "total += distance / count += 1",
+          "explanation": "循环体中常用一个变量保存累计结果。先明确初始化在循环外；每轮把当前数值加进去；循环结束后再处理均值。不要把total=0写进循环内部，否则每轮都清零，只剩下最后一个值。在真实ASW日志里还要考虑无效帧的政策，不应无依据删掉记录。",
+          "parts": [
+            [
+              "total=0",
+              "循环外初始化累计器"
+            ],
+            [
+              "total += value",
+              "每轮更新累计值"
+            ],
+            [
+              "count += 1",
+              "每处理一项增加计数"
+            ],
+            [
+              "/ count",
+              "计算均值前需要确认count不为0"
+            ]
+          ],
+          "example": "distances = [45, 34, 38]\ntotal = 0\ncount = 0\nfor value in distances:\n    total += value\n    count += 1\nprint(total, count)\nprint(total / count)",
+          "trace": [
+            "初始化total与count都为0。",
+            "三轮分别累计45、79、117；count变1、2、3。",
+            "循环结束后总和117，数量3。",
+            "117/3得到39.0。"
+          ],
+          "expected": "117 3\n39.0",
+          "errors": [
+            "空列表时count为0，除法会抛ZeroDivisionError。",
+            "初始化位置写错会破坏累计。"
+          ],
+          "practice": "修改为[20,30,40,50]求和、数量和平均数。"
+        },
+        {
+          "name": "⑫ pass是占位语句；何时不要使用",
+          "grammar": "if condition:\\n    pass",
+          "explanation": "pass是一条什么都不做的语句，方便暂时写出语法合法的空块；不是“跳过本轮循环”。continue才是跳过本轮，break则结束循环。不要在正式输入校验时用pass占位并假装通过；练习后应补上真实处理。",
+          "parts": [
+            [
+              "pass",
+              "执行后没有业务动作"
+            ],
+            [
+              "continue",
+              "直接跳到下一轮"
+            ],
+            [
+              "break",
+              "离开循环"
+            ]
+          ],
+          "example": "for value in [1, 2]:\n    if value == 1:\n        pass\n    print(value)",
+          "trace": [
+            "第一轮value=1进入if执行pass，但它什么都不做。",
+            "随后仍会执行print(1)。",
+            "第二轮value=2跳过if，print(2)。"
+          ],
+          "expected": "1\n2",
+          "errors": [
+            "pass不会自动跳过print，不能代替continue。"
+          ],
+          "practice": "将pass改为continue，预测这次会打印多少行。"
+        }
+      ]
     },
     {
       "id": "v2_09",
