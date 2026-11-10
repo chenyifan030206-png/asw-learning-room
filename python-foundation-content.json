@@ -1963,12 +1963,12 @@
           "title": "from、as与导入名称冲突",
           "syntax": "from pathlib import Path；import numpy as np",
           "explain": "from module import name取得模块某个名字；import module as alias为模块创建别名；例如numpy常缩写成np，后续np.asarray(...)的点号是访问numpy模块成员。不要把自己的文件命名为csv.py、json.py、typing.py，否则可能遮蔽标准库模块。避免from module import *，它会隐藏名字来源，增加维护成本。",
-          "code": "import math as m\nfrom pathlib import Path\nprint(m.sqrt(16))\nprint(Path('.').name)",
-          "output": "4.0\n.（在当前代码语境中，Path('.')的name通常为空字符串；本示例第二行实际会打印空行）",
+          "code": "import math as m\nfrom pathlib import Path\nprint(m.sqrt(16))\nprint(Path('log.csv').suffix)",
+          "output": "4.0\n.csv",
           "trace": [
             "m是math模块别名。",
-            "m.sqrt(16)返回浮点4.0。",
-            "Path('.')并不代表文件路径的文件名，若要获得当前目录名称，应使用Path('.').resolve().name。"
+            "m.sqrt(16)返回4.0。",
+            "Path('log.csv').suffix取得文件扩展名.csv。"
           ],
           "mistake": "不要把点号访问的模块成员与字符串小数点混淆；不要定义同名math.py覆盖标准库。",
           "exercise": "将Path('.')改成Path('.').resolve()，输出实际所在文件夹名。"
@@ -2548,8 +2548,8 @@
     {
       "id": "fullflow",
       "phase": "工程实作",
-      "title": "20 · 逐帧追踪完整ASW教学工程",
-      "minutes": 50,
+      "title": "20 · ASW离线日志完整工程：每个对象从哪来、向哪去",
+      "minutes": 84,
       "goal": "把前面独立语法串成真正的模块调用链，明确对象、变量、返回值怎样传递。",
       "story": [
         "你以前问过app.c、mock.c、demo.c谁先运行。这次对应到Python：models.py声明Frame和Decision数据类型；reader.py把CSV变为list[Frame]；monitor.py保存previous_alert并处理每帧；main.py负责入口、调用、输出；test_pipeline.py用于独立验证。",
@@ -2579,16 +2579,123 @@
         "answer": 1,
         "why": "同一个Monitor实例持有previous_alert，后续step调用会继续使用。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "先知道这是哪五层，为什么先看简单示例",
+          "syntax": "main→reader→models→monitor→main",
+          "explain": "前面已经单独学过变量、列表、for/while、函数、import、class、文件和异常。现在把这些规则用到同一个离线ASW日志工程。工程不直接连车，不定时驱动车辆，也不是AUTOSAR实车软件。models.py负责字段定义，reader.py负责把CSV变为Frame列表，monitor.py完成跨帧状态判断，main.py组织执行与JSON输出，test_pipeline.py独立进行自动测试。把它当作一次对前面语法的综合验证。",
+          "code": "# 先看目录，不需要运行这段注释：\n# main.py          入口/命令行/输出\n# reader.py        CSV->list[Frame]\n# models.py        Frame与Decision类型\n# monitor.py       Monitor.step业务规则\n# test_pipeline.py unittest\n# sample.csv       8帧教学样例",
+          "output": "这段为工程结构说明，非可执行程序。",
+          "trace": [
+            "入口main从命令行获得文件路径。",
+            "reader读取并校验每帧，依赖models创建Frame。",
+            "main创建一个Monitor，循环调用其step，取得Decision。",
+            "main保存为JSON，测试文件可独立验证。"
+          ],
+          "mistake": "不要跳过前面基础章节就直接看这里的class、dataclass、with和try，它们在前文都有独立详解。",
+          "exercise": "在页面的“完整工程”标签依次打开五个.py文件，并写出每个文件职责。"
+        },
+        {
+          "title": "运行入口：if __name__在文件最底部",
+          "syntax": "if __name__ == '__main__': raise SystemExit(main())",
+          "explain": "Python执行main.py时会依次执行顶部import和def定义，最后看到__name__检查，才真正调用main()。main中的argparse解析--input、--output，生成路径对象并调用run。SystemExit(main())会把main返回的整数作为程序退出码交给操作系统；它与main的业务结果list[dict]不同。",
+          "code": "def main():\n    print('进入main')\n    return 0\nif __name__ == '__main__':\n    raise SystemExit(main())",
+          "output": "进入main（退出码0）",
+          "trace": [
+            "定义main但不执行其函数体。",
+            "__name__等于'__main__'。",
+            "调用main，打印文字返回0。",
+            "SystemExit(0)使程序正常退出。"
+          ],
+          "mistake": "把exit code 0当成“产生的告警值0”不对；退出码与每帧业务状态不同。",
+          "exercise": "在终端运行示例，检查echo $?（WSL）得到0。"
+        },
+        {
+          "title": "读取文件：list[Frame]是怎样构造的",
+          "syntax": "load_frames(path) -> list[Frame]",
+          "explain": "reader.py用csv.DictReader迭代每行，最初row中的每项都是str。对每条记录校验数量、空值、int/float转换、数值有限性和取值范围后，才构造Frame(time_ms,speed_kmh,distance_m,radar_valid,enable)。frames.append(frame)把Frame实例放到列表。若有错误则报告CSV行号并抛ValueError；main捕获后不把结果标成有效。",
+          "code": "from dataclasses import dataclass\n@dataclass\nclass Frame:\n    time_ms: int\n    speed_kmh: float\n\nframes = []\nframes.append(Frame(0,72.0))\nprint(len(frames), frames[0].speed_kmh)",
+          "output": "1 72.0",
+          "trace": [
+            "定义Frame数据类。",
+            "创建空frames列表。",
+            "Frame(0,72.0)创建实例并append。",
+            "读取列表第0个实例的.speed_kmh属性。"
+          ],
+          "mistake": "Frame列表与原始CSV字符串列表不是同一类型；不能没有解析就把字符串当浮点计算。",
+          "exercise": "打开reader.py找到frames.append(...),说明它放进列表的对象类型。"
+        },
+        {
+          "title": "监视器生命周期：为什么Monitor()只创建一次",
+          "syntax": "monitor = Monitor()放在for外",
+          "explain": "monitor.py的__init__初始previous_alert=False。run先创建一个Monitor实例，然后用for frame in frames逐帧调用同一个对象的step；前一帧状态因此保留。你在C里已经学过MonitorContext在for外，只需迁移相同的状态生命周期思路。35/41m的滞环阈值在此仅是课程值。",
+          "code": "from models import Frame\nfrom monitor import Monitor\nm = Monitor()\nfor i, distance in enumerate([45,34,38,42]):\n    frame = Frame(i*20,72.0,float(distance),True,True)\n    result = m.step(frame,frame.time_ms+20)\n    print(i,result.alert)",
+          "output": "0 False\n1 True\n2 True\n3 False",
+          "trace": [
+            "创建一个Monitor并初始化previous_alert=False。",
+            "enumerate依次给出序号与距离。",
+            "构造Frame实例后调用m.step，传入frame与当前时刻。",
+            "result是Decision实例，按属性读取alert。"
+          ],
+          "mistake": "这一小例子需要和本项目models.py/monitor.py放在同一目录运行；不能只粘贴到一个空文件期望import成功。",
+          "exercise": "将m=Monitor()移入for并运行，解释第2帧后38m为何变化。"
+        },
+        {
+          "title": "step内部怎样从Frame到Decision",
+          "syntax": "def step(self,frame,now_ms)->Decision",
+          "explain": "监视器先根据now_ms-frame.time_ms计算数据年龄，检查未来时间或大于100ms、radar_valid是否为False；不通过时清掉旧告警并return一个INVALID的Decision。enable=False时返回OFF且valid=False；都合法才用前一帧previous_alert与当前distance_m执行滞环，再返回ACTIVE的Decision。每个return带回一个完整的对象，main仍可以按成员访问。",
+          "code": "from dataclasses import dataclass\n@dataclass\nclass Decision:\n    status: str\n    valid: bool\n    alert: bool\n\ndef result_for(valid):\n    if not valid:\n        return Decision('INVALID', False, False)\n    return Decision('ACTIVE', True, True)\n\nx = result_for(False)\nprint(x.status, x.valid, x.alert)",
+          "output": "INVALID False False",
+          "trace": [
+            "result_for收到False。",
+            "进入第一个if，构造INVALID的Decision并立即return。",
+            "主函数将对象绑定给x。",
+            "读取三个属性并打印。"
+          ],
+          "mistake": "不能只读取result.status就假定valid为真；两个字段表达不同信息。",
+          "exercise": "在monitor.py找到3个return Decision(...)分支，分别写出触发条件。"
+        },
+        {
+          "title": "结果为什么要转换成dict才能方便写JSON",
+          "syntax": "decision→asdict(decision)→results.append→json.dump",
+          "explain": "Decision是dataclass实例，不是原生JSON类型。main里asdict(decision)创建包含字段和值的普通dict，results.append将每帧结果放入列表，最终json.dump将列表保存到文件。这里不是又执行了一遍Monitor.step，而是把已经得到的结果转成易于保存的形式。原始输入CSV和输出JSON分别承担输入数据与计算结果的角色。",
+          "code": "from dataclasses import dataclass, asdict\n@dataclass\nclass Decision:\n    status: str\n    valid: bool\nx = Decision('ACTIVE', True)\nresult = asdict(x)\nprint(result)",
+          "output": "{'status': 'ACTIVE', 'valid': True}",
+          "trace": [
+            "创建Decision实例。",
+            "asdict读取实例字段形成dict。",
+            "print输出字典。"
+          ],
+          "mistake": "asdict只做对象结构转换，不代表传感器数据被再次校验。",
+          "exercise": "在main.py搜索asdict和json.dump，说明它们各自处理哪一层数据。"
+        },
+        {
+          "title": "逐帧手工推导八个案例，不直接背结果",
+          "syntax": "45,34,38,42,30invalid,34,34off,34",
+          "explain": "样例8帧距离依次是45、34、38、42、30（radar无效）、34、34（enable=False）、34。有效时距离<=35触发提示、>=41关闭；数据无效或未启用时本课清除旧告警。按同一Monitor跨帧状态推导结果：False、True、True、False、False、True、False、True。这是在模型规则基础上的离线算例，并不是实车ACC监视和控制需求。",
+          "code": "# 要先自己填表格再运行本地工程：\n# 帧0  45m  valid=True  alert=False\n# 帧1  34m  valid=True  alert=True\n# 帧2  38m  valid=True  alert=True\n# 帧3  42m  valid=True  alert=False\n# 帧4  30m  radar_invalid  alert=False\n# 帧5  34m  valid=True  alert=True\n# 帧6  34m  enable=False  alert=False\n# 帧7  34m  valid=True  alert=True",
+          "output": "0 / 1 / 1 / 0 / 0 / 1 / 0 / 1",
+          "trace": [
+            "每帧先判断雷达和使能再判断距离。",
+            "38m处于保持区，继承上一帧True。",
+            "雷达无效清旧告警，下一帧可以重新触发。",
+            "使能关闭时状态OFF、告警False。"
+          ],
+          "mistake": "只看距离而忽略上一帧告警和有效标志，会得到错误结果。",
+          "exercise": "在本地跑python main.py，再对照八帧手工表。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "至少掌握前19章的符号、循环、函数、类、CSV和异常"
+      ],
+      "chapterSummary": "会逐层追踪数据类型/值从CSV进入Frame，再通过Monitor返回Decision，最后变成dict和JSON；能手工还原八帧。"
     },
     {
       "id": "practice",
       "phase": "工程实作",
-      "title": "21 · 五次必做改动与故障注入",
-      "minutes": 55,
+      "title": "21 · 本地实作：预测、运行、故障注入、修复",
+      "minutes": 72,
       "goal": "通过能观察到的失败和修复证明自己理解代码，而不是复制粘贴。",
       "story": [
         "练习1：用原始sample.csv运行，先人工预测8帧，再对照终端日志和JSON文件。练习2：打开bad_string.csv，先预测第几行报错，运行后核对“第4行”；恢复合法车速，再验证解析通过。",
@@ -2617,16 +2724,107 @@
         "answer": 1,
         "why": "工程学习需要可重复的本地执行证据。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "第1关：正确安装与第一次本地运行",
+          "syntax": "python3 main.py --input sample.csv --output output/results.json",
+          "explain": "把完整工程ZIP下载解压，进入其中python-foundation-project目录，使用python3 --version确认解释器3.11或以上。运行main.py指定输入和输出路径；脚本在终端打印逐帧status/valid/alert，并将结果保存在output/results.json。应核对文件实际存在和8条记录，而不是看到了网页绿灯就认为完成。",
+          "code": "# 终端（WSL/Linux）\n# python3 --version\n# python3 main.py --input sample.csv --output output/results.json\n# ls -l output/results.json\n# cat output/results.json",
+          "output": "应输出8帧结果，status包含ACTIVE/INVALID/OFF，输出JSON有8条记录。",
+          "trace": [
+            "进入正确的工程目录。",
+            "执行程序并读取CSV。",
+            "逐帧调用Monitor.step。",
+            "写入JSON，main返回退出码0。"
+          ],
+          "mistake": "代码块里的#为说明写法，真正终端执行时应去掉行首#；不要把Shell命令贴进.py。",
+          "exercise": "执行后保存终端输出，并用文本编辑器打开JSON核对8条记录。"
+        },
+        {
+          "title": "第2关：逐行解析一条坏CSV",
+          "syntax": "bad_string.csv第4物理行",
+          "explain": "在bad_string.csv中第4行的speed_kmh列注入了hello字符串。reader.py尝试float('hello')会抛ValueError，再向外包装带行号诊断，最终main.py捕获，输出失败信息并用退出码2结束。应区别“本程序正确识别坏输入”与“程序自身存在错误”；预设坏样本返回2是符合课程设计的。",
+          "code": "# 终端\n# python3 main.py --input bad_string.csv\n# echo $?  # WSL检查退出码",
+          "output": "输出应包含“第4行”，最终程序退出码2。",
+          "trace": [
+            "reader读取CSV表头。",
+            "前两条数据通过解析。",
+            "物理第4行无法转换速度文本。",
+            "异常传回main，打印定位并结束，不生成有效输出。"
+          ],
+          "mistake": "不要通过删掉错误行让原始实验看起来有效；教学修复需保留修改前后记录。",
+          "exercise": "复制bad_string.csv到个人文件，修复速度为72.0，再运行修复副本。"
+        },
+        {
+          "title": "第3关：故意写错阈值让测试抓住它",
+          "syntax": "monitor.py 35.0→40.0",
+          "explain": "先运行unittest取得基线通过记录。然后只在自己复制的monitor.py里把触发阈值从35改为40，不改测试中的期望。原本距离38m应该保持上一帧状态的部分场景会发生错误，unittest应指出差异。之后恢复35重新通过。这样你会理解真正的业务判断、回归预期和故障定位三者的联系。",
+          "code": "# 终端\n# python3 -m unittest -v test_pipeline\n# 修改monitor.py阈值 35.0 -> 40.0 后再次运行同一命令\n# 恢复35.0后第三次运行同一命令",
+          "output": "应得到PASS→FAIL→PASS三次证据。",
+          "trace": [
+            "原始源码与测试匹配。",
+            "故意修改业务条件。",
+            "测试用例检测到与预期不一致。",
+            "恢复原条件后通过。"
+          ],
+          "mistake": "不要为了获得绿灯就把test_pipeline里的预期改成错误逻辑。",
+          "exercise": "保存3份终端日志及源代码行号；解释是哪一帧触发了差异。"
+        },
+        {
+          "title": "第4关：for循环里创建实例的陷阱",
+          "syntax": "for frame in frames: monitor=Monitor()",
+          "explain": "如果把Monitor()放到for内部，每帧都会执行__init__把previous_alert重置False。原本在34m触发、38m应保留告警的场景会失去前态，导致测试失败。要求你明确从语法层解释：for有多轮，循环体每轮执行，所以Monitor()也每轮运行。恢复到for外之后重新验证。",
+          "code": "# 错误位置示意（不要直接替换原工程所有代码）：\n# for frame in frames:\n#     monitor = Monitor()  # 每轮都重置状态\n#     decision = monitor.step(frame,frame.time_ms+20)",
+          "output": "错误示例会丢失状态历史；修复后滞环重新按需求保持。",
+          "trace": [
+            "第一帧创建Monitor1。",
+            "第二帧创建Monitor2，旧告警丢失。",
+            "第三帧再创建Monitor3，无法继承第二帧的结果。"
+          ],
+          "mistake": "只以为循环是“重复打印”会忽略它会重复执行所有缩进的初始化语句。",
+          "exercise": "把Monitor实例创建恢复到for外，并在总结中解释区别。"
+        },
+        {
+          "title": "第5关：函数返回值与打印值要分开",
+          "syntax": "return Decision(...) 与 print(decision)",
+          "explain": "将monitor.step的某个return Decision(...)暂时改成print(Decision(...))，函数在该路径到结尾会返回None；main仍然期望Decision实例，因此读取它的属性时可能抛AttributeError。这个试验直接验证“print不等于return”，也把你在D14问过的结构体返回值问题与Python函数联系起来。完成后必须恢复源码并复测。",
+          "code": "# 错误演示：\n# def check():\n#     print({'valid':True})  # 只打印，不返回字典\n# result = check()\n# print(result)               # None",
+          "output": "函数内部先显示字典，调用者得到None。",
+          "trace": [
+            "print执行输出副作用。",
+            "没有return时函数默认交回None。",
+            "调用者无法按原来的Decision属性访问。"
+          ],
+          "mistake": "不要在正式课程工程保留这个错误，避免后续无法完成验证。",
+          "exercise": "先单独写最小函数确认，再在本地副本中做一次模拟并恢复。"
+        },
+        {
+          "title": "第6关：逐章语法与工程可复现验收",
+          "syntax": "unittest +手算表+错误日志+笔记",
+          "explain": "一份可复核的学习结果至少包括：23章中核心语法自测、原始8帧手工推导、一次正常运行的JSON、损坏CSV的行号诊断、unit test绿灯以及至少一项故障注入后失败并恢复的证据。可以分几次做完，不建议因“页面标签完成”就跳过本地实际运行。不要把第三方CI的参考工程测试结果冒充用户自己本地通过。",
+          "code": "# 终端\n# python3 -m unittest -v test_pipeline\n# python3 main.py --input sample.csv --output output/results.json\n# python3 main.py --input bad_missing.csv",
+          "output": "正常项目测试PASS；非法CSV明确报第3行错误。",
+          "trace": [
+            "单元测试验证需求与状态。",
+            "正常程序产生JSON。",
+            "错误文件拒绝并报物理行号。",
+            "保留证据并写调用链总结。"
+          ],
+          "mistake": "页面自测无法执行本地Python，也不会真正验证你修改的个人源码。",
+          "exercise": "写出你的独立总结：输入来自哪里，哪个函数返回何种对象，哪些状态跨帧保存。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "至少掌握语法的for/while、函数返回、类与异常"
+      ],
+      "chapterSummary": "用完整可复现的本地Python证据验证学习，不仅是浏览器自评。"
     },
     {
       "id": "atlas",
       "phase": "后续索引",
-      "title": "22 · 一天内看懂未来的Python语法地图",
-      "minutes": 35,
+      "title": "22 · 全量语法地图与查阅方式：先核心、再扩展",
+      "minutes": 48,
       "goal": "知道未来遇到陌生语法去哪里查，不要求一天内熟练掌握所有高级特性。",
       "story": [
         "后续你会用到NumPy、Matplotlib、数据类、文件路径、标准测试、日志接口，以及可能的ROS2 Python脚本。它们大多是在本课已经学过的函数、对象、循环、模块基础上增加新的库调用。",
@@ -2654,16 +2852,74 @@
         "answer": 1,
         "why": "NumPy本质上是在既有Python基础上引入新的数组类型及操作函数。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "所有Python语法都要一天学会吗：分清熟练与见过",
+          "syntax": "基本语法/标准库/第三方库是三个层次",
+          "explain": "真正能使用Python需要从符号、变量、流程控制、函数、容器开始形成熟练习惯。高级语言特性、标准库中的大量工具和NumPy/pandas等外部库没有理由全部要求同一天熟练，尤其你还要保持C与ASW主线。这里将知识明确分为入门必会、随后重点、用到再深入三层，遇到不熟悉的语法随时回到相应章节。",
+          "code": "# 这一段是学习地图，不是程序语法。\n# 第一层：符号、变量、类型、if、for/while、list/dict、def\n# 第二层：class、CSV/JSON、异常、测试、NumPy/Matplotlib\n# 第三层：async、yield、装饰器、包发布、ROS2 Python接口",
+          "output": "完成第一层可以开始独立阅读原D15的代码，再补第二层。",
+          "trace": [
+            "先会读一个表达式。",
+            "再会读有条件和循环的脚本。",
+            "最后会读模块/类/文件和测试。"
+          ],
+          "mistake": "搜索到高级术语就立刻追着所有资料学习，容易脱离当前ASW学习目标。",
+          "exercise": "打开“全部语法索引”按入门必会筛选，标记最不熟悉的5项。"
+        },
+        {
+          "title": "遇到陌生函数，先看对象再看调用",
+          "syntax": "numpy.asarray、Path.cwd、rows.append",
+          "explain": "在看到a.b(...)时，先问a是什么对象（模块、列表、路径、数据类实例），再问b是属性还是方法，接着查它接受什么参数和返回什么。不要把所有点号调用都当作Python内置语法。比如np.mean是NumPy提供的函数、list.append是列表的方法、Frame.speed_kmh是属性，这些的层次并不相同。",
+          "code": "values=[1,2]\nprint(type(values).__name__)\nprint(values.append(3))\nprint(values)",
+          "output": "list\nNone\n[1, 2, 3]",
+          "trace": [
+            "values是list对象。",
+            "append是列表方法，调用它修改列表，返回None。",
+            "再打印列表确认其内容已改变。"
+          ],
+          "mistake": "不查返回值就写values=values.append(3)，会丢失列表对象。",
+          "exercise": "从原D15找一个np.xxx并查官方文档，它返回标量、向量还是矩阵。"
+        },
+        {
+          "title": "关键字查询的标准顺序：官方文档→示例→本地验证",
+          "syntax": "docs.python.org、help(obj)、type(obj)",
+          "explain": "遇到for、range、enumerate、list、dict、def等语言或标准库规则，先查Python官方文档；需要中文递进示例可以查Python-100-Days；需要看实际输入输出的短视频可查Microsoft Python for Beginners或CS50P。然后写最小独立脚本实际运行，记录自己预测与输出差异。第三方视频的讲法可辅助理解，但语法准确性应以语言文档和本地验证为准。",
+          "code": "values=[45,34]\nprint(type(enumerate(values)).__name__)\nprint(list(enumerate(values)))",
+          "output": "enumerate\n[(0, 45), (1, 34)]",
+          "trace": [
+            "创建enumerate对象。",
+            "type显示它的实际类型。",
+            "list把迭代器消费并展示生成的二元组。"
+          ],
+          "mistake": "输出一个教程里的截图不等于理解；应能解释每个0/1索引来自哪里。",
+          "exercise": "打开Python官方enumerate帮助并将代码改成start=1。"
+        },
+        {
+          "title": "导入与安装不是一回事：标准库、第三方依赖和ROS2",
+          "syntax": "import csv vs import numpy vs import rclpy",
+          "explain": "csv/json/math/pathlib/unittest来自标准库；numpy/matplotlib来自第三方库，需在对应venv安装；rclpy属于ROS2相关Python接口，运行环境更复杂。你只需在本课知道分层，不要在Python刚入门时同时配置完整ROS2环境。将来做自动化测试、日志处理和仿真时，再学习具体库的API与版本兼容性。",
+          "code": "import csv\nimport json\nimport math\nprint('标准库可用')",
+          "output": "标准库可用",
+          "trace": [
+            "Python从标准库取得三个模块。",
+            "不用pip安装即可执行。"
+          ],
+          "mistake": "在普通Python环境里直接import rclpy失败不代表Python基础安装错误；其依赖ROS2环境。",
+          "exercise": "写出三列：Python语言关键字、标准库模块、第三方库名称，各列举5个。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "全部前22章；此章为检索而不是新增艰难语法"
+      ],
+      "chapterSummary": "掌握读陌生代码的通用方法：识别符号→识别对象→查参数与返回→本地最小验证。"
     },
     {
       "id": "next",
       "phase": "后续索引",
-      "title": "23 · 进入原D15：从list到ndarray，再到曲线",
-      "minutes": 25,
+      "title": "23 · 衔接原D15：先会Python语法，再理解NumPy数组",
+      "minutes": 48,
       "goal": "明确基础导学与原D15的衔接，不打乱84天路线。",
       "story": [
         "完成这份导学后，你应能读懂原D15的demo.py：为什么先import、为什么定义main、为什么传入CSV路径、为什么try/except处理错误、为什么load_log返回数组、为什么save_charts保存图片。",
@@ -2692,10 +2948,73 @@
         "answer": 1,
         "why": "冒号表示所有行，0表示第0列。"
       },
-      "deepDive": [],
+      "deepDive": [
+        {
+          "title": "为什么list还不等于NumPy ndarray",
+          "syntax": "[1,2,3] 与 np.asarray([1,2,3])",
+          "explain": "Python list可以保存各种类型，便于一般程序数据组织；NumPy ndarray面向高效的数值数组，通常具有统一dtype、shape等属性并支持向量化运算。原D15读取CSV后把行列表转换为二维ndarray，再按列计算平均值、最小值等。没有Python基础就会难以区分“Python语法”与“NumPy库的特定API”，所以先修页在这里衔接。",
+          "code": "import numpy as np\nvalues = [1.0,2.0,3.0]\narray = np.asarray(values,dtype=float)\nprint(array.shape)\nprint(np.mean(array))",
+          "output": "(3,)\n2.0",
+          "trace": [
+            "import numpy as np取得模块别名。",
+            "np.asarray创建NumPy数组。",
+            "shape说明一维有3个元素。",
+            "np.mean计算均值2.0。"
+          ],
+          "mistake": "这段必须在已安装numpy的环境里运行，基础标准库工程本身不依赖它。",
+          "exercise": "从原D15 requirements.txt安装依赖后再运行本段。"
+        },
+        {
+          "title": "矩阵shape=(N,4)与matrix[:,0]逐字符拆开",
+          "syntax": "matrix[:, 0]",
+          "explain": "matrix变量指向二维NumPy数组，方括号中用逗号分隔两个维度：冒号:表示第一个维度“所有行”，0表示第二个维度“第0列”，因此matrix[:,0]得到时间列的一维数组。matrix[0,1]则取第一行第二列的单个数值。这里的逗号和冒号是NumPy多维下标语法，不能简单套到任意Python嵌套list上。",
+          "code": "import numpy as np\nmatrix=np.asarray([[0,72.0,45.0,0],[20,73.0,40.0,1]])\nprint(matrix.shape)\nprint(matrix[:,0])\nprint(matrix[0,1])",
+          "output": "(2, 4)\n[ 0. 20.]\n72.0",
+          "trace": [
+            "创建2行4列的ndarray。",
+            "matrix.shape报告(2,4)。",
+            "[:,0]抽取第一列[0,20]。",
+            "[0,1]抽取第一行第二列72.0。"
+          ],
+          "mistake": "原生Python嵌套list不支持matrix[:,0]这种写法，需用列表推导式或先转换为ndarray。",
+          "exercise": "用普通列表写[ row[0] for row in rows ]，对比NumPy的matrix[:,0]。"
+        },
+        {
+          "title": "Matplotlib的plot和step不是Python关键字",
+          "syntax": "ax.plot(...) / ax.step(...) / fig.savefig(...)",
+          "explain": "plot、step、savefig都是Matplotlib对象方法，不是Python语言核心语法。plot用于显示连续数量的采样变化；step更适合mode等离散状态，因为不应暗示中间的0.5状态真实存在。你已经掌握点号、函数参数和对象之后，这些调用就是“对绘图对象调用其方法”。速度纵轴km/h、距离m、时间ms、模式无量纲类别，均应在图中标明。",
+          "code": "# 示例需要本地安装matplotlib后执行：\n# from matplotlib import pyplot as plt\n# fig, ax = plt.subplots()\n# ax.plot([0,20,40],[72,73,74])\n# ax.set(xlabel='时间(ms)', ylabel='速度(km/h)')\n# fig.savefig('speed.png')",
+          "output": "本地应生成speed.png；有些系统缺少中文字体可能导致标题/标签显示方框。",
+          "trace": [
+            "导入绘图库并创建图窗/坐标轴对象。",
+            "ax.plot调用坐标轴的绘线方法。",
+            "ax.set设置轴标签。",
+            "fig.savefig写图像文件。"
+          ],
+          "mistake": "网页预览曲线不代表学员本机Matplotlib成功输出PNG；必须本地运行。",
+          "exercise": "进入原D15运行demo.py生成3张图，逐一核对单位。"
+        },
+        {
+          "title": "进入原D15前的检查：按能力链，而不是按页数",
+          "syntax": "能读import→main→load_log→summarize→save_charts",
+          "explain": "建议用实际动作检查是否具备D15条件：能从python demo.py找到入口；看到from log_reader import load_log能说明导入的是什么；看到matrix[:,0]能解释行列；看到result=...能区分函数返回和print；看到try/except能明白异常从哪来；看到plt/np的点号能说出它们是库的对象成员。达到这些要求即可进入D15，不必当天把所有高级术语背完。",
+          "code": "# D15入口的阅读顺序：\n# 1. demo.py 从 __main__ 进入main\n# 2. main 解析场景并调用load_log\n# 3. load_log从CSV创建二维数值矩阵\n# 4. summarize按列计算\n# 5. save_charts保存三张PNG\n# 6. main汇总打印或者报告解析错误",
+          "output": "能口头画出完整调用链即可进入D15原课。",
+          "trace": [
+            "辨认入口和参数。",
+            "辨认外部库与标准库。",
+            "辨认矩阵读取和返回结果。",
+            "辨认绘图文件真实保存位置。"
+          ],
+          "mistake": "不要把“导学页标记全部完成”等同于“本地Python自动测试通过”。",
+          "exercise": "从原D15项目中任选一个函数，写出其入参、返回类型与谁调用它。"
+        }
+      ],
       "syntaxWords": [],
-      "prerequisites": [],
-      "chapterSummary": ""
+      "prerequisites": [
+        "02–22：语法、循环、函数、模块、CSV和测试"
+      ],
+      "chapterSummary": "看懂原D15源码大部分基础语法；NumPy/Matplotlib作为新库逐步学习，而不是一上来理解整个工程。"
     }
   ],
   "syntaxAtlas": [
