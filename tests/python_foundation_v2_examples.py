@@ -23,7 +23,7 @@ def main() -> None:
     assert len(lessons) == 21
     assert len({chapter["id"] for chapter in lessons}) == 21
     assert all(chapter["id"].startswith("v2_") for chapter in lessons)
-    assert len(lessons[2]["details"]) >= 10
+    assert len(lessons[1]["details"]) >= 10
     assert len(lessons[7]["details"]) >= 10
     assert "for" in lessons[7]["title"] and "while" in lessons[7]["title"]
     all_details = [(chapter, item) for chapter in lessons for item in chapter["details"]]
