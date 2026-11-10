@@ -11,10 +11,10 @@
   ],
   "schedule": [
     {
-      "label": "入门语言符号",
+      "label": "第一阶段：运行与语法符号",
       "time": "按掌握进度",
       "chapters": "01–03",
-      "outcome": "环境与标点"
+      "outcome": "解释器、_ . () [] {} :、环境"
     },
     {
       "label": "基本语法",
@@ -215,179 +215,6 @@
     },
     {
       "id": "v2_02",
-      "phase": "起步",
-      "title": "02｜环境与工具：Python版本、目录、编辑器和venv",
-      "minutes": 25,
-      "goal": "明白解释器、命令行、目录、库安装的关系。",
-      "story": [
-        "在WSL/Linux，python3 --version查看当前解释器；which python3检查路径。在Windows PowerShell通常使用py -3 --version或python --version。终端的工作目录决定相对路径从哪里寻找，而__file__指向脚本文件所在位置。",
-        "venv虚拟环境相当于项目自己的Python依赖空间，避免不同工程的库版本相互影响。执行python3 -m venv .venv创建环境，source .venv/bin/activate激活；Windows PowerShell通常为.venv\\Scripts\\Activate.ps1。再用python -m pip安装库。",
-        "本补充工程只需要Python标准库，不需要安装NumPy。这是为了先理解Python如何运行和组织程序。D15原课再在另一个虚拟环境安装NumPy/Matplotlib。"
-      ],
-      "code": "# 在终端执行（这些不是Python代码）：\n# python3 --version\n# python3 -m venv .venv\n# source .venv/bin/activate\n# python -m pip --version\n\n# 创建 env_check.py 后，在终端运行python env_check.py：\nimport sys                    # 导入标准库sys，查看解释器信息。\nfrom pathlib import Path       # 从pathlib模块取得Path类。\nprint(\"解释器:\", sys.executable)\nprint(\"当前目录:\", Path.cwd())\nprint(\"脚本目录:\", Path(__file__).resolve().parent)",
-      "trace": [
-        "终端执行python3 -m venv .venv创建一个目录，里面包含项目解释器等资源。",
-        "激活后终端中的python通常指向这个环境的解释器。",
-        "运行env_check.py时导入sys和Path；print分别显示解释器、工作目录和脚本目录。",
-        "进入D15 NumPy项目后再用python -m pip install -r requirements.txt安装第三方库。"
-      ],
-      "expected": "输出依赖你的机器；解释器路径、当前目录和脚本目录通常不同。",
-      "compare": "类似C项目里选择GCC工具链、CMake构建目录和外部库；Python使用解释器、venv及pip。",
-      "trap": "不要把终端提示符里的$或>复制成Python代码。不要把“安装了Python”理解为“所有外部库已经安装”。",
-      "task": "本机执行python3 --version、python3 -m venv .venv、激活venv、python -m pip --version，记录解释器实际路径。",
-      "check": {
-        "q": "本项目什么时候需要安装NumPy？",
-        "options": [
-          "所有Python脚本都必须安装",
-          "只有需要NumPy功能的D15原课才安装",
-          "打开CSV时一定要安装"
-        ],
-        "answer": 1,
-        "why": "标准库csv、json、dataclasses等随Python提供；NumPy是第三方库。"
-      },
-      "original_id": "environment",
-      "details": [
-        {
-          "name": "查看解释器与工作目录",
-          "grammar": "python3 --version / python -c '...'",
-          "explanation": "查看Python版本是检查解释器是否可执行；运行时工作目录决定相对路径如sample.csv在哪里查找。脚本路径和工作目录可能不同，想让程序稳定地找到同目录文件可以使用Path(__file__).resolve().parent。文件路径首先是操作系统概念，不是Python会自动搜索全盘。",
-          "parts": [
-            [
-              "python3 --version",
-              "在终端运行，打印解释器版本"
-            ],
-            [
-              "Path.cwd()",
-              "当前工作目录"
-            ],
-            [
-              "__file__",
-              "Python通常给脚本模块设置的文件路径变量（交互环境可能没有）"
-            ],
-            [
-              "resolve().parent",
-              "转换为路径对象的绝对父目录"
-            ]
-          ],
-          "example": "from pathlib import Path\nprint(Path.cwd().is_dir())\nprint(Path(__file__).name)",
-          "trace": [
-            "导入pathlib里的Path类。",
-            "Path.cwd()返回当前目录，is_dir()判断确实是目录。",
-            "__file__是当前脚本的文件名或路径；Path(...).name取末尾文件名。"
-          ],
-          "expected": "True\n（第二行是你保存的.py文件名，例如env.py）",
-          "errors": [
-            "这段代码在直接输入的REPL不适合使用__file__，应保存成文件运行。"
-          ],
-          "practice": "将文件保存为env.py，记录工作目录与脚本目录。"
-        },
-        {
-          "name": "py、python、python3和解释器选择",
-          "grammar": "python3 script.py / py -3 script.py",
-          "explanation": "Windows、WSL和macOS的命令名字不一定相同。Windows常用py -3，WSL/Linux通常用python3，venv激活后常用python。重要的是用python --version和python -m pip --version确认两者指向同一个环境；不要盲目依赖电脑上同时安装的多个解释器版本。",
-          "parts": [
-            [
-              "py -3",
-              "Windows Python启动器的一种调用形式"
-            ],
-            [
-              "python3",
-              "常见Unix-like系统的解释器命令"
-            ],
-            [
-              "-m",
-              "作为模块运行，如python -m pip"
-            ],
-            [
-              "--version",
-              "查看工具版本"
-            ]
-          ],
-          "example": "import sys\nprint(sys.version_info.major)\nprint(sys.executable != \"\")",
-          "trace": [
-            "导入标准库sys。",
-            "打印主版本号，Python3应是3。",
-            "解释器路径非空，输出True。"
-          ],
-          "expected": "3\nTrue",
-          "errors": [
-            "终端命令不应直接放到.py文件中。"
-          ],
-          "practice": "在自己的本地环境找到实际解释器路径并记录。"
-        },
-        {
-          "name": "venv隔离依赖，为什么不是每份代码都要装NumPy",
-          "grammar": "python3 -m venv .venv",
-          "explanation": "venv创建项目自己的虚拟环境目录。激活后python/pip指向该环境，安装第三方包不会与系统解释器混在一起。零基础导学的ASW工程只用csv、json、pathlib、dataclasses这些Python标准库；D15 NumPy和Matplotlib才需要另外安装第三方依赖。",
-          "parts": [
-            [
-              "venv",
-              "标准库中的虚拟环境模块"
-            ],
-            [
-              "-m",
-              "运行指定模块"
-            ],
-            [
-              ".venv",
-              "常用的本地虚拟环境目录名"
-            ],
-            [
-              "pip",
-              "Python包安装工具"
-            ]
-          ],
-          "example": "import sys\nprint(sys.version_info.major >= 3)\nprint(\"环境检查完成\")",
-          "trace": [
-            "导入sys。",
-            "检查主版本不低于3。",
-            "打印提示，说明脚本已执行。"
-          ],
-          "expected": "True\n环境检查完成",
-          "errors": [
-            "虚拟环境命令需在终端执行。",
-            "建立venv不会自动安装NumPy等第三方库。"
-          ],
-          "practice": "在终端执行python3 -m venv .venv，再激活并查看python -m pip --version。"
-        },
-        {
-          "name": "运行错误：找不到文件、无法导入模块、代码有语法错",
-          "grammar": "FileNotFoundError / ModuleNotFoundError / SyntaxError",
-          "explanation": "三类错误有不同位置：python3 cannot open file说明启动时没找到脚本；脚本内open('missing.csv')可能导致FileNotFoundError；import缺少模块时是ModuleNotFoundError；写成if True却没有冒号则是SyntaxError。先从报错末尾的类型和最先定位到的文件、行号下手。",
-          "parts": [
-            [
-              "FileNotFoundError",
-              "某次文件打开/访问未找到路径"
-            ],
-            [
-              "ModuleNotFoundError",
-              "import未能找到目标模块"
-            ],
-            [
-              "SyntaxError",
-              "代码不符合Python语法"
-            ],
-            [
-              "Traceback",
-              "记录由哪些代码路径进入错误位置"
-            ]
-          ],
-          "example": "from pathlib import Path\np = Path(\"missing.csv\")\nprint(p.exists())",
-          "trace": [
-            "构造相对路径对象missing.csv，并不立即读取文件。",
-            "exists()检查文件是否存在。",
-            "如果目录里确实没有该文件，输出False而不抛出文件读取异常。"
-          ],
-          "expected": "False（前提：当前目录没有missing.csv）",
-          "errors": [
-            "不要为了绕过报错随意创建同名标准库文件csv.py。"
-          ],
-          "practice": "在本地分别制造一个文件名打错与语法冒号丢失错误。"
-        }
-      ]
-    },
-    {
-      "id": "v2_03",
       "phase": "语法符号",
       "minutes": 70,
       "goal": "拿到一行Python代码能够逐字解释每个常见标点；先学语法，不跳进ASW工程。",
@@ -816,7 +643,180 @@
         "why": "点号访问对象属性，圆括号调用取到的可调用方法。"
       },
       "original_id": null,
-      "title": "03｜代码符号逐字讲解：_ . () [] {} : , = == #"
+      "title": "02｜代码符号逐字讲解：_ . () [] {} : , = == #"
+    },
+    {
+      "id": "v2_03",
+      "phase": "起步",
+      "title": "03｜环境与工具：Python版本、目录、编辑器和venv",
+      "minutes": 25,
+      "goal": "明白解释器、命令行、目录、库安装的关系。",
+      "story": [
+        "在WSL/Linux，python3 --version查看当前解释器；which python3检查路径。在Windows PowerShell通常使用py -3 --version或python --version。终端的工作目录决定相对路径从哪里寻找，而__file__指向脚本文件所在位置。",
+        "venv虚拟环境相当于项目自己的Python依赖空间，避免不同工程的库版本相互影响。执行python3 -m venv .venv创建环境，source .venv/bin/activate激活；Windows PowerShell通常为.venv\\Scripts\\Activate.ps1。再用python -m pip安装库。",
+        "本补充工程只需要Python标准库，不需要安装NumPy。这是为了先理解Python如何运行和组织程序。D15原课再在另一个虚拟环境安装NumPy/Matplotlib。"
+      ],
+      "code": "# 在终端执行（这些不是Python代码）：\n# python3 --version\n# python3 -m venv .venv\n# source .venv/bin/activate\n# python -m pip --version\n\n# 创建 env_check.py 后，在终端运行python env_check.py：\nimport sys                    # 导入标准库sys，查看解释器信息。\nfrom pathlib import Path       # 从pathlib模块取得Path类。\nprint(\"解释器:\", sys.executable)\nprint(\"当前目录:\", Path.cwd())\nprint(\"脚本目录:\", Path(__file__).resolve().parent)",
+      "trace": [
+        "终端执行python3 -m venv .venv创建一个目录，里面包含项目解释器等资源。",
+        "激活后终端中的python通常指向这个环境的解释器。",
+        "运行env_check.py时导入sys和Path；print分别显示解释器、工作目录和脚本目录。",
+        "进入D15 NumPy项目后再用python -m pip install -r requirements.txt安装第三方库。"
+      ],
+      "expected": "输出依赖你的机器；解释器路径、当前目录和脚本目录通常不同。",
+      "compare": "类似C项目里选择GCC工具链、CMake构建目录和外部库；Python使用解释器、venv及pip。",
+      "trap": "不要把终端提示符里的$或>复制成Python代码。不要把“安装了Python”理解为“所有外部库已经安装”。",
+      "task": "本机执行python3 --version、python3 -m venv .venv、激活venv、python -m pip --version，记录解释器实际路径。",
+      "check": {
+        "q": "本项目什么时候需要安装NumPy？",
+        "options": [
+          "所有Python脚本都必须安装",
+          "只有需要NumPy功能的D15原课才安装",
+          "打开CSV时一定要安装"
+        ],
+        "answer": 1,
+        "why": "标准库csv、json、dataclasses等随Python提供；NumPy是第三方库。"
+      },
+      "original_id": "environment",
+      "details": [
+        {
+          "name": "查看解释器与工作目录",
+          "grammar": "python3 --version / python -c '...'",
+          "explanation": "查看Python版本是检查解释器是否可执行；运行时工作目录决定相对路径如sample.csv在哪里查找。脚本路径和工作目录可能不同，想让程序稳定地找到同目录文件可以使用Path(__file__).resolve().parent。文件路径首先是操作系统概念，不是Python会自动搜索全盘。",
+          "parts": [
+            [
+              "python3 --version",
+              "在终端运行，打印解释器版本"
+            ],
+            [
+              "Path.cwd()",
+              "当前工作目录"
+            ],
+            [
+              "__file__",
+              "Python通常给脚本模块设置的文件路径变量（交互环境可能没有）"
+            ],
+            [
+              "resolve().parent",
+              "转换为路径对象的绝对父目录"
+            ]
+          ],
+          "example": "from pathlib import Path\nprint(Path.cwd().is_dir())\nprint(Path(__file__).name)",
+          "trace": [
+            "导入pathlib里的Path类。",
+            "Path.cwd()返回当前目录，is_dir()判断确实是目录。",
+            "__file__是当前脚本的文件名或路径；Path(...).name取末尾文件名。"
+          ],
+          "expected": "True\n（第二行是你保存的.py文件名，例如env.py）",
+          "errors": [
+            "这段代码在直接输入的REPL不适合使用__file__，应保存成文件运行。"
+          ],
+          "practice": "将文件保存为env.py，记录工作目录与脚本目录。"
+        },
+        {
+          "name": "py、python、python3和解释器选择",
+          "grammar": "python3 script.py / py -3 script.py",
+          "explanation": "Windows、WSL和macOS的命令名字不一定相同。Windows常用py -3，WSL/Linux通常用python3，venv激活后常用python。重要的是用python --version和python -m pip --version确认两者指向同一个环境；不要盲目依赖电脑上同时安装的多个解释器版本。",
+          "parts": [
+            [
+              "py -3",
+              "Windows Python启动器的一种调用形式"
+            ],
+            [
+              "python3",
+              "常见Unix-like系统的解释器命令"
+            ],
+            [
+              "-m",
+              "作为模块运行，如python -m pip"
+            ],
+            [
+              "--version",
+              "查看工具版本"
+            ]
+          ],
+          "example": "import sys\nprint(sys.version_info.major)\nprint(sys.executable != \"\")",
+          "trace": [
+            "导入标准库sys。",
+            "打印主版本号，Python3应是3。",
+            "解释器路径非空，输出True。"
+          ],
+          "expected": "3\nTrue",
+          "errors": [
+            "终端命令不应直接放到.py文件中。"
+          ],
+          "practice": "在自己的本地环境找到实际解释器路径并记录。"
+        },
+        {
+          "name": "venv隔离依赖，为什么不是每份代码都要装NumPy",
+          "grammar": "python3 -m venv .venv",
+          "explanation": "venv创建项目自己的虚拟环境目录。激活后python/pip指向该环境，安装第三方包不会与系统解释器混在一起。零基础导学的ASW工程只用csv、json、pathlib、dataclasses这些Python标准库；D15 NumPy和Matplotlib才需要另外安装第三方依赖。",
+          "parts": [
+            [
+              "venv",
+              "标准库中的虚拟环境模块"
+            ],
+            [
+              "-m",
+              "运行指定模块"
+            ],
+            [
+              ".venv",
+              "常用的本地虚拟环境目录名"
+            ],
+            [
+              "pip",
+              "Python包安装工具"
+            ]
+          ],
+          "example": "import sys\nprint(sys.version_info.major >= 3)\nprint(\"环境检查完成\")",
+          "trace": [
+            "导入sys。",
+            "检查主版本不低于3。",
+            "打印提示，说明脚本已执行。"
+          ],
+          "expected": "True\n环境检查完成",
+          "errors": [
+            "虚拟环境命令需在终端执行。",
+            "建立venv不会自动安装NumPy等第三方库。"
+          ],
+          "practice": "在终端执行python3 -m venv .venv，再激活并查看python -m pip --version。"
+        },
+        {
+          "name": "运行错误：找不到文件、无法导入模块、代码有语法错",
+          "grammar": "FileNotFoundError / ModuleNotFoundError / SyntaxError",
+          "explanation": "三类错误有不同位置：python3 cannot open file说明启动时没找到脚本；脚本内open('missing.csv')可能导致FileNotFoundError；import缺少模块时是ModuleNotFoundError；写成if True却没有冒号则是SyntaxError。先从报错末尾的类型和最先定位到的文件、行号下手。",
+          "parts": [
+            [
+              "FileNotFoundError",
+              "某次文件打开/访问未找到路径"
+            ],
+            [
+              "ModuleNotFoundError",
+              "import未能找到目标模块"
+            ],
+            [
+              "SyntaxError",
+              "代码不符合Python语法"
+            ],
+            [
+              "Traceback",
+              "记录由哪些代码路径进入错误位置"
+            ]
+          ],
+          "example": "from pathlib import Path\np = Path(\"missing.csv\")\nprint(p.exists())",
+          "trace": [
+            "构造相对路径对象missing.csv，并不立即读取文件。",
+            "exists()检查文件是否存在。",
+            "如果目录里确实没有该文件，输出False而不抛出文件读取异常。"
+          ],
+          "expected": "False（前提：当前目录没有missing.csv）",
+          "errors": [
+            "不要为了绕过报错随意创建同名标准库文件csv.py。"
+          ],
+          "practice": "在本地分别制造一个文件名打错与语法冒号丢失错误。"
+        }
+      ]
     },
     {
       "id": "v2_04",
