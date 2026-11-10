@@ -3263,7 +3263,152 @@
         "why": "CSV是文本格式，必须显式转换并校验。"
       },
       "original_id": "files",
-      "details": []
+      "details": [
+        {
+          "name": "Path路径和当前工作目录",
+          "grammar": "from pathlib import Path; Path.cwd()",
+          "explanation": "Path是pathlib模块的类，方便跨操作系统处理文件路径。Path.cwd()得到当前工作目录；Path(__file__).resolve().parent通常得到脚本文件所在目录（在脚本上下文有效）。脚本执行目录和当前工作目录不同会造成相对路径找不到文件；这和CSV内容是否有效不是一回事。",
+          "parts": [
+            [
+              "from pathlib import Path",
+              "从pathlib导入Path类"
+            ],
+            [
+              "Path.cwd()",
+              "当前工作目录路径对象"
+            ],
+            [
+              "__file__",
+              "脚本模块文件位置，交互环境不保证存在"
+            ],
+            [
+              ".parent",
+              "路径对象的上一级目录"
+            ]
+          ],
+          "example": "from pathlib import Path\np=Path(\"sample.csv\")\nprint(p.name)\nprint(p.suffix)",
+          "trace": [
+            "Path构造一个相对路径对象，并没有打开文件。",
+            "p.name得到末端文件名sample.csv。",
+            "p.suffix得到扩展名.csv。"
+          ],
+          "expected": "sample.csv\n.csv",
+          "errors": [
+            "Path('sample.csv')不保证文件存在。"
+          ],
+          "practice": "用Path.cwd()打印本地当前目录，并检查sample.csv是否在该目录。"
+        },
+        {
+          "name": "with打开文件：为什么不需要手动close",
+          "grammar": "with path.open('r', encoding='utf-8') as f:",
+          "explanation": "with是上下文管理语法，进入代码块时获得文件对象，离开时自动关闭，即使执行中发生异常也会执行清理流程。'r'表示读、'w'表示写（会覆盖），newline=''常与csv模块配合；encoding='utf-8'控制文本编码。读文件得到的是字符串，不会自动变成数值。",
+          "parts": [
+            [
+              "with",
+              "进入/离开自动管理资源"
+            ],
+            [
+              "open('r')",
+              "打开文本供读取"
+            ],
+            [
+              "as file",
+              "当前代码块用于引用文件对象的名字"
+            ],
+            [
+              "encoding",
+              "文本编码规则"
+            ],
+            [
+              "'w'",
+              "写文件，可能覆盖原内容"
+            ]
+          ],
+          "example": "from pathlib import Path\np=Path(\"example.txt\")\nwith p.open(\"w\",encoding=\"utf-8\") as file:\n    file.write(\"72\\n\")\nwith p.open(\"r\",encoding=\"utf-8\") as file:\n    print(file.read().strip())",
+          "trace": [
+            "创建文件路径对象。",
+            "以写模式打开并写入'72\\n'，离开with自动关闭。",
+            "再以读模式打开，read读取文本、strip去掉换行，最后打印72。"
+          ],
+          "expected": "72（在当前工作目录生成example.txt）",
+          "errors": [
+            "'w'会覆盖目标文件，正式日志不要随便覆盖原始数据。"
+          ],
+          "practice": "在本地复制样例目录后运行，确认文件内容是文本。"
+        },
+        {
+          "name": "csv.reader与csv.DictReader返回什么",
+          "grammar": "reader=csv.DictReader(file); row['speed_kmh']",
+          "explanation": "CSV是文本格式。DictReader以首行字段名作为字典键，每轮取得一个字典，里面的值通常仍是字符串；需要float/int和有效性检查才能成为业务数据。reader.line_num用于定位物理CSV行号。相比str.split(',')，标准库csv能处理有引号的字段等CSV格式细节。",
+          "parts": [
+            [
+              "csv",
+              "Python标准库CSV模块"
+            ],
+            [
+              "DictReader(file)",
+              "以表头作为键的逐行读取器"
+            ],
+            [
+              "row['speed_kmh']",
+              "本行中的车速文本"
+            ],
+            [
+              "float(...)",
+              "明确转换数值"
+            ],
+            [
+              "reader.line_num",
+              "当前CSV读取的物理行位置"
+            ]
+          ],
+          "example": "import csv\nfrom io import StringIO\nsource=StringIO(\"speed_kmh,distance_m\\n72,34\\n\")\nreader=csv.DictReader(source)\nrow=next(reader)\nprint(row[\"speed_kmh\"],type(row[\"speed_kmh\"]).__name__)",
+          "trace": [
+            "StringIO构建一个内存文本文件供示范。",
+            "DictReader读表头，然后next取得第一条字典数据行。",
+            "speed_kmh键对应文本'72'，类型是str。"
+          ],
+          "expected": "72 str",
+          "errors": [
+            "CSV解析得到str不是物理量；不能直接比较row['speed_kmh']>100。"
+          ],
+          "practice": "尝试把CSV文本中的speed_kmh改为oops，再使用float解析观察异常。"
+        },
+        {
+          "name": "json.dump保存分析结果及中文",
+          "grammar": "json.dump(result, file, ensure_ascii=False, indent=2)",
+          "explanation": "JSON是另一种文本格式，可以保存字典、列表、数字、字符串、bool和None对应值。json.dump把Python对象序列化并写入文件，json.dumps则返回一个字符串；ensure_ascii=False让中文直接以可读字符写入，indent=2提供缩进。JSON不是Python可执行文件。",
+          "parts": [
+            [
+              "json.dump",
+              "把对象写入打开的文件"
+            ],
+            [
+              "json.dumps",
+              "返回JSON字符串"
+            ],
+            [
+              "ensure_ascii=False",
+              "中文字符直接保留"
+            ],
+            [
+              "indent=2",
+              "输出格式的缩进空格"
+            ]
+          ],
+          "example": "import json\nrow={\"state\":\"正常\",\"alert\":False}\nprint(json.dumps(row,ensure_ascii=False))",
+          "trace": [
+            "导入json模块。",
+            "定义包含中文和值的字典。",
+            "json.dumps把它转为JSON字符串打印。"
+          ],
+          "expected": "{\"state\": \"正常\", \"alert\": false}",
+          "errors": [
+            "JSON中布尔字面量是true/false，而Python是True/False。"
+          ],
+          "practice": "把两帧结果组成列表并保存为output.json。"
+        }
+      ]
     },
     {
       "id": "v2_16",
@@ -3298,7 +3443,148 @@
         "why": "应保留可定位的错误信息，禁止无声掩盖异常。"
       },
       "original_id": "exceptions",
-      "details": []
+      "details": [
+        {
+          "name": "异常是什么：错误类型与Traceback",
+          "grammar": "ValueError / TypeError / KeyError / IndexError / FileNotFoundError",
+          "explanation": "当执行过程遇到无法按预期完成的操作，Python通常抛出异常，并附带Traceback调用栈。ValueError表示值不能满足期望、TypeError表示类型/调用方式不适合、KeyError缺失字典键、IndexError索引越界、FileNotFoundError文件不存在。先读最后的异常类型，再顺着栈定位是哪一行触发。",
+          "parts": [
+            [
+              "ValueError",
+              "转换或取值不符合要求"
+            ],
+            [
+              "TypeError",
+              "操作对象类型或函数参数不合适"
+            ],
+            [
+              "KeyError",
+              "字典缺少键"
+            ],
+            [
+              "IndexError",
+              "序列索引越界"
+            ],
+            [
+              "Traceback",
+              "从调用入口到错误点的函数/文件路径"
+            ]
+          ],
+          "example": "try:\n    int(\"oops\")\nexcept ValueError as error:\n    print(type(error).__name__)",
+          "trace": [
+            "try进入受保护的代码块。",
+            "int('oops')不能解析为整数，抛ValueError。",
+            "except捕获特定异常，打印其类型名。"
+          ],
+          "expected": "ValueError",
+          "errors": [
+            "不要在except里写pass然后把错误输入当有效数据继续处理。"
+          ],
+          "practice": "分别制造KeyError和IndexError，查看Traceback的末行。"
+        },
+        {
+          "name": "try/except/else/finally的不同触发条件",
+          "grammar": "try: ... except ValueError: ... else: ... finally: ...",
+          "explanation": "try块先执行，出现匹配异常才进入except；没有抛异常时可运行else；finally通常无论是否发生异常都用于资源清理。异常匹配应尽可能具体，如ValueError，不要直接用裸except吞掉键盘中断和其他异常。错误处理是按业务约定拒绝坏记录，而不是擅自把错误记录设为0。",
+          "parts": [
+            [
+              "try",
+              "尝试可能失败的操作"
+            ],
+            [
+              "except ValueError",
+              "只处理ValueError及其子类"
+            ],
+            [
+              "else",
+              "try中未触发异常时执行"
+            ],
+            [
+              "finally",
+              "结束异常控制结构时执行的清理分支"
+            ]
+          ],
+          "example": "try:\n    x=int(\"72\")\nexcept ValueError:\n    print(\"输入错误\")\nelse:\n    print(\"成功\",x)\nfinally:\n    print(\"本轮结束\")",
+          "trace": [
+            "int('72')成功得到72。",
+            "except不执行。",
+            "else打印成功72，finally随后打印本轮结束。"
+          ],
+          "expected": "成功 72\n本轮结束",
+          "errors": [
+            "finally不等于“程序一定成功”，失败路径也可能执行finally。"
+          ],
+          "practice": "把'72'改为'bad'，先预测输出。"
+        },
+        {
+          "name": "raise主动拒绝数据与异常链",
+          "grammar": "raise ValueError('speed invalid')",
+          "explanation": "除了由解释器自动抛出异常，业务程序可以用raise表达“这份数据违反接口合同”。例如车速为-5km/h不能直接当有效日志分析。异常消息应说明字段、行号或数据范围。raise ... from exc会关联原始转换异常，便于追踪根因。",
+          "parts": [
+            [
+              "raise",
+              "主动抛出异常"
+            ],
+            [
+              "ValueError(...)",
+              "构造有具体消息的异常"
+            ],
+            [
+              "from exc",
+              "保留原始异常因果链"
+            ],
+            [
+              "line_num",
+              "可附到异常消息里的CSV物理行号"
+            ]
+          ],
+          "example": "def parse_speed(raw):\n    speed=float(raw)\n    if speed<0:\n        raise ValueError(\"speed_kmh不能为负\")\n    return speed\ntry:\n    print(parse_speed(\"-5\"))\nexcept ValueError as exc:\n    print(exc)",
+          "trace": [
+            "调用parse_speed('-5')，float转换成功得到-5。",
+            "范围检查发现负数，raise ValueError。",
+            "外层except捕获并打印具体消息。"
+          ],
+          "expected": "speed_kmh不能为负",
+          "errors": [
+            "raise不会自动重试或纠正数据。"
+          ],
+          "practice": "给parse_speed增加上限250，并测试251。"
+        },
+        {
+          "name": "异常与状态对象invalid有什么区别",
+          "grammar": "return Decision(valid=False) vs raise ValueError",
+          "explanation": "文件格式错误、非数值等属于解析无法继续的问题，可以抛异常并定位行号；雷达invalid这类可预期业务状态，可以返回Decision(valid=False)表示当前帧不可作为有效告警。选哪种机制应由函数接口合同决定，不能把所有invalid都变成程序崩溃，也不能用正常返回码掩盖损坏文本。",
+          "parts": [
+            [
+              "raise ValueError",
+              "解析失败等异常路径"
+            ],
+            [
+              "return Decision(...)",
+              "业务逻辑返回结构化结果"
+            ],
+            [
+              "valid=False",
+              "不可消费当前判断结果"
+            ],
+            [
+              "异常处理器",
+              "在合适外层捕获并解释错误"
+            ]
+          ],
+          "example": "def parse(flag):\n    if flag not in (\"0\",\"1\"):\n        raise ValueError(\"非法有效位\")\n    return flag==\"1\"\nprint(parse(\"0\"))",
+          "trace": [
+            "parse('0')满足字符串集合约定。",
+            "返回False布尔值，函数正常结束。",
+            "外层打印False。"
+          ],
+          "expected": "False",
+          "errors": [
+            "bool('0')其实是True，不能代替协议解析。"
+          ],
+          "practice": "尝试parse('maybe')并观察ValueError。"
+        }
+      ]
     },
     {
       "id": "v2_17",
@@ -3333,7 +3619,140 @@
         "why": "断言是验证需求的证据，不应为了绿灯随意改变预期。"
       },
       "original_id": "debug",
-      "details": []
+      "details": [
+        {
+          "name": "print调试、断点与局部变量",
+          "grammar": "print('speed=',speed) / breakpoint()",
+          "explanation": "初学阶段打印变量、类型和当前函数名可以快速看清执行链；调试器断点则能停在具体源码行、查看局部变量与调用栈，逐步进入/跳出函数。print调试不应随意在高频循环里产生海量输出，测试日志要有可比对的输入编号、单位和状态。",
+          "parts": [
+            [
+              "print",
+              "展示当前值，不返回业务数据"
+            ],
+            [
+              "breakpoint()",
+              "在配置了调试器的环境中请求暂停"
+            ],
+            [
+              "调用栈",
+              "从main到当前函数之间的嵌套调用关系"
+            ]
+          ],
+          "example": "def add_one(x):\n    print(\"进入函数\",x)\n    return x+1\nprint(add_one(3))",
+          "trace": [
+            "调用add_one(3)进入函数，内部先打印参数。",
+            "return得到4。",
+            "外层print打印4。"
+          ],
+          "expected": "进入函数 3\n4",
+          "errors": [
+            "临时print不是单元测试的替代品。"
+          ],
+          "practice": "在函数入口和返回前分别打印，画出调用顺序。"
+        },
+        {
+          "name": "assert与unittest：期望值不能事后随意改",
+          "grammar": "assert actual == expected / unittest.TestCase",
+          "explanation": "assert通常用于开发期检查一个应该永远成立的条件，Python在优化模式可能跳过普通assert，因此不适合把它当正式外部输入校验。unittest是标准库测试框架；写test_开头的方法、通过self.assertEqual核对明确预期，可以重复执行验证业务行为。",
+          "parts": [
+            [
+              "assert",
+              "断言条件，失败抛AssertionError（优化模式可能跳过）"
+            ],
+            [
+              "unittest.TestCase",
+              "测试类基类"
+            ],
+            [
+              "self.assertEqual(a,b)",
+              "比较实际值和期望值"
+            ],
+            [
+              "test_",
+              "测试发现的常见方法名前缀"
+            ]
+          ],
+          "example": "import unittest\nclass TestMath(unittest.TestCase):\n    def test_sum(self):\n        self.assertEqual(2+3,5)\nif __name__==\"__main__\":\n    unittest.main(exit=False)",
+          "trace": [
+            "导入unittest。",
+            "定义TestMath测试类和test_sum方法。",
+            "作为脚本执行时unittest运行发现的测试，并输出OK。"
+          ],
+          "expected": "运行测试，结果为1项测试通过（具体进度及输出格式依环境而异）。",
+          "errors": [
+            "不要把错误业务行为的期望值改成错误结果以获取PASS。"
+          ],
+          "practice": "测试输入72km/h得到20m/s，使用assertAlmostEqual。"
+        },
+        {
+          "name": "故障注入的正确记录方式",
+          "grammar": "基线PASS → 故意制造FAIL → 修复PASS",
+          "explanation": "真实工程中，要先运行原始代码获取基线，再只修改一个明确位置引入错误，运行测试观察期望的失败，最后恢复并复测。记录代码差异、输入、实际输出和预期。这样证明的是测试覆盖与理解，而不是编造实验数据或单纯截图绿色图标。",
+          "parts": [
+            [
+              "基线",
+              "未经故意修改的已验证版本"
+            ],
+            [
+              "故障注入",
+              "局部、可撤销的一处改动"
+            ],
+            [
+              "FAIL",
+              "测试识别出违背约定的行为"
+            ],
+            [
+              "恢复PASS",
+              "撤销故障并再次完整运行测试"
+            ]
+          ],
+          "example": "def warning(d):\n    return d<=35\nassert warning(34)\nassert not warning(38)\nprint(\"baseline PASS\")",
+          "trace": [
+            "原始阈值为35，34触发True。",
+            "38不触发，所以not warning(38)为True。",
+            "两条断言都通过，打印baseline PASS。"
+          ],
+          "expected": "baseline PASS",
+          "errors": [
+            "不能为得到绿色测试而随便改断言期望。"
+          ],
+          "practice": "将<=35改为<=40执行，记录AssertionError，再恢复。"
+        },
+        {
+          "name": "测试入口和业务入口分开",
+          "grammar": "python -m unittest -v test_pipeline",
+          "explanation": "测试模块会导入真实业务函数并调用它，但不等于运行main.py的命令行入口。测试框架通常会分别构造输入，检查状态和数据。python -m unittest执行标准库测试工具；-v是详细输出选项。测试通过表示当前环境里的代码和案例满足断言，不能替代其他机器、系统的真实运行记录。",
+          "parts": [
+            [
+              "-m unittest",
+              "作为模块运行unittest测试框架"
+            ],
+            [
+              "-v",
+              "详细测试输出"
+            ],
+            [
+              "test_pipeline",
+              "要测试的模块名字"
+            ],
+            [
+              "import main",
+              "获取run等函数，而非自动执行main命令行入口"
+            ]
+          ],
+          "example": "def add(a,b):\n    return a+b\nprint(add(2,3))",
+          "trace": [
+            "本小例子只展示被测函数的行为。",
+            "真实test_pipeline.py在项目文件中，单独用unittest命令运行。",
+            "add(2,3)返回5，打印5。"
+          ],
+          "expected": "5",
+          "errors": [
+            "网页预览不是Python解释器，也不会执行unittest。"
+          ],
+          "practice": "下载本课完整项目后运行python -m unittest -v test_pipeline。"
+        }
+      ]
     },
     {
       "id": "v2_18",
@@ -3370,7 +3789,153 @@
         "why": "同一个Monitor实例持有previous_alert，后续step调用会继续使用。"
       },
       "original_id": "fullflow",
-      "details": []
+      "details": [
+        {
+          "name": "main.py的入口与命令行参数",
+          "grammar": "if __name__ == '__main__': raise SystemExit(main())",
+          "explanation": "直接运行main.py时__name__=='__main__'，才调用main()。main里使用argparse读取--input、--output并将文本路径交给run。raise SystemExit(main())用main返回的整数作为程序退出码；0表示成功，2是本工程定义的输入读取失败。注意main本身不是凭函数名自动被Python寻找的。",
+          "parts": [
+            [
+              "__name__",
+              "当前模块特殊名称"
+            ],
+            [
+              "main()",
+              "显式调用入口函数"
+            ],
+            [
+              "argparse",
+              "标准库命令行参数解析"
+            ],
+            [
+              "SystemExit",
+              "通知解释器退出并提供状态码"
+            ]
+          ],
+          "example": "def main():\n    print(\"入口执行\")\n    return 0\nif __name__==\"__main__\":\n    raise SystemExit(main())",
+          "trace": [
+            "定义main函数时不执行。",
+            "直接运行脚本，__name__为'__main__'。",
+            "调用main打印入口，返回0作为退出码。"
+          ],
+          "expected": "入口执行",
+          "errors": [
+            "import main.py里的函数时不应意外启动整个程序。"
+          ],
+          "practice": "从完整工程里找到main→run具体位置。"
+        },
+        {
+          "name": "reader.py负责解析与校验，而不是业务告警",
+          "grammar": "load_frames(path) -> list[Frame]",
+          "explanation": "load_frames接收CSV路径，使用csv.DictReader依次读取，检查列名、空值、类型、时间与有限性，构造一个个Frame并append到列表。如果发现损坏行，抛出带原CSV物理行的ValueError，而不计算alert，也不悄悄删除坏数据。这样reader可以独立测试。",
+          "parts": [
+            [
+              "path",
+              "从main传给reader的路径参数"
+            ],
+            [
+              "list[Frame]",
+              "返回由Frame对象组成的列表"
+            ],
+            [
+              "Frame(...)",
+              "创建一帧业务输入数据"
+            ],
+            [
+              "raise ValueError",
+              "拒绝格式/范围不合法的CSV"
+            ]
+          ],
+          "example": "frames=[{\"time_ms\":0,\"distance_m\":45},{\"time_ms\":20,\"distance_m\":34}]\nprint(len(frames))\nprint(frames[1][\"distance_m\"])",
+          "trace": [
+            "简化列表表达两帧已经解析的数据。",
+            "len为2。",
+            "frames[1]取第二帧，再通过'distance_m'键取距离34。"
+          ],
+          "expected": "2\n34",
+          "errors": [
+            "这是简化展示，真实reader.py使用Frame数据对象、独立校验。"
+          ],
+          "practice": "打开真实reader.py，逐行找出哪条语句会附加原CSV行号。"
+        },
+        {
+          "name": "monitor.step返回Decision对象，state跨帧保留",
+          "grammar": "decision=monitor.step(frame,now_ms)",
+          "explanation": "Monitor在run进入for前只创建一次，以便previous_alert能保留上一帧状态。每帧step接收Frame对象与now_ms，计算age后检查失效或enable，再用距离滞环更新状态，返回Decision实例。return不是打印，也不是发往车辆总线；main通过asdict把Decision转成字典，再存进结果列表。",
+          "parts": [
+            [
+              "monitor",
+              "同一个Monitor实例"
+            ],
+            [
+              ".step",
+              "取实例上的方法"
+            ],
+            [
+              "(frame,now_ms)",
+              "把本帧数据和当前模拟时刻作为实参"
+            ],
+            [
+              "return Decision(...)",
+              "返回结构化对象"
+            ],
+            [
+              "asdict",
+              "把dataclass对象转换成字典"
+            ]
+          ],
+          "example": "from dataclasses import dataclass\n@dataclass\nclass Decision:\n    valid:bool\n    alert:bool\ndef step():\n    return Decision(True,True)\nresult=step()\nprint(result.valid,result.alert)",
+          "trace": [
+            "定义Decision类型和step函数。",
+            "调用step创建一份Decision(True,True)。",
+            "返回对象并通过属性读取两个成员。"
+          ],
+          "expected": "True True",
+          "errors": [
+            "跨帧状态与当前帧输出是两个不同对象的职责。"
+          ],
+          "practice": "用纸画出第一、二、三帧state的变化并核对真实工程。"
+        },
+        {
+          "name": "八帧完整预测表：读输入→输出→解释",
+          "grammar": "sample.csv八帧→status/valid/alert",
+          "explanation": "本课程的sample.csv八帧距离依次为45、34、38、42、30、34、34、34。第5帧雷达无效，第7帧未启用，两者都清除旧告警。其他帧按<=35开启、>=41关闭；第三帧38应保持第二帧开启状态。这里的示例只做离线告警提示，不是真实ACC制动决策或调度。",
+          "parts": [
+            [
+              "Frame",
+              "本轮输入"
+            ],
+            [
+              "Monitor.previous_alert",
+              "跨帧状态"
+            ],
+            [
+              "Decision.valid",
+              "当前输出可否使用"
+            ],
+            [
+              "Decision.alert",
+              "仅在valid=True时有意义"
+            ],
+            [
+              "sample.csv",
+              "教学样例，不是实车数据"
+            ]
+          ],
+          "example": "distances=[45,34,38,42]\nalert=False\nfor d in distances:\n    if d<=35: alert=True\n    elif d>=41: alert=False\n    print(int(alert))",
+          "trace": [
+            "45m未触发，打印0。",
+            "34m触发，打印1。",
+            "38m在保持区，仍1。",
+            "42m达到关闭阈值，打印0。"
+          ],
+          "expected": "0\n1\n1\n0",
+          "errors": [
+            "本示例演示正常帧滞环，真实八帧的雷达/enable无效处理见monitor.py。"
+          ],
+          "practice": "完整手写8帧status、valid、alert，然后跑主程序验证。"
+        }
+      ]
     },
     {
       "id": "v2_19",
@@ -3406,7 +3971,110 @@
         "why": "工程学习需要可重复的本地执行证据。"
       },
       "original_id": "practice",
-      "details": []
+      "details": [
+        {
+          "name": "为什么先运行原始工程再修改",
+          "grammar": "python main.py --input sample.csv",
+          "explanation": "从GitHub页面下载完整源码ZIP后，在同一文件夹运行；成功时输出8帧结果，保存JSON。首先记录输入文件、命令、程序输出，确保能复现。不要直接从片段复制后缺少reader.py、models.py却误把ModuleNotFoundError当作代码算法失败。",
+          "parts": [
+            [
+              "main.py",
+              "实际入口文件"
+            ],
+            [
+              "--input sample.csv",
+              "命令行传输入路径"
+            ],
+            [
+              "--output output/results.json",
+              "保存离线输出的路径"
+            ],
+            [
+              "returncode 0",
+              "本项目的成功退出状态"
+            ]
+          ],
+          "example": "from pathlib import Path\nprint(Path(\"sample.csv\").name)\nprint(\"先确认本地工程文件齐全\")",
+          "trace": [
+            "先确认路径名。",
+            "在终端下载整个工程，而不是只拷贝示例中的三行代码。",
+            "运行完整程序与测试。"
+          ],
+          "expected": "sample.csv\n先确认本地工程文件齐全",
+          "errors": [
+            "GitHub Actions通过并不意味着你自己的WSL本地Python通关。"
+          ],
+          "practice": "实际下载ZIP、解压，在本地执行main.py及test_pipeline.py并保存日志。"
+        },
+        {
+          "name": "从模拟故障到失败断言",
+          "grammar": "<=35.0改成<=40.0",
+          "explanation": "本地先运行unittest基线PASS；把monitor.py中的距离开启阈值从35改为40，原本38m应保持/重新判定的行为可能偏离预期，测试设计有意捕获这种错误。修改后需要保留失败日志，而不是修改测试期望让它通过。最后把阈值恢复原值再次运行，确认PASS。",
+          "parts": [
+            [
+              "<=35.0",
+              "本课程原有告警触发条件"
+            ],
+            [
+              "<=40.0",
+              "故意引入的单一偏差"
+            ],
+            [
+              "test_pipeline.py",
+              "记录了原预期结果的独立测试"
+            ],
+            [
+              "FAIL→PASS",
+              "测试覆盖证据"
+            ]
+          ],
+          "example": "def warning(d): return d<=35\nassert not warning(38)\nprint(\"baseline PASS\")",
+          "trace": [
+            "原始条件下38>35，不告警。",
+            "not warning(38)为True，assert通过。",
+            "打印PASS；若把35改为40则断言失败。"
+          ],
+          "expected": "baseline PASS",
+          "errors": [
+            "不要向公共主稿推送故意损坏的文件。"
+          ],
+          "practice": "本地记录基线、故障、恢复三个日志文件与源码差异。"
+        },
+        {
+          "name": "自写的一个函数测试是否能独立完成",
+          "grammar": "def is_valid_speed(raw): ...",
+          "explanation": "你应该可以独立完成一个简化函数：输入原始文本，先尝试转换float，拒绝NaN/inf及超范围值，返回明确bool或抛异常。先写4个最小测试：'72'正常、'-1'拒绝、'nan'拒绝、'bad'报格式异常。通过这一步再继续NumPy比直接看懂原ASW工程更重要。",
+          "parts": [
+            [
+              "float(raw)",
+              "文本转换为浮点值"
+            ],
+            [
+              "math.isfinite",
+              "排除NaN/inf"
+            ],
+            [
+              "0<=speed<=250",
+              "检查速度范围"
+            ],
+            [
+              "return bool",
+              "把校验结果交给调用者"
+            ]
+          ],
+          "example": "import math\ndef valid_speed(raw):\n    try: speed=float(raw)\n    except ValueError: return False\n    return math.isfinite(speed) and 0<=speed<=250\nprint(valid_speed(\"72\"))\nprint(valid_speed(\"bad\"))",
+          "trace": [
+            "valid_speed('72')解析72并校验有效，True。",
+            "valid_speed('bad')发生ValueError，被except处理并返回False。",
+            "外层依次打印True与False。"
+          ],
+          "expected": "True\nFalse",
+          "errors": [
+            "这是课堂基础函数；真正工程若需要定位错误行和字段，应抛含细节的异常，而不是只返回False。"
+          ],
+          "practice": "给这个函数写完整4类输入测试并记录结果。"
+        }
+      ]
     },
     {
       "id": "v2_20",
@@ -3441,7 +4109,104 @@
         "why": "NumPy本质上是在既有Python基础上引入新的数组类型及操作函数。"
       },
       "original_id": "atlas",
-      "details": []
+      "details": [
+        {
+          "name": "先会读，不急着写：lambda与生成式",
+          "grammar": "lambda x:x>0 / (x for x in xs)",
+          "explanation": "lambda创建短小匿名函数，生成器表达式用圆括号按需产生元素。它们都建立在函数、循环和表达式基础上，不是入门前置条件。见到lambda要先把它还原为普通def；见到生成式要先还原为for循环。",
+          "parts": [
+            [
+              "lambda",
+              "表达式形式的匿名函数"
+            ],
+            [
+              "x:x>0",
+              "参数与表达式主体"
+            ],
+            [
+              "(x for x in xs)",
+              "按需给值的生成器表达式"
+            ]
+          ],
+          "example": "f=lambda x:x>0\nprint(f(3))\nprint(sum(x for x in [1,2,3]))",
+          "trace": [
+            "f是可调用对象，f(3)计算3>0为True。",
+            "生成器依次给1、2、3，sum汇总为6。"
+          ],
+          "expected": "True\n6",
+          "errors": [
+            "生成器不是列表，不一定能够直接反复遍历而不重新创建。"
+          ],
+          "practice": "写一个等价的def is_positive(x)，再比较。"
+        },
+        {
+          "name": "yield与async/await到底放在哪一阶段",
+          "grammar": "yield / async def / await",
+          "explanation": "yield用于生成器函数，使函数在每次产出值时暂停并保留执行状态；async/await用于协作式异步编程，需要理解事件循环与可等待对象。它们和ASW ECU实时任务调度并不相同。先学好基本for/while、函数和模块调用，再按项目需求深入，不能仅因为某段代码看起来“异步”就认定有实时保证。",
+          "parts": [
+            [
+              "yield",
+              "在生成器函数中逐次产出值"
+            ],
+            [
+              "async def",
+              "定义协程函数"
+            ],
+            [
+              "await",
+              "在协程中等待可等待对象"
+            ],
+            [
+              "非实时",
+              "Python协作式异步不等于严格ECU周期调度"
+            ]
+          ],
+          "example": "def numbers():\n    yield 1\n    yield 2\nprint(list(numbers()))",
+          "trace": [
+            "numbers()返回生成器，不立即一次性执行完所有yield。",
+            "list消耗生成器，依次得到1和2。",
+            "打印结果列表。"
+          ],
+          "expected": "[1, 2]",
+          "errors": [
+            "本课程不要求立刻编写asyncio或ROS2节点。"
+          ],
+          "practice": "先把yield例子改写成返回列表的普通函数。"
+        },
+        {
+          "name": "match-case、属性与typing进阶只做索引",
+          "grammar": "match x / Protocol / Optional",
+          "explanation": "match-case是Python现代模式匹配语法，不能把它简单等同于C switch（模式能力更广）。typing里的Protocol、Optional等帮助描述接口，普通类型注解通常由静态检查工具辅助分析，而不是运行时强制校验。完整ASW项目目前先写可测试的简单类、函数，不靠复杂语法体现“专业”。",
+          "parts": [
+            [
+              "match",
+              "模式匹配语句"
+            ],
+            [
+              "case",
+              "匹配分支"
+            ],
+            [
+              "typing.Protocol",
+              "结构化协议类型提示"
+            ],
+            [
+              "Optional[T]",
+              "允许T或None的类型注解"
+            ]
+          ],
+          "example": "state=\"ACTIVE\"\nif state==\"ACTIVE\":\n    print(\"已启用\")",
+          "trace": [
+            "先用已经掌握的if完成等价的简单判断。",
+            "高级match-case放在将来有实际需要时再研究。"
+          ],
+          "expected": "已启用",
+          "errors": [
+            "不要用高级语法掩盖不清晰的数据协议。"
+          ],
+          "practice": "在未来阅读代码时把不懂语法记入本页的语法索引，不必当天全部掌握。"
+        }
+      ]
     },
     {
       "id": "v2_21",
@@ -3477,7 +4242,110 @@
         "why": "冒号表示所有行，0表示第0列。"
       },
       "original_id": "next",
-      "details": []
+      "details": [
+        {
+          "name": "NumPy为何在Python基础之后学习",
+          "grammar": "np.asarray(rows, dtype=float)",
+          "explanation": "NumPy是第三方库，提供高效的多维ndarray以及向量化操作。此前学过list、import、函数和切片后才能理解np.asarray：np是numpy模块别名；点号取asarray函数；括号调用并传入rows和dtype参数。它不是Python的原生列表。",
+          "parts": [
+            [
+              "import numpy as np",
+              "导入NumPy并取别名np"
+            ],
+            [
+              "np.asarray",
+              "模块属性函数"
+            ],
+            [
+              "rows",
+              "原Python二维列表"
+            ],
+            [
+              "dtype=float",
+              "要求数值元素类型"
+            ]
+          ],
+          "example": "rows=[[0,72.0],[20,73.0]]\nprint(len(rows))\nprint(len(rows[0]))",
+          "trace": [
+            "先用标准Python列表确认2行。",
+            "每行2列。",
+            "进入原D15后再用NumPy将其构造为shape=(2,2)数组。"
+          ],
+          "expected": "2\n2",
+          "errors": [
+            "本节示例未调用NumPy；真实np.asarray需要在本地安装库。"
+          ],
+          "practice": "回到D15后逐字符解释np.asarray(rows,dtype=float)。"
+        },
+        {
+          "name": "shape、二维行列、切片[:,0]",
+          "grammar": "matrix.shape / matrix[:,0]",
+          "explanation": "NumPy二维数组shape=(N,4)表示N行4列。matrix[:,0]含义是所有行（冒号）第0列（逗号后0），得到一维向量shape=(N,)；matrix[0,1]取第0行第1列的标量。不能把这一写法与普通list的索引完全混为一谈。",
+          "parts": [
+            [
+              "matrix.shape",
+              "数组维度元组"
+            ],
+            [
+              ":,0",
+              "所有行、第0列"
+            ],
+            [
+              "0,1",
+              "第0行、第1列"
+            ],
+            [
+              "(N,)",
+              "一维向量的shape元组"
+            ]
+          ],
+          "example": "rows=[[0,72.0,45,0],[20,73.0,34,1]]\nprint(len(rows),len(rows[0]))\nprint(rows[0][1])",
+          "trace": [
+            "普通list中rows有2行，每行4个元素。",
+            "rows[0][1]先取第0行，再取其中下标1的速度72。",
+            "进入NumPy后才使用matrix[:,1]取整列。"
+          ],
+          "expected": "2 4\n72.0",
+          "errors": [
+            "普通Python list不支持matrix[:,0]这种NumPy形式索引。"
+          ],
+          "practice": "在原D15中运行np.asarray并打印shape。"
+        },
+        {
+          "name": "Matplotlib图形接口与数据物理单位",
+          "grammar": "plt.plot(time_ms, speed_kmh); plt.savefig(path)",
+          "explanation": "Matplotlib是第三方绘图库。pyplot通常导入为plt；plt.plot()绘制曲线、plt.xlabel/ylabel设置坐标含义和单位、savefig()保存PNG。速度是km/h，距离是m，模式为类别而非连续物理量；模式建议用step阶梯图，以免画出不存在的中间状态。",
+          "parts": [
+            [
+              "plt",
+              "pyplot的模块别名"
+            ],
+            [
+              "plot(x,y)",
+              "绘制数据曲线"
+            ],
+            [
+              "step(x,y)",
+              "适合类别状态序列"
+            ],
+            [
+              "savefig(path)",
+              "将图像保存到指定路径"
+            ]
+          ],
+          "example": "time_ms=[0,20,40]\nspeed_kmh=[72,73,74]\nprint(len(time_ms)==len(speed_kmh))",
+          "trace": [
+            "准备三个时间点与三个速度。",
+            "长度相同只是画图基本前提，还要注意每个时间的物理意义。",
+            "本小例不导入绘图库，只验证数据数量。"
+          ],
+          "expected": "True",
+          "errors": [
+            "不要在没有Matplotlib时运行plt.plot并把ModuleNotFoundError当作Python基础语法错误。"
+          ],
+          "practice": "完成原D15的三张独立曲线并亲自核对中文标题与坐标单位。"
+        }
+      ]
     }
   ],
   "syntaxAtlas": [
