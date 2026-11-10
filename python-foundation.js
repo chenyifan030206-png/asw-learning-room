@@ -514,7 +514,7 @@ $('importNotes').onchange=async()=>{
        !payload.data.fileNotes)throw Error('不是本导学页的正确笔记格式');
     if(!confirm('恢复这份备份会替换当前导学页的本地笔记，是否继续？'))return;
     state=Object.assign(stateDefault(),payload.data);saveState();
-    hasOpenedChapter=false;renderChapterNav();openChapter(state.lastChapter||book.chapters[0].id);
+    hasOpenedChapter=false;renderChapterNav();openChapter(book.chapters.some(x=>x.id===state.lastChapter)?state.lastChapter:book.chapters[0].id);
     alert('笔记已恢复。原D15课程笔记未受到修改。');
   }catch(error){alert('无法导入：'+error.message);}
   finally{input.value='';}
@@ -533,7 +533,7 @@ async function init(){
         node('div',item.outcome));$('scheduleCards').append(card);
     }
     state=loadState();renderChapterNav();
-    openChapter(book.chapters.some(x=>x.id===state.lastChapter)?state.lastChapter:'start');
+    openChapter(book.chapters.some(x=>x.id===state.lastChapter)?state.lastChapter:book.chapters[0].id);
     document.body.dataset.foundationReady='yes';
   }catch(error){
     $('heroIntro').textContent='页面加载失败：'+error.message+'。请刷新页面或查看GitHub Pages部署状态。';
