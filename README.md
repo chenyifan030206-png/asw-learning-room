@@ -42,4 +42,4 @@ D15原计划为CSV日志读取、NumPy shape/标量/向量，输出速度（km/h
 
 ## Python导学 V3（2026-11-10）
 
-在已发布的 V2（21章、102节、旧笔记迁移）基础上整合更细致的语法讲解，新增独立迭代工具和列表推导式章节，合计 **23章、144个小节**。保持既有 v2_01–v2_21 章节ID、页面本地笔记键及旧版只读笔记查看面板，防止先前批注错位。新教材文件为 python-foundation-v3-content.json，原V1/V2教材原样保留。内容从标点、变量、if、for与while同章、range/enumerate/zip、列表、函数参数与返回、模块调用到CSV、异常、测试及ASW综合工程；每个知识点有语法形式、详细解释、独立代码、执行过程、预期结果、常见错误和动手修改。原D15、原D16规划及私人学习记录不变。本次审查依据详见 docs/python-foundation/PYTHON_V2_SYLLABUS_AUDIT.md。
+在已发布的 V2（21章、102节、旧笔记迁移）基础上整合更细致的语法讲解，新增独立迭代工具和列表推导式章节，合计 **23章、144个小节**。保持既有 v2_01–v2_21 章节ID、页面本地笔记键及旧版只读笔记查看面板，防止先前批注错位。新教材文件为 python-foundation-v3-content.json，原V1/V2教材原样保留。内容从标点、变量、if、for与while同章、range/enumerate/zip、列表、函数参数与返回、模块调用到CSV、异常、测试及ASW综合工程；每个知识点有语法形式、详细解释、独立代码、执行过程、预期结果、常见错误和动手修改。原D15、原D16规划及私人学习记录不变。本次审查依据详见 docs/python-foundation/PYTHON_V3_SYLLABUS_AUDIT.md。
