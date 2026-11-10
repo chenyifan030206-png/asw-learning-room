@@ -32,8 +32,8 @@ def main() -> None:
         page.locator("#chapterNav button[data-chapter]").first.wait_for()
         page.wait_for_function("document.body.dataset.foundationReady === 'yes'")
 
-        # 21章与逐点语法内容实际渲染，不能只检查JSON目录。
-        assert page.locator("#chapterNav button[data-chapter]").count() == 21
+        # 23章和144项语法内容真实渲染，旧笔记只读视图继续可用。
+        assert page.locator("#chapterNav button[data-chapter]").count() == 23
         assert "01｜Python如何运行" in page.locator("#chapterPanel").inner_text()
         assert page.locator("#chapterPanel .syntaxDetail").count() >= 4
         page.get_by_role("button",name="旧版笔记与批注（保留）").click()
@@ -60,7 +60,7 @@ def main() -> None:
 
         # 逐章理解检测、掌握标记和笔记导出。
         page.get_by_role("button", name="标记本章已完成").click()
-        assert "1 / 21" in page.locator("#progressLine").inner_text()
+        assert "1 / 23" in page.locator("#progressLine").inner_text()
         with page.expect_download() as info:
             page.get_by_role("button", name="导出学习笔记 JSON").click()
         notes = info.value
@@ -68,14 +68,22 @@ def main() -> None:
         assert payload["app"] == "asw-python-foundation"
         assert payload["data"]["notes"]["v2_01"].startswith("我理解了")
 
-        # 循环章必须把for/while/range/enumerate/zip/break/continue集中完整呈现。
+        # for与while放同一章，range/enumerate/zip紧邻下一章而不是提前调用。
         page.locator("#chapterNav button[data-chapter='v2_08']").click()
         loop = page.locator("#chapterPanel")
-        assert loop.locator(".syntaxDetail").count() >= 10
+        assert loop.locator(".syntaxDetail").count() >= 9
         assert "for 变量 in 可迭代对象" in loop.inner_text()
-        assert "enumerate" in loop.inner_text()
         assert "while 条件表达式" in loop.inner_text()
-        assert "break和continue" in loop.inner_text()
+        assert "break与continue" in loop.inner_text()
+        page.locator("#chapterNav button[data-chapter='v3_iteration_tools']").click()
+        iteration = page.locator("#chapterPanel")
+        assert iteration.locator(".syntaxDetail").count() >= 8
+        assert "enumerate" in iteration.inner_text()
+        assert "zip" in iteration.inner_text()
+        page.locator("#chapterNav button[data-chapter='v2_02']").click()
+        assert page.locator("#chapterPanel .syntaxDetail").count() >= 9
+        assert "下划线" in page.locator("#chapterPanel").inner_text()
+        assert "点号" in page.locator("#chapterPanel").inner_text()
         page.get_by_role("button", name="C语言 → Python 对照表").click()
         assert not page.locator("#bridgePanel").is_hidden()
         assert page.locator("#bridgeTable tbody tr").count() >= 20
