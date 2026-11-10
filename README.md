@@ -33,3 +33,9 @@ D15原计划为CSV日志读取、NumPy shape/标量/向量，输出速度（km/h
 已新增`python-foundation.html`：面向完全没系统学过Python的学习者，20章详细中文解释、完整执行链、C→Python20项对照、24项未来语法索引、11个官方/开源资源。提供`python-foundation-project/`全套原创标准库工程，网页可读源码/下载完整ZIP，含8帧ASW离线监视、两类坏CSV和unittest。导学页支持浏览器本地自动保存章节笔记、划线批注、逐文件代码理解、导出/导入JSON；补充页与D15原主课进度相互独立。要私有云同步导学页总结，可复制到D15原笔记框继续同步；不将补充页保存机制冒充原私有同步。
 
 所有D01–D15既有课程、试题、代码旁注和本地真实C/Python验收规则保留。参考资料与教学选择详见`docs/python-foundation/RESOURCE_AUDIT_AND_TEACHING_DESIGN.md`。
+
+## Python零基础V2：逐符号、逐语法重新梳理（2026-11-10）
+
+根据学习者明确反馈：原导学过度压缩、讲解顺序颠倒、未解释`_`、`.`、`__init__`与`for`/`enumerate`的语法结构。V2保留原先修页URL及所有笔记存储键，以免覆盖或丢失已有批注；教材改为**23章、144个详细小节**，从解释器及字符符号→变量/类型→运算→字符串→if→**for与while同章**→range/enumerate/zip逐项拆解→列表/字典→函数及返回→import/class→文件/异常/测试→ASW完整多文件工程。每小节有明确的语法形式、结构解释、独立代码、实际执行链、预期结果、典型错误和动手练习，并在电脑端并排展示源码和执行步骤。
+
+GitHub教程核对依据为`jackfrued/Python-100-Days`中的变量与命名、循环结构和列表基础原章节；同时保留Python官方教程、Microsoft视频及其GitHub示例、CS50P等参考入口。证据及重排决定见`docs/python-foundation/PYTHON_V2_SYLLABUS_AUDIT.md`。V2不会修改D01–D15主课或学习者私有云端记录，真实Python本地验收仍需本人完成。
