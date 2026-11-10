@@ -58,17 +58,27 @@ jobs:
               assert f'第{line}行' in p.stdout,(name,p.stdout)
           print('PASS actual Python project output + exact error line numbers')
           PY
-      - name: Verify source count, 20-chapter textbook, 24 syntax categories and references
+      - name: Verify 23 chapters, >=140 detailed syntax units and references
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           j=json.loads(Path('python-foundation-content.json').read_text(encoding='utf-8'))
-          assert len(j['chapters'])==20
-          assert len(j['syntaxAtlas'])>=24 and len(j['cBridge'])==20
-          assert len(j['resources'])>=10
+          assert len(j['chapters'])==23
+          assert len(j['syntaxAtlas'])>=26 and len(j['cBridge'])==20
+          assert len(j['resources'])>=14
           assert len(j['projectFiles'])==9
+          assert sum(len(x['deepDive']) for x in j['chapters'])>=140
+          ids=[x['id'] for x in j['chapters']]
+          assert ids[:10]==['start','symbols','environment','types','operators',
+              'strings','conditions','loops','iteration-tools','lists']
           for x in j['chapters']:
+              assert len(x['deepDive'])>=4,x['id']
+              for topic in x['deepDive']:
+                  for key in ('title','syntax','explain','code','output','trace','mistake','exercise'):
+                      assert topic.get(key),(x['id'],topic['title'],key)
+                  assert len(topic['explain'])>=85,(x['id'],topic['title'])
+                  assert len(topic['trace'])>=2,(x['id'],topic['title'])
               for k in ('id','title','phase','story','code','trace','expected','task','check','compare','trap'):
                   assert x.get(k), (x.get('id'),k)
               assert len(x['story'])>=2 and len(x['trace'])>=3
@@ -76,7 +86,7 @@ jobs:
           for file in j['projectFiles']:
               assert Path('python-foundation-project',file).exists(),file
           assert 'python-foundation.html' in Path('index.html').read_text(encoding='utf-8')
-          print('PASS 20 independent lessons, 24 syntax entries, C bridge and all project assets')
+          print('PASS 23 chapters, 144 detailed grammar sections, 26 syntax entries and original ASW files')
           PY
       - name: Check JavaScript syntax and existing D15 runtime remains intact
         run: |
