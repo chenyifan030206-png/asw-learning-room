@@ -182,7 +182,7 @@
         "运行python main.py时导入sensor，只执行sensor的顶层函数定义，sensor的入口代码不运行。",
         "main.py调用sensor.identity()返回字符串，然后打印。"
       ],
-      "output": "命令 python sensor.py 输出：\n直接运行sensor\n命令 python main.py 输出：\n从main调用 sensor",
+      "output": "直接运行sensor\n从main调用 sensor",
       "mistakes": [
         "不要以为文件名main.py必定决定__name__；真正作为入口运行的脚本才是__main__。",
         "在不同目录执行时，Python查找模块的路径可能变化，要确认两个文件在同一目录。"
