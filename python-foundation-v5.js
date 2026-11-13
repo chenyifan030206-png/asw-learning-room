@@ -169,6 +169,94 @@ function renderWalkthroughs(card,chapter){
     card.append(wrap);
   }
 }
+
+function renderDeepLessons(card,chapter){
+  const lessons=chapter.deepLessons||[];
+  if(!lessons.length)return;
+  heading(card,'V5 逐字逐行精讲 · '+lessons.length+'个课题');
+  paragraph(card,'按顺序点击课题标题展开。每节都讲学习目的、符号和参数、完整源码、逐句执行、预期输出、典型错误和自己修改。多文件例子必须按文件名分别保存，本页不会执行Python。');
+  const nav=node('div',undefined,'deepNav');
+  for(const [i,lesson] of lessons.entries()){
+    const button=node('button',String(i+1).padStart(2,'0')+' · '+lesson.title);
+    button.type='button';
+    button.onclick=()=>{
+      const target=document.getElementById('deep-'+chapter.id+'-'+i);
+      if(target){target.open=true;target.scrollIntoView({block:'start',behavior:'smooth'});}
+    };
+    nav.append(button);
+  }
+  card.append(nav);
+  for(const [i,lesson] of lessons.entries()){
+    const sec=node('details',undefined,'deepLesson');
+    sec.id='deep-'+chapter.id+'-'+i;sec.open=i===0;
+    sec.append(node('summary',String(i+1).padStart(2,'0')+' · '+lesson.title));
+    const inner=node('div',undefined,'deepBody');
+    inner.append(node('h5','先理解：为什么需要这一节？'));
+    paragraph(inner,lesson.why,'detailedExplain');
+    inner.append(node('h5','准确的语法模板'));
+    inner.append(node('pre',lesson.syntax,'syntaxSignature'));
+    inner.append(node('h5','每一个关键符号 / 参数的实际作用'));
+    const table=node('table'),th=node('thead'),head=node('tr');
+    head.append(node('th','语法写法'),node('th','在当前例子中代表什么'));th.append(head);table.append(th);
+    const tb=node('tbody');
+    for(const [name,meaning] of lesson.tokens){
+      const tr=node('tr'),n=node('td'),m=node('td');
+      n.append(node('code',name));m.append(quoteMarks(meaning));
+      tr.append(n,m);tb.append(tr);
+    }
+    table.append(tb);const scroll=node('div',undefined,'syntaxTable');scroll.append(table);inner.append(scroll);
+    inner.append(node('h5','完整代码 / 完整步骤'));
+    const header=node('div',undefined,'codeTop');
+    header.append(node('span',lesson.kind==='noexec'?'这是结构说明或终端指令，不要当Python源码运行':lesson.kind==='multifile'?'多文件案例：下面按文件名提供全部真实代码':'复制后到本地Python运行，不是网页在线执行'));
+    const copy=node('button','复制本例');copy.onclick=()=>copyText(lesson.code).then(ok=>{if(ok)copy.textContent='已复制';});
+    header.append(copy);inner.append(header,node('pre',lesson.code,'deepCode'));
+    if(lesson.files&&lesson.files.length){
+      inner.append(node('h5','完整多文件源码（每份都要分别保存）'));
+      for(const source of lesson.files){
+        const bar=node('div',undefined,'codeTop');
+        bar.append(node('strong',source.name));
+        const b=node('button','复制 '+source.name);
+        b.onclick=()=>copyText(source.code).then(ok=>{if(ok)b.textContent='已复制';});
+        bar.append(b);
+        inner.append(bar,node('pre',source.code,'deepCode'));
+      }
+      if(lesson.command){
+        inner.append(node('h5','终端运行命令'));
+        inner.append(node('pre',lesson.command,'syntaxSignature'));
+      }
+    }
+    inner.append(node('h5','真实执行顺序：一条一条追踪'));
+    const steps=node('ol',undefined,'deepSteps');
+    for(const step of lesson.steps)steps.append(node('li',step));
+    inner.append(steps);
+    let pos=0;
+    const control=node('div',undefined,'deepStepper'),prev=node('button','上一步'),next=node('button','下一步'),status=node('span');
+    const update=()=>{
+      Array.from(steps.children).forEach((el,k)=>el.classList.toggle('activeStep',k===pos));
+      status.textContent='正在看第 '+(pos+1)+' / '+lesson.steps.length+' 步';
+      prev.disabled=pos===0;next.disabled=pos===lesson.steps.length-1;
+    };
+    prev.onclick=()=>{pos=Math.max(0,pos-1);update();};
+    next.onclick=()=>{pos=Math.min(lesson.steps.length-1,pos+1);update();};
+    control.append(prev,status,next);inner.append(control);update();
+    inner.append(node('h5','预期运行结果 / 测试口径'));
+    inner.append(node('pre',lesson.output,'expected'));
+    const errors=node('div',undefined,'topicErrors');
+    errors.append(node('strong','容易出错的地方'));
+    for(const err of lesson.mistakes)paragraph(errors,'· '+err);
+    inner.append(errors);
+    inner.append(node('h5','在本地改动一处，自己推算并运行'));
+    paragraph(inner,lesson.exercise,'task');
+    const key=chapter.id+'::'+i;
+    const note=node('textarea');note.rows=4;note.value=state.deepNotes?.[key]||'';
+    note.setAttribute('aria-label','精讲个人笔记：'+lesson.title);
+    note.placeholder='写下：每个形参对应什么、为什么输出这个结果、你修改后真实运行的输出。';
+    note.addEventListener('input',()=>{state.deepNotes[key]=note.value;saveState();});
+    inner.append(node('label','这道题的学习笔记（自动保存）','notelabel'),note);
+    sec.append(inner);card.append(sec);
+  }
+}
+
 function renderDetailedKnowledge(card,chapter){
   const details=chapter.details||[];
   if(!details.length)return;
@@ -258,7 +346,13 @@ function openChapter(id){
   heading(card,'先把问题和场景讲清楚');
   for(const p of chapter.story)paragraph(card,p,'explain');
   renderSymbolGuide(card);
-  renderDetailedKnowledge(card,chapter);
+  renderDeepLessons(card,chapter);
+  if((chapter.deepLessons||[]).length){
+    const review=node('details',undefined,'deepReview');
+    review.append(node('summary','点击展开旧版语法小节复习（'+chapter.details.length+'个）'));
+    renderDetailedKnowledge(review,chapter);
+    card.append(review);
+  }else{renderDetailedKnowledge(card,chapter);}
   renderWalkthroughs(card,chapter);
   heading(card,'本章综合示例 · 将刚学的语法连在一起');
   const toolbar=node('div',undefined,'codeTop');
