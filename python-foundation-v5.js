@@ -455,6 +455,7 @@ $('chapterNote').addEventListener('input',()=>{
 });
 $('chapterSearch').addEventListener('input',()=>renderChapterNav($('chapterSearch').value));
 $('startFirst').onclick=()=>openChapter(book.chapters[0].id);
+$('startDeep').onclick=()=>openChapter(book.chapters[14].id);
 $('openLegacy').onclick=()=>{showPanel('legacy');$('legacyPanel').scrollIntoView({block:'start'});};
 $('openBridge').onclick=()=>{showPanel('bridge');$('bridgePanel').scrollIntoView({block:'start'});};
 $('openAtlas').onclick=()=>{showPanel('atlas');$('atlasPanel').scrollIntoView({block:'start'});};
