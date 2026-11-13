@@ -1,0 +1,318 @@
+{
+  "scope": "第15章模块与多文件调用",
+  "chapterId": "v2_13",
+  "lessons": [
+    {
+      "title": "01｜从C语言函数到Python模块：先分清定义和调用",
+      "why": "C语言里会把函数放进不同.c/.h文件；Python一般把相关函数写在.py文件中。导入文件和调用函数是两回事，不能看到import就认为里面每个函数都运行了一次。",
+      "syntax": "import 模块名；模块名.函数名(实参)",
+      "tokens": [
+        [
+          "import",
+          "导入语句，找到并加载模块；模块第一次加载时会执行它的顶层语句"
+        ],
+        [
+          "math",
+          "当前作用域绑定的模块对象名"
+        ],
+        [
+          ".",
+          "从左边模块里查找右边的成员名"
+        ],
+        [
+          "sqrt(16)",
+          "调用sqrt并将整数16传作参数"
+        ]
+      ],
+      "code": "import math\nprint(math.sqrt(16))\nprint(type(math).__name__) ",
+      "steps": [
+        "第一句取得math模块，math成为当前模块中的一个名字。",
+        "math.sqrt找到平方根函数；(16)真正调用函数，返回浮点数4.0。",
+        "type(math)拿到math对象的类型，.__name__返回模块类型的名字。"
+      ],
+      "output": "4.0\nmodule",
+      "mistakes": [
+        "只写import math并不能直接写sqrt(16)，除非另外导入名字sqrt。",
+        "math.sqrt只是取得函数，不写括号就没有执行。"
+      ],
+      "exercise": "删除第二句括号改成print(math.sqrt)，判断打印的是计算结果还是函数对象。"
+    },
+    {
+      "title": "02｜import、from...import、as是三种不同的命名方式",
+      "why": "你前面问过import math as m和from pathlib import Path。模块、函数、类都可以在当前文件绑定名字；关键是之后要用什么名称访问，而非‘导入了几个文件’。",
+      "syntax": "import math as m / from math import sqrt / from pathlib import Path",
+      "tokens": [
+        [
+          "import math as m",
+          "模块仍然是math，只是在本文件里用m表示它"
+        ],
+        [
+          "from math import sqrt",
+          "直接把math.sqrt这个函数绑定到当前的名字sqrt"
+        ],
+        [
+          "Path('demo.txt')",
+          "调用Path类创建路径对象，不会立即创建磁盘文件"
+        ],
+        [
+          "as",
+          "给被导入的名字指定当前作用域中的别名"
+        ]
+      ],
+      "code": "import math as m\nfrom math import sqrt\nfrom pathlib import Path\nprint(m.sqrt(25))\nprint(sqrt(25))\nprint(Path('demo.txt').name)",
+      "steps": [
+        "m.sqrt(25)先从m模块取得函数，返回5.0。",
+        "sqrt(25)由于直接从math导入，因此不需要写m.或math.。",
+        "Path('demo.txt')创建路径对象，.name读取文件名，不打开文件。"
+      ],
+      "output": "5.0\n5.0\ndemo.txt",
+      "mistakes": [
+        "from pathlib import Path后不能直接写pathlib.Path，除非又执行import pathlib。",
+        "from math import *会污染本地名称，初学与工程代码均应避免。"
+      ],
+      "exercise": "写import pathlib as pl；把最后一句改成pl.Path('demo.txt').name并运行。"
+    },
+    {
+      "title": "03｜导入时执行的是顶层代码，不等于执行所有函数",
+      "why": "当你import一个自编模块，模块文件从上到下执行顶层语句。def会建立函数对象，函数体只有被调用才运行。这个区别决定了在多文件工程中调试输出会出现在哪一刻。",
+      "syntax": "import logic；logic.check(34)",
+      "tokens": [
+        [
+          "def check(d):",
+          "创建函数定义，尚未调用函数体"
+        ],
+        [
+          "import logic",
+          "首次导入logic会运行其中的模块顶层代码"
+        ],
+        [
+          "logic.check(34)",
+          "把34传给逻辑模块的check函数，并取得返回结果"
+        ],
+        [
+          "return",
+          "函数执行到return才把计算值返回调用者"
+        ]
+      ],
+      "code": "# 下面为真正的双文件案例，逐个保存为 logic.py 与 main.py。\n# 请不要将两个文件的内容合并保存后期待相同的导入行为。",
+      "steps": [
+        "执行main.py第一条import logic时，会先运行logic.py的顶层print。",
+        "logic.py中的def只建立check函数，函数体print没有运行。",
+        "main.py调用logic.check(34)后，才打印‘进入check’，然后返回True给main.py。"
+      ],
+      "output": "导入logic\n进入check\nTrue",
+      "mistakes": [
+        "示例涉及两个.py文件：不能把它们的内容误放到同一文件。",
+        "从import发生的位置观察执行顺序，而不是按文件名按字母顺序。"
+      ],
+      "exercise": "把main.py中的logic.check(34)改成logic.check(42)，预测最终布尔值。",
+      "kind": "multifile",
+      "files": [
+        {
+          "name": "logic.py",
+          "code": "print('导入logic')\n\ndef check(d):\n    print('进入check')\n    return d <= 35\n"
+        },
+        {
+          "name": "main.py",
+          "code": "import logic\n\nresult = logic.check(34)\nprint(result)\n"
+        }
+      ],
+      "command": "python main.py"
+    },
+    {
+      "title": "04｜`__name__`与`__main__`前后两个下划线各有什么作用",
+      "why": "一个文件直接运行与被import时的身份不一样。Python为模块设置内置的特殊名字__name__：直接运行通常是'__main__'，被导入通常是模块名称。入口保护让函数可复用且导入不意外启动程序。",
+      "syntax": "if __name__ == '__main__':",
+      "tokens": [
+        [
+          "__name__",
+          "两侧各两个下划线；每个模块的特殊名称变量"
+        ],
+        [
+          "==",
+          "比较是否等于，得到布尔值；不是赋值"
+        ],
+        [
+          "'__main__'",
+          "直接运行的顶层环境使用的约定字符串"
+        ],
+        [
+          ": + 四空格",
+          "条件成立时执行的代码块"
+        ]
+      ],
+      "code": "def main():\n    print('真正执行main')\n\nif __name__ == '__main__':\n    main()",
+      "steps": [
+        "解释器先运行def，建立函数main但不执行里面print。",
+        "直接运行本文件时__name__的值为'__main__'，条件为True。",
+        "执行缩进中的main()，此时才进入函数体打印文字。"
+      ],
+      "output": "真正执行main",
+      "mistakes": [
+        "if __name__ == 'main':少了前后双下划线，条件不成立。",
+        "模块顶部写main()会让被其他文件import时也执行它，可能造成意外副作用。"
+      ],
+      "exercise": "将底部的if块注释掉再运行，解释为什么没有任何输出。"
+    },
+    {
+      "title": "05｜同一个脚本被直接执行与被导入时的差异",
+      "why": "你在终端python sensor.py时，此文件是入口；另一文件import sensor时，此文件只是依赖模块。用两个真实文件记录__name__差别，比背诵规则容易记住。",
+      "syntax": "python sensor.py / python main.py",
+      "tokens": [
+        [
+          "sensor.py",
+          "模块文件名，不是特殊关键字"
+        ],
+        [
+          "import sensor",
+          "把sensor模块绑定给当前名字sensor"
+        ],
+        [
+          "sensor.identity()",
+          "通过点号访问并执行函数"
+        ],
+        [
+          "入口保护",
+          "只有直接运行sensor.py才执行的调试部分"
+        ]
+      ],
+      "code": "# 这是双文件练习：在同一目录保存sensor.py和main.py。\n# 在终端分别执行 python sensor.py 和 python main.py。",
+      "steps": [
+        "运行python sensor.py时先定义identity，再执行if内的print，得到直接运行。",
+        "运行python main.py时导入sensor，只执行sensor的顶层函数定义，sensor的入口代码不运行。",
+        "main.py调用sensor.identity()返回字符串，然后打印。"
+      ],
+      "output": "命令 python sensor.py 输出：\n直接运行sensor\n命令 python main.py 输出：\n从main调用 sensor",
+      "mistakes": [
+        "不要以为文件名main.py必定决定__name__；真正作为入口运行的脚本才是__main__。",
+        "在不同目录执行时，Python查找模块的路径可能变化，要确认两个文件在同一目录。"
+      ],
+      "exercise": "在sensor.py顶部加print('模块顶部')，比较两次终端运行分别显示什么。",
+      "kind": "multifile",
+      "files": [
+        {
+          "name": "sensor.py",
+          "code": "def identity():\n    return 'sensor'\n\nif __name__ == '__main__':\n    print('直接运行sensor')\n"
+        },
+        {
+          "name": "main.py",
+          "code": "import sensor\nprint('从main调用',sensor.identity())\n"
+        }
+      ],
+      "command": "python sensor.py && python main.py"
+    },
+    {
+      "title": "06｜跨文件传参：函数形参仍然按位置对应",
+      "why": "import不改变def函数的参数绑定规则。main.py向calculator.add传入3和4，函数的a接到3，b接到4；只有普通实例方法通过对象.方法(...)调用时，才会自动绑定实例到第一个形参。",
+      "syntax": "result = calculator.add(3,4)",
+      "tokens": [
+        [
+          "calculator",
+          "从import calculator取得的模块名"
+        ],
+        [
+          "add",
+          "模块中的函数名"
+        ],
+        [
+          "(3,4)",
+          "两个显式位置实参，分别绑定给形参a、b"
+        ],
+        [
+          "return a+b",
+          "把结果7返回到main.py的调用位置"
+        ]
+      ],
+      "code": "# 双文件案例，真实运行指令及完整文件内容列在下方。",
+      "steps": [
+        "main.py导入calculator.py，在导入时仅定义函数add。",
+        "main.py执行calculator.add(3,4)，在add内a=3,b=4。",
+        "计算7后return回main，再由print显示7。"
+      ],
+      "output": "7",
+      "mistakes": [
+        "不要把普通模块函数当成实例方法，它不会自动接收整个模块作为self。",
+        "函数print的副作用与return的返回值是不同的。"
+      ],
+      "exercise": "把add改成return a*10+b，验证结果34。",
+      "kind": "multifile",
+      "files": [
+        {
+          "name": "calculator.py",
+          "code": "def add(a,b):\n    return a+b\n"
+        },
+        {
+          "name": "main.py",
+          "code": "import calculator\nprint(calculator.add(3,4))\n"
+        }
+      ],
+      "command": "python main.py"
+    },
+    {
+      "title": "07｜导入名字冲突：为什么推荐模块前缀",
+      "why": "比如你自己也定义了sqrt，from math import sqrt可能发生同名覆盖；用math.sqrt就明确指出函数来自哪个模块。ASW多模块工程更应避免变量名与文件名冲突。",
+      "syntax": "import math / math.sqrt(...) / from math import sqrt as square_root",
+      "tokens": [
+        [
+          "模块前缀",
+          "math.sqrt说明成员来自math模块"
+        ],
+        [
+          "as square_root",
+          "当前文件里给导入函数取另一个名字"
+        ],
+        [
+          "def sqrt(x)",
+          "此处定义了本地函数，同名可能覆盖此前导入的名字"
+        ]
+      ],
+      "code": "import math\nfrom math import sqrt as square_root\n\ndef sqrt(x):\n    return x + 1\n\nprint(sqrt(9))\nprint(math.sqrt(9))\nprint(square_root(9))",
+      "steps": [
+        "本地def sqrt将名字sqrt绑定为自己定义的函数。",
+        "sqrt(9)执行本地函数返回10。",
+        "math.sqrt(9)与square_root(9)访问标准库函数，返回3.0。"
+      ],
+      "output": "10\n3.0\n3.0",
+      "mistakes": [
+        "不要随意给自己的文件取名math.py、json.py、csv.py，否则可能遮蔽标准库模块。",
+        "只看函数名未必知道来源，代码阅读时要追踪import。"
+      ],
+      "exercise": "尝试把别名改成root，判断哪几个调用表达式要同步改。"
+    },
+    {
+      "title": "08｜导入失败时如何定位：名字、文件、安装环境",
+      "why": "ModuleNotFoundError常见于模块找不到；ImportError也可能表示模块存在但没有指定名字。标准库通常随Python附带；第三方库需要在当前解释器环境安装。不要见到任何导入错误就立即pip install。",
+      "syntax": "import module / from module import name",
+      "tokens": [
+        [
+          "ModuleNotFoundError",
+          "模块名在当前搜索路径中找不到"
+        ],
+        [
+          "ImportError",
+          "导入模块中指定名字失败等情况"
+        ],
+        [
+          "__file__",
+          "模块实际文件路径，帮助确认是否导入了意外的同名文件"
+        ],
+        [
+          "sys.executable",
+          "当前运行的Python解释器完整路径"
+        ]
+      ],
+      "code": "import json\nimport sys\nprint(json.__name__)\nprint(sys.executable == '')",
+      "steps": [
+        "导入标准库json和sys。",
+        "json.__name__返回模块名称json。",
+        "sys.executable通常是非空解释器路径，因此与空字符串比较得到False。"
+      ],
+      "output": "json\nFalse",
+      "mistakes": [
+        "不要把pip安装到另一套Python，再用当前解释器运行代码。",
+        "同名本地文件json.py会改变导入目标并可能导致奇怪错误。"
+      ],
+      "exercise": "执行python -c \"import sys;print(sys.executable)\"，解释它能帮助排查哪类环境问题。"
+    }
+  ]
+}
