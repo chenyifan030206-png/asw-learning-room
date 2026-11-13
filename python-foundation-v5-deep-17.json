@@ -1,0 +1,731 @@
+{
+  "scope": "第17章文件模式、CSV解析、JSON序列化全链路",
+  "chapterId": "v2_15",
+  "lessons": [
+    {
+      "title": "01｜文件路径先于文件：Path对象并不创建文件",
+      "why": "C语言中相对路径和当前工作目录有关，Python同样如此。Path('demo.txt')仅建立一个表示文件位置的对象，不等同于打开或创建文件。先区分工作目录、相对路径与绝对路径。",
+      "syntax": "from pathlib import Path; p=Path('demo.txt')",
+      "tokens": [
+        [
+          "Path",
+          "pathlib里的路径类，调用后得到Path实例"
+        ],
+        [
+          "'demo.txt'",
+          "相对文件名字符串，以当前工作目录为参照"
+        ],
+        [
+          "p.name",
+          "读取文件名属性，不是调用函数"
+        ],
+        [
+          "p.resolve()",
+          "计算绝对路径形式，结果与当前工作目录相关"
+        ],
+        [
+          "p.exists()",
+          "检查指定路径当前是否存在"
+        ]
+      ],
+      "code": "from pathlib import Path\np=Path('demo.txt')\nprint(p.name)\nprint(p.suffix)\nprint(p.is_absolute())",
+      "steps": [
+        "从pathlib导入Path类。",
+        "Path('demo.txt')建立路径对象，不创建文件。",
+        ".name返回文件名，.suffix返回扩展名；因为路径是相对的，is_absolute为False。"
+      ],
+      "output": "demo.txt\n.txt\nFalse",
+      "mistakes": [
+        "不能以为p=Path('demo.txt')已经创建磁盘文件。",
+        "__file__对应脚本位置，Path.cwd()对应工作目录，这两个位置不一定一致。"
+      ],
+      "exercise": "在本地运行print(Path.cwd())和print(p.resolve())，解释二者有什么联系。"
+    },
+    {
+      "title": "02｜Path的点号与斜杠：文件夹拼接不是数值除法",
+      "why": "Python的Path重载了/运算符，使它可以组合目录与文件名；不必手动处理Windows与Linux不同的分隔符。但路径是否存在仍要检查。",
+      "syntax": "folder / 'demo.txt'",
+      "tokens": [
+        [
+          "Path('logs')",
+          "只建立文件夹路径对象，不代表实际建好目录"
+        ],
+        [
+          "/ 'demo.txt'",
+          "Path类型的路径拼接操作，不执行数字除法"
+        ],
+        [
+          ".parent",
+          "读取父目录路径"
+        ],
+        [
+          ".name",
+          "读取最后一级文件名"
+        ]
+      ],
+      "code": "from pathlib import Path\np=Path('logs')/'demo.txt'\nprint(p.parts)\nprint(p.name)\nprint(p.parent)",
+      "steps": [
+        "创建相对目录logs的路径对象。",
+        "运算符/追加demo.txt并构成新路径。",
+        ".parts返回路径部分组成的元组；操作系统路径分隔符会按平台确定。"
+      ],
+      "output": "（首行依运行平台而定，例如 ('logs', 'demo.txt')）\ndemo.txt\nlogs",
+      "mistakes": [
+        "p.parent不会自动创建logs目录。",
+        "不要把Path的/误认作普通字符串除法；'logs'/'demo.txt'没有这种含义。"
+      ],
+      "exercise": "尝试p.parent.mkdir(parents=True,exist_ok=True)，观察何时真正创建目录。",
+      "kind": "run_variable_output"
+    },
+    {
+      "title": "03｜with...as与文件对象：谁打开、谁读写、谁关闭",
+      "why": "你已学过with path.open('w',encoding='utf-8') as f；它包含路径对象、文件打开方法、文件对象绑定和退出块关闭四个步骤。C通常手动fopen/fclose，Python with帮助可靠清理资源。",
+      "syntax": "with p.open('w',encoding='utf-8') as f:",
+      "tokens": [
+        [
+          "with",
+          "进入上下文管理器，离开块时按规则清理资源"
+        ],
+        [
+          "p.open('w')",
+          "对路径打开文件，w为创建或覆盖写入"
+        ],
+        [
+          "encoding='utf-8'",
+          "文本编码参数，用于字节与字符串的转换"
+        ],
+        [
+          "as f",
+          "把已打开的文件对象赋给名字f"
+        ],
+        [
+          "冒号+缩进",
+          "决定受with管理的代码块范围"
+        ]
+      ],
+      "code": "from pathlib import Path\np=Path('demo.txt')\nwith p.open('w',encoding='utf-8') as f:\n    f.write('radar')\nprint(f.closed)\nprint(p.read_text(encoding='utf-8'))",
+      "steps": [
+        "with进入时打开文件并绑定f。",
+        "f.write把五个字符写入文本文件；退出with后f.closed为True。",
+        "Path.read_text重新读取整个文件，打印radar。"
+      ],
+      "output": "True\nradar",
+      "mistakes": [
+        "f在with块外仍可能作为变量存在，但文件已关闭，不能继续执行f.write。",
+        "'w'会清空已有内容，处理实验原始数据时一定区分输入与输出文件。"
+      ],
+      "exercise": "在with外尝试f.write('x')，观察ValueError: I/O operation on closed file。"
+    },
+    {
+      "title": "04｜模式r/w/a/x一口气讲清：固定合法值，行为不同",
+      "why": "模式字符串由open规定，不是任意自己起名。r读已存在、w清空再写、a追加、x仅当不存在时创建。特别注意：w与x都能创建文件，但x不会覆盖已存在的文件。",
+      "syntax": "p.open('r'|'w'|'a'|'x',encoding='utf-8')",
+      "tokens": [
+        [
+          "'r'",
+          "read；打开已有文件读取，不存在则FileNotFoundError"
+        ],
+        [
+          "'w'",
+          "write；不存在则创建，存在则清空后写"
+        ],
+        [
+          "'a'",
+          "append；不存在则创建，存在则追加到末尾"
+        ],
+        [
+          "'x'",
+          "exclusive creation；要求文件不存在，否则FileExistsError"
+        ],
+        [
+          "mode变量",
+          "可以自己命名，但值必须是规定的模式字符串"
+        ]
+      ],
+      "code": "from pathlib import Path\np=Path('modes.txt')\nwith p.open('w',encoding='utf-8') as f:\n    f.write('radar\\n')\nwith p.open('a',encoding='utf-8') as f:\n    f.write('camera\\n')\nwith p.open('r',encoding='utf-8') as f:\n    print(f.read(),end='')",
+      "steps": [
+        "w创建或清空modes.txt并写入radar以及换行。",
+        "a保留第一行并追加camera与换行。",
+        "r读取全部内容；print(...,end='')不再额外增加换行。"
+      ],
+      "output": "radar\ncamera",
+      "mistakes": [
+        "在同一个文件已被w创建后再用x打开，会报FileExistsError且后面的读取不会执行。",
+        "字符x不是独占锁；它只用于安全地创建不存在的文件。"
+      ],
+      "exercise": "把a改成w运行第二次，预测为什么只剩camera。"
+    },
+    {
+      "title": "05｜独占创建x与FileExistsError：通过异常理解规则",
+      "why": "x模式最常见的错误是前面刚通过w建立了文件，然后用x打开同名路径。这里故意重复创建，看Python如何拒绝覆盖。用临时目录保证每次练习都可重复。",
+      "syntax": "with p.open('x') as f: ... / except FileExistsError:",
+      "tokens": [
+        [
+          "tempfile.TemporaryDirectory",
+          "提供可自动清理的临时目录，避免污染实验文件"
+        ],
+        [
+          "Path(folder)/'data.txt'",
+          "拼接临时文件路径"
+        ],
+        [
+          "'x'",
+          "要求文件不存在时才创建"
+        ],
+        [
+          "except FileExistsError",
+          "捕获文件已存在的特定异常"
+        ]
+      ],
+      "code": "from pathlib import Path\nfrom tempfile import TemporaryDirectory\nwith TemporaryDirectory() as folder:\n    p=Path(folder)/'data.txt'\n    with p.open('x',encoding='utf-8') as f:\n        f.write('first')\n    try:\n        with p.open('x',encoding='utf-8') as f:\n            f.write('second')\n    except FileExistsError:\n        print('文件已存在，拒绝覆盖')\n    print(p.read_text(encoding='utf-8'))",
+      "steps": [
+        "第一次x打开时文件不存在，成功创建并写first。",
+        "第二次x发现同名文件已经存在，抛FileExistsError并进入except。",
+        "文件没有被覆盖，读取结果仍为first。"
+      ],
+      "output": "文件已存在，拒绝覆盖\nfirst",
+      "mistakes": [
+        "先用exists()检查再用x不能从根本上避免竞争条件，应捕获FileExistsError。",
+        "try内部发生异常时，后面的f.write('second')根本不会执行。"
+      ],
+      "exercise": "在except里加print(type(p).__name__)观察p的类型。"
+    },
+    {
+      "title": "06｜字符串中的\\n、文本文件编码与打印换行",
+      "why": "\\n在Python字符串中是一个换行字符，写入时不是两个可见字符。a模式不会自动换行，必须在已有内容尾部或新增内容前后明确写\\n。print默认也会附加换行，两者容易混淆。",
+      "syntax": "f.write('radar\\ndistance\\n')",
+      "tokens": [
+        [
+          "'radar\\ndistance\\n'",
+          "字符串含两个换行控制字符"
+        ],
+        [
+          "f.write",
+          "写入字符串内容，不自动添加额外换行"
+        ],
+        [
+          "print(...,end='')",
+          "更改print的结尾字符，不影响文件原始内容"
+        ],
+        [
+          "encoding",
+          "处理文件文本与字节之间的转换"
+        ]
+      ],
+      "code": "from io import StringIO\nf=StringIO()\nf.write('radar\\ndistance\\n')\nprint(repr(f.getvalue()))\nprint(f.getvalue(),end='')",
+      "steps": [
+        "StringIO创建内存文本流，不在磁盘建文件。",
+        "write写入radar、换行、distance、换行。",
+        "repr显示转义字符串，而print(f.getvalue())把换行实际显示。"
+      ],
+      "output": "'radar\\ndistance\\n'\nradar\ndistance",
+      "mistakes": [
+        "不要把write理解成print，前者不自动添加换行。",
+        "UTF-8用于文本编码，与\\n换行是两个不同概念。"
+      ],
+      "exercise": "把最后一个\\n删掉，先打印repr，再检查输出行数。"
+    },
+    {
+      "title": "07｜read、readline与for逐行读取：读取位置会移动",
+      "why": "打开文件后有一个当前读取位置，read()会消耗剩余内容，第二次再read通常得到空字符串。读大型日志时逐行遍历往往比一次read()更节省内存。",
+      "syntax": "f.read() / f.readline() / for line in f:",
+      "tokens": [
+        [
+          "read()",
+          "读取从当前位置起的剩余文本；不传参数通常直到末尾"
+        ],
+        [
+          "readline()",
+          "读取一行，通常保留末尾的换行符"
+        ],
+        [
+          "for line in f",
+          "从文件对象依次取得一行文本"
+        ],
+        [
+          "f.seek(0)",
+          "把读取位置移回开头（文本流用法依具体文件而定）"
+        ]
+      ],
+      "code": "from io import StringIO\nf=StringIO('A\\nB\\n')\nprint(repr(f.readline()))\nprint(repr(f.read()))\nprint(repr(f.read()))\nf.seek(0)\nprint(repr(f.readline()))\nf.close()",
+      "steps": [
+        "第一次readline得到第一行'A\\n'，读取位置前进。",
+        "第一次read取得剩余'B\\n'，第二次read因为已到末尾返回''。",
+        "seek(0)回到起始位置，readline再次得到'A\\n'。"
+      ],
+      "output": "'A\\n'\n'B\\n'\n''\n'A\\n'",
+      "mistakes": [
+        "不要假设每次read()都会重新从文件开头开始。",
+        "read()整个文件可能占大量内存，按行处理更适合大日志。"
+      ],
+      "exercise": "把第二句改成for line in f: print(repr(line))，比较读取位置的变化。"
+    },
+    {
+      "title": "08｜CSV为什么不用split(',')：引号里面的逗号属于字段值",
+      "why": "CSV格式不是简单的字符串逗号切割。比如\"radar,front\"必须算作一个字段。Python的csv模块认识引号、逗号和换行等CSV规则，因此要优先使用csv.reader/DictReader。",
+      "syntax": "csv.reader(StringIO(raw))",
+      "tokens": [
+        [
+          "raw",
+          "原始文本字符串，尚未解析为表格"
+        ],
+        [
+          "StringIO(raw)",
+          "将字符串包装成可按行读取的内存文本流"
+        ],
+        [
+          "csv.reader",
+          "依据CSV格式返回行列表的迭代器"
+        ],
+        [
+          "list(...)",
+          "取出所有数据行，形成列表"
+        ],
+        [
+          "双引号",
+          "CSV中把含逗号的字段内容包围，解析后通常移除包围引号"
+        ]
+      ],
+      "code": "import csv\nfrom io import StringIO\nraw='name,speed\\n\"radar,front\",72.0\\n'\nrows=list(csv.reader(StringIO(raw)))\nprint(rows)\nprint(rows[1][0])",
+      "steps": [
+        "StringIO把字符串包装为类文件输入。",
+        "reader读取两行：表头一行和数据一行，字段值保持字符串。",
+        "第二行第一个字段是radar,front，内部逗号没有被当作分隔符。"
+      ],
+      "output": "[['name', 'speed'], ['radar,front', '72.0']]\nradar,front",
+      "mistakes": [
+        "用raw.split(',')会错误拆成radar与front两个字段。",
+        "CSV文件中的双引号不是Python字符串定界符，它属于CSV自身语法。"
+      ],
+      "exercise": "改用raw.split(',')打印结果，指出多出了哪一段。"
+    },
+    {
+      "title": "09｜DictReader如何从表头创建每行字典：先list后dict",
+      "why": "DictReader默认将第一行作为字段名，其后每一条记录转成字典。要理解rows[0]['name']必须先判断rows是list，然后rows[0]是dict，最后['name']才按键找值。",
+      "syntax": "rows=list(csv.DictReader(StringIO(raw)))",
+      "tokens": [
+        [
+          "DictReader",
+          "生成表头为键的每行字典"
+        ],
+        [
+          "list",
+          "将迭代记录收集起来（小数据方便，海量数据可逐行处理）"
+        ],
+        [
+          "rows[0]",
+          "列表从0开始，取第一条字典记录"
+        ],
+        [
+          "rows[0]['name']",
+          "对该字典按键'name'读取字段值"
+        ]
+      ],
+      "code": "import csv\nfrom io import StringIO\nraw='name,speed\\n\"radar,front\",72.0\\n'\nrows=list(csv.DictReader(StringIO(raw)))\nprint(rows[0])\nprint(rows[0]['name'])",
+      "steps": [
+        "DictReader将表头name和speed作为字典键。",
+        "第一条数据行配对为{'name':'radar,front','speed':'72.0'}。",
+        "rows[0]读取字典，再通过['name']读取字符串radar,front。"
+      ],
+      "output": "{'name': 'radar,front', 'speed': '72.0'}\nradar,front",
+      "mistakes": [
+        "rows[0]['name']不是二维数组的两个整数索引，第二个方括号是字典键访问。",
+        "DictReader不自动判断列是float还是str。"
+      ],
+      "exercise": "增加第二条数据camera,60.0，观察rows[1]['speed']的结果。"
+    },
+    {
+      "title": "10｜为什么CSV速度是str：float()转换与输入校验",
+      "why": "即使CSV写72.0，DictReader得到的字段通常也是字符串'72.0'；若要做阈值比较必须转换为float。对于真实测试日志，非法字符/空值还需要单独处理，不能默默把坏数据当0。",
+      "syntax": "speed=float(row['speed'])",
+      "tokens": [
+        [
+          "row['speed']",
+          "从本行字典中读取文本值'72.0'"
+        ],
+        [
+          "float('72.0')",
+          "解析十进制数字文本为浮点数72.0"
+        ],
+        [
+          "type(...).__name__",
+          "读取对象实际类型名称"
+        ],
+        [
+          "ValueError",
+          "字符串不能转换成float时可能抛出的异常"
+        ]
+      ],
+      "code": "import csv\nfrom io import StringIO\nrow=next(csv.DictReader(StringIO('speed\\n72.0\\n')))\nprint(type(row['speed']).__name__)\nspeed=float(row['speed'])\nprint(type(speed).__name__)\nprint(speed>60)",
+      "steps": [
+        "DictReader按字符串读取speed字段。",
+        "float把文本'72.0'转换成数值72.0。",
+        "数值与60比较得到True。"
+      ],
+      "output": "str\nfloat\nTrue",
+      "mistakes": [
+        "直接写row['speed']>60会因str与int无法比较而抛TypeError。",
+        "float('NaN')通常能返回nan，并不自动报ValueError；真实传感器数据还应检查math.isfinite。"
+      ],
+      "exercise": "把72.0改成oops，通过try/except ValueError提示格式错误。"
+    },
+    {
+      "title": "11｜CSV文件版：newline=''与DictReader逐行读取",
+      "why": "内存StringIO用于学习；真实CSV文件从Path打开。读取CSV时建议newline=''，让csv模块自行处理换行；encoding='utf-8'规定文本编码。循环直接遍历reader可减少一次性构造大列表。",
+      "syntax": "with path.open('r',encoding='utf-8',newline='') as f:",
+      "tokens": [
+        [
+          "newline=''",
+          "以适用于csv模块的方式处理换行"
+        ],
+        [
+          "csv.DictReader(f)",
+          "用文件对象构建按行读取的字典迭代器"
+        ],
+        [
+          "for row in reader",
+          "逐条读取，不强制提前把整个文件放进列表"
+        ],
+        [
+          "path.write_text",
+          "简短写入文本文件的方法；这里只用于生成可复现教学样例"
+        ]
+      ],
+      "code": "from pathlib import Path\nfrom tempfile import TemporaryDirectory\nimport csv\nwith TemporaryDirectory() as folder:\n    p=Path(folder)/'data.csv'\n    p.write_text('name,speed\\nradar,72.0\\n',encoding='utf-8')\n    with p.open('r',encoding='utf-8',newline='') as f:\n        for row in csv.DictReader(f):\n            print(row['name'],float(row['speed']))",
+      "steps": [
+        "临时目录中建立data.csv并写两行文本。",
+        "open以r模式和newline=''打开给csv处理。",
+        "DictReader读取表头，for循环取唯一记录，转换速度72.0后打印。"
+      ],
+      "output": "radar 72.0",
+      "mistakes": [
+        "不要用简单split(',')代替csv的字段解析。",
+        "要访问字段必须确保CSV存在该列，否则会KeyError。"
+      ],
+      "exercise": "将name列重命名为sensor，观察读取row['name']时出现什么异常。"
+    },
+    {
+      "title": "12｜CSV异常与行号：字段缺失、空值、非法数字是不同错误",
+      "why": "当传感器日志缺少列名或数值错误时，不能只报‘无法读取’。先查必需列，再逐行转换，用reader.line_num记录物理行号。带引号跨行的CSV字段可能让物理行号与逻辑记录序号不同。",
+      "syntax": "if 'speed' not in reader.fieldnames: raise ValueError(...)",
+      "tokens": [
+        [
+          "reader.fieldnames",
+          "DictReader识别的列标题列表"
+        ],
+        [
+          "raise ValueError",
+          "主动表示格式或内容不满足要求"
+        ],
+        [
+          "reader.line_num",
+          "CSV读取器已读取的源文件物理行数"
+        ],
+        [
+          "float(row['speed'])",
+          "转换字段文本，非法数值会抛ValueError"
+        ]
+      ],
+      "code": "import csv\nfrom io import StringIO\nraw='name,speed\\nradar,72.0\\ncamera,oops\\n'\nreader=csv.DictReader(StringIO(raw))\nif 'speed' not in (reader.fieldnames or []):\n    raise ValueError('缺少speed列')\nfor row in reader:\n    try:\n        print(float(row['speed']))\n    except ValueError:\n        print('第',reader.line_num,'行速度不是数字')",
+      "steps": [
+        "先检查表头存在speed列。",
+        "第二物理行radar,72.0转换成功，打印72.0。",
+        "第三物理行oops导致ValueError，except根据reader.line_num打印第3行。"
+      ],
+      "output": "72.0\n第 3 行速度不是数字",
+      "mistakes": [
+        "不要在非法数据上使用except:pass并继续默默产生不完整结果。",
+        "字段为空字符串、字段为None和字段值为NaN需要按不同场景进一步校验。"
+      ],
+      "exercise": "把speed列删除，预测程序会在哪个阶段报错。"
+    },
+    {
+      "title": "13｜JSON是文本格式，不是Python字典本身",
+      "why": "JSON把不同语言之间的数据交换格式固定下来。Python字典True、False、None序列化后写成true、false、null，键必须是JSON字符串。先理解对象与字符串，不要以为把字典print出来就是标准JSON。",
+      "syntax": "json.dumps({'valid': True})",
+      "tokens": [
+        [
+          "dict",
+          "Python运行时映射对象"
+        ],
+        [
+          "JSON字符串",
+          "保存数据的一段str文本，能够被其他语言解析"
+        ],
+        [
+          "True / true",
+          "前者是Python布尔字面量，后者是JSON语法"
+        ],
+        [
+          "json.dumps",
+          "将Python对象序列化成JSON字符串"
+        ]
+      ],
+      "code": "import json\nresult={'status':'ACTIVE','valid':True,'alert':False}\ntext=json.dumps(result)\nprint(type(result).__name__)\nprint(type(text).__name__)\nprint(text)",
+      "steps": [
+        "result首先是dict，其中valid为Python bool True。",
+        "json.dumps按JSON规则生成str，布尔值显示为小写true/false。",
+        "print输出JSON文本，但text并不具备字典键访问能力。"
+      ],
+      "output": "dict\nstr\n{\"status\": \"ACTIVE\", \"valid\": true, \"alert\": false}",
+      "mistakes": [
+        "不要对text这个str写text['valid']，会产生TypeError。",
+        "JSON不允许用Python里的单引号属性名或大写True直接作为合法文本。"
+      ],
+      "exercise": "尝试把字典中的alert改成None，观察JSON显示null。"
+    },
+    {
+      "title": "14｜dumps/loads各个字母：内存字符串方向",
+      "why": "字母s可以帮助记忆string。dumps:Python对象→JSON字符串；loads:JSON文本→Python对象。loads并不读取磁盘文件，传入的必须是包含合法JSON的字符串/字节等。",
+      "syntax": "text=json.dumps(result);data=json.loads(text)",
+      "tokens": [
+        [
+          "dumps",
+          "序列化并返回str"
+        ],
+        [
+          "loads",
+          "解析JSON文本并返回对应Python对象"
+        ],
+        [
+          "loads(text)['valid']",
+          "先loads生成dict，再按键取值"
+        ],
+        [
+          "type(...).__name__",
+          "查看解析前后对象的实际类型名称"
+        ]
+      ],
+      "code": "import json\nresult={'status':'ACTIVE','valid':True,'alert':False}\ntext=json.dumps(result,ensure_ascii=False)\nprint(text)\ndata=json.loads(text)\nprint(data['valid'])\nprint(type(data).__name__)",
+      "steps": [
+        "dumps把字典变为JSON文本，True在文本中是小写true。",
+        "loads解析JSON文本，将true还原成Python True。",
+        "data是dict，['valid']按键读取布尔True。"
+      ],
+      "output": "{\"status\": \"ACTIVE\", \"valid\": true, \"alert\": false}\nTrue\ndict",
+      "mistakes": [
+        "dumps并不会自动把内容保存成.json文件。",
+        "loads('{\\'valid\\': True}')不是合法JSON，因为这是Python字典写法。"
+      ],
+      "exercise": "将data['valid']换成data.get('missing',False)，解释默认值什么时候生效。"
+    },
+    {
+      "title": "15｜ensure_ascii、indent、sort_keys分别影响什么",
+      "why": "中文字段用ensure_ascii=False可直接显示文字，indent控制缩进排版，sort_keys控制键排序；它们改变的是输出文本的表示方式，不会改变输入字典的业务含义。",
+      "syntax": "json.dumps(data,ensure_ascii=False,indent=2,sort_keys=True)",
+      "tokens": [
+        [
+          "ensure_ascii=False",
+          "非ASCII字符尽量不转成\\u转义；不等于文件编码参数"
+        ],
+        [
+          "indent=2",
+          "嵌套缩进采用两个空格，便于人阅读"
+        ],
+        [
+          "sort_keys=True",
+          "按键排序输出，便于文本对比"
+        ],
+        [
+          "encoding='utf-8'",
+          "文件写入时另行指定文本编码"
+        ]
+      ],
+      "code": "import json\ndata={'状态':'告警','valid':True}\nprint(json.dumps(data,ensure_ascii=False,sort_keys=True))\nprint(json.dumps({'x':1},indent=2))",
+      "steps": [
+        "第一个dumps直接保留中文，并将键排序。",
+        "第二个dumps按两个空格缩进，多行显示一个对象。",
+        "两个函数都返回str，不执行磁盘写入。"
+      ],
+      "output": "{\"valid\": true, \"状态\": \"告警\"}\n{\n  \"x\": 1\n}",
+      "mistakes": [
+        "ensure_ascii=False不保证写到文件时自动采用UTF-8，仍需明确编码。",
+        "JSON中不允许在最后一个属性后加多余逗号或放注释。"
+      ],
+      "exercise": "把第一行改成ensure_ascii=True，解释看到的\\u字符表示什么。"
+    },
+    {
+      "title": "16｜dump/load：直接对文件读写，和dumps/loads有何区别",
+      "why": "不带s的dump和load面向文件对象。dump(data,f)把Python数据转为JSON并写入打开的f；load(f)从f读取JSON并解析。它们与f.write(json.dumps(data))、json.loads(f.read())在教学情形下等价。",
+      "syntax": "json.dump(data,f) / json.load(f)",
+      "tokens": [
+        [
+          "dump(data,f)",
+          "序列化Python对象并写入文本文件对象f"
+        ],
+        [
+          "load(f)",
+          "从文本文件对象f读取并解析JSON"
+        ],
+        [
+          "'w' / 'r'",
+          "决定文件打开为写入覆盖或读取"
+        ],
+        [
+          "with...as f",
+          "进入文件操作区间，结束时自动关闭文件"
+        ]
+      ],
+      "code": "import json\nfrom pathlib import Path\nfrom tempfile import TemporaryDirectory\nwith TemporaryDirectory() as folder:\n    p=Path(folder)/'result.json'\n    with p.open('w',encoding='utf-8') as f:\n        json.dump({'valid':True,'状态':'告警'},f,ensure_ascii=False)\n    with p.open('r',encoding='utf-8') as f:\n        loaded=json.load(f)\n    print(loaded['valid'],loaded['状态'])",
+      "steps": [
+        "写入模式w在临时目录创建result.json。",
+        "json.dump写入小写true等JSON语法文本。",
+        "读文件时json.load解析回字典，valid字段是True。"
+      ],
+      "output": "True 告警",
+      "mistakes": [
+        "json.load(f)与json.loads(f)不是一回事：前者要文件对象，后者要JSON文本。",
+        "读取时如果文件不存在会抛FileNotFoundError，不是JSONDecodeError。"
+      ],
+      "exercise": "把loaded['状态']打印为repr，比较它与原JSON文本里双引号的区别。"
+    },
+    {
+      "title": "17｜JSON类型变化：列表、字典、布尔值与字符串数字",
+      "why": "CSV列默认是str，而JSON自带数字/布尔/空值语法。JSON中72.0不加引号被解析为float，'72.0'必须按JSON格式写双引号才能变成str。列表变数组，字典变对象；tuple转JSON数组再读回通常是list。",
+      "syntax": "json.loads('{\"speed\":72.0,\"valid\":true}')",
+      "tokens": [
+        [
+          "72.0",
+          "合法JSON数字，被解析为Python float"
+        ],
+        [
+          "\"72.0\"",
+          "合法JSON字符串，被解析为Python str"
+        ],
+        [
+          "true / false",
+          "JSON布尔常量，解析后成为True/False"
+        ],
+        [
+          "null",
+          "JSON空值，解析为Python None"
+        ],
+        [
+          "[] / {}",
+          "JSON数组/对象，通常对应Python list/dict"
+        ]
+      ],
+      "code": "import json\nvalue=json.loads('{\"speed\":72.0,\"valid\":true,\"none\":null}')\nprint(type(value['speed']).__name__)\nprint(value['valid'])\nprint(value['none'] is None)\nprint(type(json.loads('{\"speed\":\"72.0\"}')['speed']).__name__)",
+      "steps": [
+        "JSON数字72.0被解析为float，输出类型名float。",
+        "true被解析成Python True；null被解析成None。",
+        "字符串\"72.0\"有引号，保持str类型。"
+      ],
+      "output": "float\nTrue\nTrue\nstr",
+      "mistakes": [
+        "不能把CSV/JSON的数字解析规则混成一条。",
+        "对自定义dataclass对象直接dumps通常不支持，需要先转换。"
+      ],
+      "exercise": "把speed改成72（没有小数点），预测解析后的类型名字。"
+    },
+    {
+      "title": "18｜dataclass与JSON：为什么先asdict再dumps",
+      "why": "Frame和Decision由dataclass定义，json.dumps默认不会认识你的自定义实例。asdict()把dataclass字段递归转成普通字典/列表形式，才方便写JSON；json.loads不会自动把字典重新构造成Decision。",
+      "syntax": "json.dumps(asdict(decision))",
+      "tokens": [
+        [
+          "dataclass",
+          "自动生成初始化及repr等方法的类装饰器"
+        ],
+        [
+          "asdict(obj)",
+          "从dataclass实例获得字段字典"
+        ],
+        [
+          "dumps",
+          "从字典生成JSON字符串"
+        ],
+        [
+          "loads",
+          "解析回来通常得到dict，不是自动还原的自定义类"
+        ]
+      ],
+      "code": "import json\nfrom dataclasses import dataclass,asdict\n@dataclass\nclass Decision:\n    status:str\n    valid:bool\nd=Decision('ACTIVE',True)\ntext=json.dumps(asdict(d))\nprint(text)\nprint(type(json.loads(text)).__name__)",
+      "steps": [
+        "dataclass使Decision('ACTIVE',True)合法并初始化字段。",
+        "asdict(d)创建普通字典，然后dumps生成JSON文本。",
+        "loads(text)返回dict，因此输出dict。"
+      ],
+      "output": "{\"status\": \"ACTIVE\", \"valid\": true}\ndict",
+      "mistakes": [
+        "json.dumps(d)在默认配置下会抛TypeError。",
+        "json.loads(text)得到dict，不能直接把它当Decision对象调用方法。"
+      ],
+      "exercise": "把字典还原为Decision(**json.loads(text))，解释双星号如何展开关键字参数。"
+    },
+    {
+      "title": "19｜JSON格式错误与字段缺失：两类问题不能混为一谈",
+      "why": "JSONDecodeError表示文本本身不符合JSON语法；KeyError表示JSON已经成功解析，但所要求的字典键不存在。不同错误应给出不同提示，便于定位数据来源问题。",
+      "syntax": "try: json.loads(text) / except json.JSONDecodeError:",
+      "tokens": [
+        [
+          "json.JSONDecodeError",
+          "解析非法JSON文本时的异常"
+        ],
+        [
+          "KeyError",
+          "字典中访问不存在的键时的异常"
+        ],
+        [
+          "try/except",
+          "只捕获预计会发生的错误，不应吞掉所有异常"
+        ],
+        [
+          "get",
+          "可提供默认值，但必需字段应明确检查"
+        ]
+      ],
+      "code": "import json\nbad='{\"valid\": True}'\ntry:\n    json.loads(bad)\nexcept json.JSONDecodeError:\n    print('JSON语法不合法')\nobj=json.loads('{\"status\":\"ACTIVE\"}')\ntry:\n    print(obj['valid'])\nexcept KeyError:\n    print('缺少valid字段')",
+      "steps": [
+        "第一个文本用了Python大写True，不是合法JSON，解析时抛JSONDecodeError。",
+        "except捕获并输出JSON语法不合法。",
+        "第二个文本解析成功，但字典没有valid键，访问时抛KeyError。"
+      ],
+      "output": "JSON语法不合法\n缺少valid字段",
+      "mistakes": [
+        "不要对错误的JSON直接使用eval()，这有安全风险。",
+        "不要无条件用get('valid',True)掩盖必需字段的缺失。"
+      ],
+      "exercise": "把bad改成'{\"valid\": true}'，观察第一个except还会不会执行。"
+    },
+    {
+      "title": "20｜CSV→数值→Decision→JSON：完整小案例不跳任何环节",
+      "why": "把前面的语法串起来：CSV原始文本→DictReader得到字符串字段→float数值转换→按距离计算告警布尔值→字典记录列表→dumps生成JSON字符串→loads还原。用两帧小数据保证每一步都能手算。",
+      "syntax": "csv.DictReader → float → list[dict] → json.dumps/loads",
+      "tokens": [
+        [
+          "StringIO",
+          "内存文件对象提供CSV文本流"
+        ],
+        [
+          "DictReader",
+          "根据表头把每行解析成字典"
+        ],
+        [
+          "float(row['distance_m'])",
+          "将距离文本转换为浮点数"
+        ],
+        [
+          "append",
+          "把每条结果加进列表"
+        ],
+        [
+          "json.dumps",
+          "把列表中的字典整体序列化为JSON字符串"
+        ]
+      ],
+      "code": "import csv,json\nfrom io import StringIO\nraw='frame,distance_m\\n0,45\\n1,34\\n'\nresults=[]\nfor row in csv.DictReader(StringIO(raw)):\n    distance=float(row['distance_m'])\n    results.append({'frame':int(row['frame']),'alert':distance<=35})\ntext=json.dumps(results)\nprint(text)\nprint(json.loads(text)[1]['alert'])",
+      "steps": [
+        "CSV两条记录中frame和distance_m一开始都是字符串。",
+        "for逐条取出后分别转为int、float并判断<=35。",
+        "results列表有两个字典，dumps变JSON数组文本；loads还原后读取第二条的alert。"
+      ],
+      "output": "[{\"frame\": 0, \"alert\": false}, {\"frame\": 1, \"alert\": true}]\nTrue",
+      "mistakes": [
+        "这是独立阈值判断，不是带滞环的有状态Monitor；真正工程章节才使用跨帧状态。",
+        "不要以为data=json.loads(text)会自动更新已有的Monitor对象。"
+      ],
+      "exercise": "把距离34改成36，预测第二帧的alert变化。"
+    }
+  ]
+}
