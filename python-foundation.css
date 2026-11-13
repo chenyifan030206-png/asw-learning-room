@@ -166,3 +166,6 @@ footer{text-align:center;font-size:13px;color:var(--muted);padding-bottom:38px}
 .deepReview>.topicMenu,.deepReview>.syntaxDetail,.deepReview>h3,.deepReview>p{margin-left:12px;margin-right:12px}
 .deepBody textarea{max-width:100%;width:100%;box-sizing:border-box;min-height:94px}
 @media(max-width:650px){.deepBody{padding:12px}.deepNav button{width:100%}.deepLesson>summary{padding:12px;font-size:14px}.deepCode{font-size:12px}}
+
+/* Both V4 (extra V5 link) and V5 topbars must wrap on narrow screens. */
+@media(max-width:810px){.toplinks{white-space:normal;flex-wrap:wrap;gap:7px 15px;max-width:100%}.toplinks a{overflow-wrap:anywhere}}
