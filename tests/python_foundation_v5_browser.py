@@ -16,7 +16,7 @@ def main():
         errors=[]
         page.on("pageerror",lambda error:errors.append(str(error)))
         page.add_init_script("""(() => {
-            const old='asw-python-foundation-v1:'+location.pathname.replace(/python-foundation-v5\\.html$/,'python-foundation.html');
+            const old='asw-python-foundation-v1:'+location.pathname.replace(/python-foundation-v5\.html$/,'python-foundation.html');
             if(!localStorage.getItem(old)){
                 localStorage.setItem(old,JSON.stringify({
                     schema:1,
@@ -35,7 +35,7 @@ def main():
         assert page.locator("#chapterNav button[data-chapter]").count()==23
         assert "已从当前浏览器旧页迁移" in page.locator("#migrationStatus").inner_text()
         old_json=page.evaluate("""() => {
-            const k='asw-python-foundation-v1:'+location.pathname.replace(/python-foundation-v5\\.html$/,'python-foundation.html');
+            const k='asw-python-foundation-v1:'+location.pathname.replace(/python-foundation-v5\.html$/,'python-foundation.html');
             return localStorage.getItem(k);
         }""")
         assert old_json and "第一章旧笔记" in old_json
