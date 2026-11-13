@@ -1,0 +1,232 @@
+{
+  "scope": "第22章语法查阅、导入环境与能力连接",
+  "chapterId": "v2_20",
+  "lessons": [
+    {
+      "title": "01｜看到新语法应该先定位它属于哪一层",
+      "why": "阅读Python工程时先识别：关键词def/return/for/if、对象属性点号、函数调用括号、下标方括号、类型注解冒号。不要见到陌生单词就认为它是语言关键字，例如DictReader和Path都是库成员名称。",
+      "syntax": "module.object.method(arguments)[index]",
+      "tokens": [
+        [
+          "module",
+          "模块名字，由import绑定"
+        ],
+        [
+          ".",
+          "按成员名称从左侧对象读取属性/方法"
+        ],
+        [
+          "(...)",
+          "调用函数或方法并传参，或表达式分组"
+        ],
+        [
+          "[...]",
+          "对左侧对象做下标/切片/字典键访问"
+        ],
+        [
+          "def/for/if",
+          "Python核心语句关键字"
+        ]
+      ],
+      "code": "import json\ndata={'a':[10,20]}\nprint(data['a'][1])\nprint(type(json.dumps(data)).__name__)",
+      "steps": [
+        "data['a']先按字典键拿到列表[10,20]。",
+        "随后[1]从列表中取第二个元素20。",
+        "json.dumps转换成JSON文本，type.__name__显示str。"
+      ],
+      "output": "20\nstr",
+      "mistakes": [
+        "不要把DictReader理解为Python关键字；它是csv模块提供的类。",
+        "遇到点号先确定左侧对象实际是什么类型。"
+      ],
+      "exercise": "把data['a'][1]改成data.get('a')[0]，判断输出。"
+    },
+    {
+      "title": "02｜看懂函数签名：参数注解不负责自动类型检查",
+      "why": "例如def step(self,frame:Frame,now_ms:int)->Decision: 中的Frame/int/Decision说明预期接口类型，真正的数据检验需要代码进行。先识别普通形参、带类型注解形参和返回类型注解，而不要把它们当C编译器强制检查。",
+      "syntax": "def check(x:float)->bool: ...",
+      "tokens": [
+        [
+          "x:float",
+          "对形参x作类型注解，不是为它赋默认值"
+        ],
+        [
+          "->bool",
+          "函数返回类型注解，函数仍必须return"
+        ],
+        [
+          "check(3)",
+          "位置实参3绑定到x，普通运行时不自动拒绝整数"
+        ],
+        [
+          "return",
+          "真正把计算值返回给调用者"
+        ]
+      ],
+      "code": "def check(x:float)->bool:\n    return x>0\nprint(check(3))\nprint(check(-1))",
+      "steps": [
+        "def创建函数对象，并记录预期的签名注解。",
+        "check(3)计算3>0得True。",
+        "check(-1)计算-1>0得False。"
+      ],
+      "output": "True\nFalse",
+      "mistakes": [
+        "类型注解不是自动转换器：输入'3'并不会自动float('3')。",
+        "->Decision不能代替return Decision(...)。"
+      ],
+      "exercise": "调用check('3')观察哪一行发生了什么类型错误。"
+    },
+    {
+      "title": "03｜如何查官方文档，不被库函数名字吓住",
+      "why": "先查Python语言层语法，再查标准库中对象的具体函数。比如import json里的dumps是库函数，应查json模块文档；for/while是语言语法，应查教程控制流章节。文档示例需要本地运行验证，不宜只看函数名。",
+      "syntax": "help(json.dumps) / print(json.dumps.__doc__)",
+      "tokens": [
+        [
+          "help(...)",
+          "Python内置帮助入口，终端可阅读对象文档"
+        ],
+        [
+          ".__doc__",
+          "对象可提供的文档字符串"
+        ],
+        [
+          "type(...)",
+          "获取运行时实际对象类型"
+        ],
+        [
+          "官方教程",
+          "适合按语法概念学习，如if/for/try/with"
+        ],
+        [
+          "标准库文档",
+          "适合查询json/pathlib/csv/unittest具体参数"
+        ]
+      ],
+      "code": "import json\nprint(json.dumps.__module__)\nprint(callable(json.dumps))",
+      "steps": [
+        "json.dumps是一项可调用的函数。",
+        "通过.__module__读取函数被定义的模块名称。",
+        "callable检查它是否可以被当作函数调用。"
+      ],
+      "output": "json\nTrue",
+      "mistakes": [
+        "不要把help()输出在不同Python版本中的排版当作固定精确结果。",
+        "网上教程可能使用旧版Python语法，实验需与你安装的版本一致。"
+      ],
+      "exercise": "在Python交互环境输入help(json.loads)，记录它的第一个参数叫什么。"
+    },
+    {
+      "title": "04｜能读懂import和pip的区别，就不会遇错乱装包",
+      "why": "import只查找和加载模块；pip负责把第三方包安装到指定Python环境。json/csv/pathlib属于标准库，通常不用pip安装。numpy不是标准库，进入D15时才需要确认所用解释器中安装它。",
+      "syntax": "python -m pip --version / import json",
+      "tokens": [
+        [
+          "import",
+          "运行时按模块搜索路径加载模块"
+        ],
+        [
+          "pip",
+          "用于包安装管理的命令行工具"
+        ],
+        [
+          "python -m pip",
+          "确保pip关联当前命令所选Python解释器"
+        ],
+        [
+          "venv",
+          "可为项目建立独立的第三方依赖环境"
+        ]
+      ],
+      "code": "import json\nimport pathlib\nprint(json.__name__)\nprint(pathlib.__name__)",
+      "steps": [
+        "import json成功取得Python标准库模块。",
+        "import pathlib同样属于标准库。",
+        "分别输出两个模块名。"
+      ],
+      "output": "json\npathlib",
+      "mistakes": [
+        "不要为找不到自己本地的reader.py就盲目pip install reader。",
+        "安装到一套解释器不代表另一套Python环境也能import对应包。"
+      ],
+      "exercise": "在终端查询python -m pip --version，并与python -c里的sys.executable比对。"
+    },
+    {
+      "title": "05｜读取报错的时候，先区分语法、类型、文件和业务需求",
+      "why": "SyntaxError先修代码语法，TypeError先看对象类型，FileNotFoundError先看文件路径，ValueError先看字段内容。只有明白异常发生在哪一步，才能决定补充try/except还是修改输入数据。",
+      "syntax": "异常类型→出错行→变量值→最小复现",
+      "tokens": [
+        [
+          "SyntaxError",
+          "代码不合法，解释器在解析阶段报告"
+        ],
+        [
+          "TypeError",
+          "类型与操作或调用不兼容"
+        ],
+        [
+          "FileNotFoundError",
+          "读取的文件路径不存在"
+        ],
+        [
+          "ValueError",
+          "某操作不接受此值，如float('oops')"
+        ],
+        [
+          "异常信息",
+          "应与Traceback上出错文件/行号一起看"
+        ]
+      ],
+      "code": "def parse(text):\n    try:\n        return float(text)\n    except ValueError:\n        return None\nprint(parse('72.0'))\nprint(parse('bad') is None)",
+      "steps": [
+        "72.0合法，float返回72.0。",
+        "bad无法转换，except选择返回None。",
+        "外部用is None检查第二次失败路径。"
+      ],
+      "output": "72.0\nTrue",
+      "mistakes": [
+        "并非所有错误都适合转成None；必需字段缺失时最好明确报告。",
+        "不能仅靠代码是否运行到最后来判断ASW日志记录是否完整。"
+      ],
+      "exercise": "把float改成int，预测对'72.0'字符串会发生什么变化。"
+    },
+    {
+      "title": "06｜学完15–21章之后的能力地图：先做到能读、能改、能查",
+      "why": "语法地图不是要求背诵所有Python。接下来优先能独立读一个带模块导入、数据类、文件读写、循环和异常处理的50行脚本，并解释每个变量的类型、保存位置和返回值。",
+      "syntax": "输入→解析→状态更新→结果对象→JSON",
+      "tokens": [
+        [
+          "输入",
+          "CSV/字符串的文本数据"
+        ],
+        [
+          "解析",
+          "DictReader与float/int进行类型构造和校验"
+        ],
+        [
+          "状态",
+          "Monitor实例保存历史alert"
+        ],
+        [
+          "输出",
+          "Decision转换dict，再dump为JSON"
+        ],
+        [
+          "测试",
+          "unittest对比预期与实际输出"
+        ]
+      ],
+      "code": "import json\ninputs=[45,34,38,42]\nalert=False\nresults=[]\nfor d in inputs:\n    if not alert and d<=35:alert=True\n    elif alert and d>=41:alert=False\n    results.append({'distance_m':d,'alert':alert})\nprint(len(results))\nprint(json.loads(json.dumps(results))[2]['alert'])",
+      "steps": [
+        "先在循环外定义alert和results，确保跨帧保存状态。",
+        "四帧循环依次更新alert并追加字典。",
+        "JSON往返后读取第三帧alert仍为True。"
+      ],
+      "output": "4\nTrue",
+      "mistakes": [
+        "不要先跳进NumPy数组，再反过来猜for/dict如何执行。",
+        "列表索引2表示第3项，不是第2项。"
+      ],
+      "exercise": "把距离改为[45,35,40,41]，自己逐轮计算再运行。"
+    }
+  ]
+}
