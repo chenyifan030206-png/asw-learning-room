@@ -1,0 +1,287 @@
+{
+  "scope": "第19章调试、真实断言和自动化测试",
+  "chapterId": "v2_17",
+  "lessons": [
+    {
+      "title": "01｜调试不是到处print：先明确预期、再观察实际",
+      "why": "只看到程序打印并不证明它正确。先写出输入与期望状态，比如45→False、34→True、38→True、42→False，再运行对账。print适合最初定位，完整项目应保留能反映输入和结果的日志。",
+      "syntax": "print(f'frame={i} distance={d} alert={alert}')",
+      "tokens": [
+        [
+          "f'...'",
+          "格式化字符串，花括号内放当前变量的表达式"
+        ],
+        [
+          "frame={i}",
+          "帧编号显示，避免不知道问题出在哪一帧"
+        ],
+        [
+          "return",
+          "计算结果应由函数返回，而不只是打印"
+        ],
+        [
+          "expected",
+          "测试之前定义好的期望，不应随实际错误输出随意更改"
+        ]
+      ],
+      "code": "distances=[45,34]\nfor i,d in enumerate(distances):\n    alert=d<=35\n    print(f'frame={i} distance={d} alert={alert}')",
+      "steps": [
+        "enumerate依次产生(0,45),(1,34)。",
+        "每轮计算简单阈值布尔值。",
+        "print用字段名使日志清楚，不会自动保存磁盘文件。"
+      ],
+      "output": "frame=0 distance=45 alert=False\nframe=1 distance=34 alert=True",
+      "mistakes": [
+        "只打印alert没有帧号和输入，会难以定位哪一帧异常。",
+        "这个独立阈值示例没有滞环历史状态，不可混同有状态Monitor。"
+      ],
+      "exercise": "先在纸上列出2帧的期望，再修改阈值并检查输出。"
+    },
+    {
+      "title": "02｜断点和逐步运行：step into / over / out",
+      "why": "IDE断点会在代码运行到那一行时暂停，允许查看self.alert和d的当前值。step into进入被调用函数，step over执行这次函数调用但停在调用者后续行，step out从当前函数继续到返回位置。",
+      "syntax": "VS Code：在m.step(distance)处设断点",
+      "tokens": [
+        [
+          "断点",
+          "IDE暂时停止真正运行到这条语句的代码"
+        ],
+        [
+          "step into",
+          "逐步进入被调用函数体"
+        ],
+        [
+          "step over",
+          "将一条调用作为整体执行，不进入函数内部逐步停留"
+        ],
+        [
+          "step out",
+          "完成当前函数，回到上一层调用位置"
+        ]
+      ],
+      "code": "def square(x):\n    y=x*x\n    return y\nprint(square(3))",
+      "steps": [
+        "定义square时函数体尚未执行。",
+        "在return y行设断点，调用square(3)后进入并可观察x=3,y=9。",
+        "执行return将9送回print显示。"
+      ],
+      "output": "9",
+      "mistakes": [
+        "给从未调用的函数内部设断点，程序不会自动停在那里。",
+        "浏览器的执行表不是Python解释器，无法代替本地IDE真实单步执行。"
+      ],
+      "exercise": "在VS Code本地运行，在square的y=x*x行设断点，分别尝试进入与跳过。"
+    },
+    {
+      "title": "03｜assert表示需要成立的判断，不是输出语句",
+      "why": "单元测试最简单的工具是assert 条件。条件为True则继续执行；False通常抛AssertionError。它适合验证输入输出是否符合预期，不建议把它当生产输入校验，因为优化模式可禁用assert。",
+      "syntax": "assert actual == expected",
+      "tokens": [
+        [
+          "assert",
+          "断言，判断表达式是否为真"
+        ],
+        [
+          "==",
+          "值比较，不是赋值"
+        ],
+        [
+          "AssertionError",
+          "断言失败时抛出的异常"
+        ],
+        [
+          "-O",
+          "Python优化运行模式可能忽略assert语句，因此业务参数验证不能只靠assert"
+        ]
+      ],
+      "code": "def check(d):\n    return d<=35\nassert check(34) is True\nassert check(45) is False\nprint('两项断言通过')",
+      "steps": [
+        "check(34)返回True，第一条断言成立。",
+        "check(45)返回False，第二条断言成立。",
+        "所有断言通过后执行print。"
+      ],
+      "output": "两项断言通过",
+      "mistakes": [
+        "assert check(34)只验证真实布尔真值，不等同于比较全部结果字段。",
+        "不要把生产输入检查放在可被优化禁用的assert中。"
+      ],
+      "exercise": "把第二条的False改成True，观察AssertionError，并恢复正确期望。"
+    },
+    {
+      "title": "04｜unittest最小完整例子：测试类、方法和断言",
+      "why": "unittest是标准库中的测试框架。测试类通常继承unittest.TestCase，方法名以test_开头，框架才能发现并运行。assertEqual把实际计算与事先定义的期望比较。",
+      "syntax": "class TestMonitor(unittest.TestCase): def test_case(self): ...",
+      "tokens": [
+        [
+          "unittest.TestCase",
+          "测试类继承的基类"
+        ],
+        [
+          "def test_...",
+          "方法名以test_开头以便测试发现"
+        ],
+        [
+          "self.assertEqual",
+          "测试框架提供的比较方法"
+        ],
+        [
+          "unittest.main()",
+          "作为脚本运行时执行测试入口"
+        ]
+      ],
+      "code": "import unittest\n\ndef add(a,b):\n    return a+b\nclass TestAdd(unittest.TestCase):\n    def test_sum(self):\n        self.assertEqual(add(3,4),7)\n\nif __name__=='__main__':\n    unittest.main(verbosity=0,exit=False)",
+      "steps": [
+        "定义add与测试类，不会在定义时自动调用test_sum。",
+        "脚本作为__main__运行时进入unittest.main并发现test_sum。",
+        "测试框架调用assertEqual，比较7==7，测试成功。"
+      ],
+      "output": "测试框架向stderr输出测试成功信息（版本和环境可能有差异）",
+      "mistakes": [
+        "测试方法写成check_sum而没有test_前缀，通常不会被默认发现。",
+        "unittest主要将结果写到stderr，不保证与普通print相同的精确显示格式。"
+      ],
+      "exercise": "把期望7改成8，看失败信息如何显示expected与actual。",
+      "kind": "run_variable_output"
+    },
+    {
+      "title": "05｜setUp与测试隔离：每条测试独立创建Monitor",
+      "why": "如果测试共用上一个测试留下的m.alert状态，测试可能顺序相关而不稳定。unittest.setUp在每个测试方法前执行，适合创建新的Monitor，让每个用例有确定的初始状态。",
+      "syntax": "def setUp(self): self.monitor=Monitor()",
+      "tokens": [
+        [
+          "setUp",
+          "每个测试方法运行前的初始化钩子"
+        ],
+        [
+          "self.monitor",
+          "该测试实例保存的Monitor对象"
+        ],
+        [
+          "self.assertFalse",
+          "检查给定值为假"
+        ],
+        [
+          "self.assertTrue",
+          "检查给定值为真"
+        ]
+      ],
+      "code": "class Monitor:\n    def __init__(self):\n        self.alert=False\n    def step(self,d):\n        if d<=35:self.alert=True\n        elif d>=41:self.alert=False\n        return self.alert\n\nm1=Monitor()\nprint(m1.step(34))\nm2=Monitor()\nprint(m2.alert)",
+      "steps": [
+        "m1独立创建，初始False；step(34)后变True。",
+        "m2随后独立创建，重新初始化为False。",
+        "两个对象状态独立，说明测试应避免共享可变状态。"
+      ],
+      "output": "True\nFalse",
+      "mistakes": [
+        "m1和m2是两个实例，不会因为同属Monitor类就共享实例alert。",
+        "同一个实例跨帧复用是算法要求；不同测试用例相互隔离是测试要求，两者不矛盾。"
+      ],
+      "exercise": "在本地把m2=m1改写，解释为什么这时m2.alert就变为True。"
+    },
+    {
+      "title": "06｜边界值要测35与41，不只测34与42",
+      "why": "比较运算符<=和>=包括阈值本身。滞环算法必须分别测试35触发、41解除，还要测试区间中间值38保持状态。若测试只用明显远离阈值的数，极容易漏掉<与<=写错的缺陷。",
+      "syntax": "distance<=35 / distance>=41",
+      "tokens": [
+        [
+          "<=35",
+          "包含35本身，处于未告警状态时触发"
+        ],
+        [
+          ">=41",
+          "包含41本身，处于告警状态时解除"
+        ],
+        [
+          "38",
+          "中间区域，取决于先前状态"
+        ],
+        [
+          "expected序列",
+          "事前设定的完整状态轨迹"
+        ]
+      ],
+      "code": "class Monitor:\n    def __init__(self):self.alert=False\n    def step(self,d):\n        if not self.alert and d<=35:self.alert=True\n        elif self.alert and d>=41:self.alert=False\n        return self.alert\nm=Monitor()\nprint([m.step(d) for d in [45,35,38,41]])",
+      "steps": [
+        "45不告警。",
+        "35满足包含等于的进入条件，转为True。",
+        "38位于35和41之间，保持True；41满足解除条件，变False。"
+      ],
+      "output": "[False, True, True, False]",
+      "mistakes": [
+        "把<=写成<会在35处错，必须有精确边界测试。",
+        "如果每次列表推导前重新创建Monitor，会丢掉中间帧的状态。"
+      ],
+      "exercise": "把阈值改成d<35，观察哪一帧输出与期望不一致。"
+    },
+    {
+      "title": "07｜故障注入要经历失败再修复，不是仅看绿色PASS",
+      "why": "回归测试的价值在于能抓住真实缺陷。先将解除阈值41故意改为40，输入40会错误解除；运行断言让它失败，再把源码修回41并再次PASS。这一步理解测试为何可信。",
+      "syntax": "故意修改代码→运行FAIL→恢复代码→运行PASS",
+      "tokens": [
+        [
+          "故障注入",
+          "故意制造确定的逻辑错误进行测试"
+        ],
+        [
+          "assert",
+          "用预定义期望识别输出不一致"
+        ],
+        [
+          "修复",
+          "恢复正确需求对应的比较运算或阈值"
+        ],
+        [
+          "回归",
+          "再次运行原测试，确认问题已修复"
+        ]
+      ],
+      "code": "def clear_at(d):\n    return d>=41\nassert clear_at(40) is False\nassert clear_at(41) is True\nprint('PASS')",
+      "steps": [
+        "正常实现下40不足解除阈值，断言False成立。",
+        "41恰好达到解除阈值，断言True成立。",
+        "把>=41故意改成>=40后第一条断言失败；恢复后再次输出PASS。"
+      ],
+      "output": "PASS",
+      "mistakes": [
+        "只把实际错误结果抄进期望值使测试通过，不代表修好了算法。",
+        "测试应该能发现自己故意制造的错误，否则覆盖范围需要重新审视。"
+      ],
+      "exercise": "在本地按计划改成d>=40运行一次失败，再恢复41运行通过。"
+    },
+    {
+      "title": "08｜JSON读写也要测试：文件存在≠内容正确",
+      "why": "测试一个输出文件不能只看文件是否生成，还应解析JSON并检查记录数、字段、布尔值和对应的源帧号，必要时验证读写前后内容一致。可以用TemporaryDirectory避免测试污染学习文件。",
+      "syntax": "json.dump(data,f)→json.load(f)→assert",
+      "tokens": [
+        [
+          "TemporaryDirectory",
+          "为每次测试创建隔离的临时目录"
+        ],
+        [
+          "json.dump",
+          "写入JSON格式文本"
+        ],
+        [
+          "json.load",
+          "读回并解析成Python结构"
+        ],
+        [
+          "assert loaded==data",
+          "比较保存与读取后的数据是否保持一致"
+        ]
+      ],
+      "code": "import json\nfrom pathlib import Path\nfrom tempfile import TemporaryDirectory\nrows=[{'frame':0,'alert':False},{'frame':1,'alert':True}]\nwith TemporaryDirectory() as folder:\n    p=Path(folder)/'out.json'\n    with p.open('w',encoding='utf-8') as f:json.dump(rows,f)\n    with p.open('r',encoding='utf-8') as f:loaded=json.load(f)\n    assert loaded==rows\n    print(len(loaded),loaded[1]['alert'])",
+      "steps": [
+        "创建两条记录并写进临时JSON文件。",
+        "重新打开并用json.load解析。",
+        "assert验证内容相等，再打印记录数2与第二条告警True。"
+      ],
+      "output": "2 True",
+      "mistakes": [
+        "保存成功不代表数据列完整，仍需验证关键字段和值。",
+        "临时目录退出后会清理，不应把它当作永久学习报告存储位置。"
+      ],
+      "exercise": "删掉某条记录的alert键，再加入字段完整性检查断言。"
+    }
+  ]
+}

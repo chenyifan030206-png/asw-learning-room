@@ -10,6 +10,12 @@ on:
       - 'python-foundation-v2-content.json'
       - 'python-foundation-v3-content.json'
       - 'python-foundation-v4-content.json'
+      - 'python-foundation-v5-content.json'
+      - 'python-foundation-v5-deep-*.json'
+      - 'python-foundation-v5.html'
+      - 'python-foundation-v5.js'
+      - 'tests/python_foundation_v5_examples.py'
+      - 'tests/python_foundation_v5_browser.py'
       - 'tests/python_foundation_v4_examples.py'
       - 'tests/python_foundation_v3_examples.py'
       - 'tests/python_foundation_v2_examples.py'
@@ -28,6 +34,12 @@ on:
       - 'python-foundation-v2-content.json'
       - 'python-foundation-v3-content.json'
       - 'python-foundation-v4-content.json'
+      - 'python-foundation-v5-content.json'
+      - 'python-foundation-v5-deep-*.json'
+      - 'python-foundation-v5.html'
+      - 'python-foundation-v5.js'
+      - 'tests/python_foundation_v5_examples.py'
+      - 'tests/python_foundation_v5_browser.py'
       - 'tests/python_foundation_v4_examples.py'
       - 'tests/python_foundation_v3_examples.py'
       - 'tests/python_foundation_v2_examples.py'
@@ -93,6 +105,23 @@ jobs:
           PY
           python tests/python_foundation_v2_examples.py
 
+      - name: Validate V5 84 deep lessons with real Python execution
+        run: |
+          python tests/python_foundation_v5_examples.py
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('python-foundation-v5.html').read_text(encoding='utf-8')
+          js=Path('python-foundation-v5.js').read_text(encoding='utf-8')
+          old=Path('python-foundation.html').read_text(encoding='utf-8')
+          assert 'migrationStatus' in html and 'startDeep' in html
+          assert 'OLD_PAGE_KEY' in js and 'deepNotes' in js
+          assert 'renderDeepLessons' in js and 'sections.reduce' in js
+          assert 'python-foundation-v5.js' in html
+          assert 'python-foundation-v5.html' in old
+          assert 'python-foundation-v5.html' in Path('index.html').read_text(encoding='utf-8')
+          print('PASS V5 new page links, note migration and original V4 page intact')
+          PY
+
       - name: Validate V4 complete grammar and execute real Python examples
         run: |
           python tests/python_foundation_v4_examples.py
@@ -134,6 +163,7 @@ jobs:
       - name: Check JavaScript syntax and existing D15 runtime remains intact
         run: |
           node --check python-foundation.js
+          node --check python-foundation-v5.js
           node --check app.js
           node --check pages-runtime.js
           python - <<'PY'
@@ -160,6 +190,12 @@ jobs:
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" || true' EXIT
           python3 tests/python_foundation_browser.py
+      - name: V5 deep lessons and old chapter notes migration on desktop/mobile
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/python-foundation-v5-pages.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          python3 tests/python_foundation_v5_browser.py
       - name: Upload screenshots of reviewed page
         if: always()
         uses: actions/upload-artifact@v4
@@ -168,4 +204,6 @@ jobs:
           path: |
             python-foundation-test-desktop.png
             python-foundation-test-mobile.png
+            python-foundation-v5-test-desktop.png
+            python-foundation-v5-test-mobile.png
           if-no-files-found: warn

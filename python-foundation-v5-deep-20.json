@@ -1,0 +1,278 @@
+{
+  "scope": "第20章ASW多文件九文件工程逐层精读",
+  "chapterId": "v2_18",
+  "lessons": [
+    {
+      "title": "01｜先画出真实项目的五个Python文件，避免上来就背源码",
+      "why": "这个教学项目真实包括models.py、reader.py、monitor.py、main.py、test_pipeline.py，还有sample.csv与错误样例。先理解每个文件输入与输出：模型定义→读取并校验→持续监控→JSON输出→测试验证。页面的‘完整工程’选项提供全部九个原始文件，不能把下面的结构注释当作独立运行项目。",
+      "syntax": "main.py → reader.load_frames() → Monitor.step() → json.dump()",
+      "tokens": [
+        [
+          "models.py",
+          "提供Frame/Decision两种dataclass数据协议"
+        ],
+        [
+          "reader.py",
+          "解析CSV字段并创建list[Frame]"
+        ],
+        [
+          "monitor.py",
+          "含Monitor类，跨帧保留previous_alert"
+        ],
+        [
+          "main.py",
+          "组织调用、打印并保存JSON"
+        ],
+        [
+          "test_pipeline.py",
+          "单元测试，不是业务主入口"
+        ]
+      ],
+      "code": "# 这是文件关系说明，不是可执行程序。\n# main.py 入口\n#   ├─ reader.py 读取CSV\n#   │    └─ models.py 生成Frame对象\n#   ├─ monitor.py 生成Decision结果\n#   │    └─ models.py 定义Decision\n#   └─ json.dump 将dict列表保存\n# test_pipeline.py 单独调用run/Monitor/reader验证",
+      "steps": [
+        "终端启动main.py并解释命令行参数。",
+        "reader根据CSV逐条构建Frame对象返回列表。",
+        "main只创建一个Monitor，循环中每帧调用step并得到Decision。",
+        "main使用asdict并保存JSON，test_pipeline独立校验。"
+      ],
+      "output": "结构讲解，不直接运行。",
+      "mistakes": [
+        "不要把这里的注释复制为main.py就期待程序有业务行为。",
+        "main.py导入模块期间不会自动调用所有模块函数。"
+      ],
+      "exercise": "在完整工程源码查看器中找到reader.py的load_frames和monitor.py的step。",
+      "kind": "noexec"
+    },
+    {
+      "title": "02｜程序入口与命令行参数：`argparse`不是Python关键字",
+      "why": "真实工程main.py使用argparse读取--input/--output。理解命令行参数是由终端传给脚本，parser负责解析字符串，run再根据得到的路径读写文件。先用独立最小示例理解参数默认值。",
+      "syntax": "parser.add_argument('--input',default='sample.csv')",
+      "tokens": [
+        [
+          "argparse.ArgumentParser",
+          "创建命令行参数解析器"
+        ],
+        [
+          "add_argument",
+          "声明脚本认识的参数名及默认值"
+        ],
+        [
+          "parse_args",
+          "解析终端命令传入的字符串"
+        ],
+        [
+          "args.input",
+          "读取解析结果对象的input属性"
+        ],
+        [
+          "if __name__=='__main__'",
+          "直接运行脚本时调用入口"
+        ]
+      ],
+      "code": "import argparse\nparser=argparse.ArgumentParser()\nparser.add_argument('--input',default='sample.csv')\nargs=parser.parse_args([])\nprint(args.input)",
+      "steps": [
+        "创建解析器，声明--input的默认值。",
+        "parse_args([])表示这次没有额外参数，因此使用默认值。",
+        "args.input得到字符串'sample.csv'。"
+      ],
+      "output": "sample.csv",
+      "mistakes": [
+        "实际项目parse_args()从命令行取值，示例parse_args([])只是为保证输出固定。",
+        "--input与Python函数形参名不是一回事，前者是命令行选项。"
+      ],
+      "exercise": "改成parser.parse_args(['--input','my.csv'])并预测打印结果。"
+    },
+    {
+      "title": "03｜reader如何把文本变成Frame实例：不要跳过str→float",
+      "why": "read_frames调用csv.DictReader从一行得到字符串，如'72.0'；在创建Frame前要转换成float，并验证有效性。Python dataclass字段注解不会替你自动做数据转换。",
+      "syntax": "Frame(int(row['time_ms']),float(row['speed_kmh']),...)",
+      "tokens": [
+        [
+          "DictReader",
+          "按表头名字取值，字段通常是str"
+        ],
+        [
+          "int/float",
+          "显式转换成正确数值类型"
+        ],
+        [
+          "parse_flag",
+          "按项目约定转换'0'/'1'到bool"
+        ],
+        [
+          "Frame(...)",
+          "创建由models.py定义的输入帧实例"
+        ],
+        [
+          "append",
+          "将该帧加入列表，保留每一条记录"
+        ]
+      ],
+      "code": "from dataclasses import dataclass\n@dataclass\nclass Frame:\n    time_ms:int\n    speed_kmh:float\n    distance_m:float\n    radar_valid:bool\nrow={'time_ms':'20','speed_kmh':'72.0','distance_m':'34.0','radar_valid':'1'}\nframe=Frame(int(row['time_ms']),float(row['speed_kmh']),float(row['distance_m']),row['radar_valid']=='1')\nprint(frame)",
+      "steps": [
+        "row是读取文本后的字典，每个值起初都是字符串。",
+        "int转换时间20，float转换车速72.0和距离34.0。",
+        "比较'1'=='1'得到True，Frame(...)保存字段并打印。"
+      ],
+      "output": "Frame(time_ms=20, speed_kmh=72.0, distance_m=34.0, radar_valid=True)",
+      "mistakes": [
+        "真实reader.parse_flag还会拒绝'yes'等非法标记，不是简单比较就算完成检查。",
+        "不要把样例示意的4字段Frame误当完整工程models.py的5字段Frame；完整版本还有enable。"
+      ],
+      "exercise": "在完整reader.py找到校验字段、时间递增与math.isfinite的位置。"
+    },
+    {
+      "title": "04｜Monitor的真实step条件顺序：INVALID/OFF/ACTIVE三个分支",
+      "why": "项目里的step不仅看距离：先计算数据年龄，检查过期或雷达无效；再检查enable；只有有效且启用时才进行滞环判断。先验证分支先后：INVALID会清历史告警，OFF也会清历史，ACTIVE保留或更新告警。",
+      "syntax": "decision=monitor.step(frame,now_ms)",
+      "tokens": [
+        [
+          "age_ms=now_ms-frame.time_ms",
+          "当前处理时刻减去采样时刻的年龄"
+        ],
+        [
+          "age_ms>100",
+          "项目示例的超时规则，100毫秒以上判INVALID"
+        ],
+        [
+          "not frame.radar_valid",
+          "雷达标记无效，返回INVALID"
+        ],
+        [
+          "not frame.enable",
+          "功能不使能，返回OFF"
+        ],
+        [
+          "previous_alert",
+          "唯一Monitor实例的历史告警状态"
+        ]
+      ],
+      "code": "from dataclasses import dataclass\n@dataclass\nclass Frame:\n    distance_m:float\n    radar_valid:bool\n    enable:bool\nclass Monitor:\n    def __init__(self):self.alert=False\n    def step(self,frame):\n        if not frame.radar_valid:\n            self.alert=False\n            return 'INVALID'\n        if not frame.enable:\n            self.alert=False\n            return 'OFF'\n        if not self.alert and frame.distance_m<=35:self.alert=True\n        elif self.alert and frame.distance_m>=41:self.alert=False\n        return 'ALERT' if self.alert else 'NORMAL'\nm=Monitor()\nprint(m.step(Frame(34,True,True)))\nprint(m.step(Frame(30,False,True)))\nprint(m.step(Frame(38,True,True)))",
+      "steps": [
+        "第一帧34有效使能，进入告警，返回ALERT。",
+        "第二帧雷达无效，优先进入INVALID，清除历史状态。",
+        "第三帧38有效，但历史状态已被清除且38>35，返回NORMAL。"
+      ],
+      "output": "ALERT\nINVALID\nNORMAL",
+      "mistakes": [
+        "本例为了聚焦顺序省略age_ms；完整monitor.py也检查采样年龄并返回Decision对象。",
+        "不要只根据距离忽略雷达有效性和功能使能；不同状态的优先级有明确意义。"
+      ],
+      "exercise": "在完整monitor.py找到age_ms<0和age_ms>100的处理。"
+    },
+    {
+      "title": "05｜八帧状态表：每次输入、历史、分支、输出一一对应",
+      "why": "sample.csv八帧固定：距离45/34/38/42/30无效/34有效/34 OFF/34重新启用。此时输出警告依次0,1,1,0,0,1,0,1。逐轮追踪才能识别为什么第5帧30米反而不告警。",
+      "syntax": "for frame in frames: decision=monitor.step(frame,now_ms)",
+      "tokens": [
+        [
+          "Frame",
+          "一条带时间戳、车速、距离、valid、enable的完整输入对象"
+        ],
+        [
+          "now_ms",
+          "本教学项目用time_ms+20模拟处理时间"
+        ],
+        [
+          "Decision",
+          "封装status、valid、alert、age_ms等输出字段"
+        ],
+        [
+          "state",
+          "上一帧留下的previous_alert，要在8帧之间持续保存"
+        ]
+      ],
+      "code": "class Monitor:\n    def __init__(self):self.alert=False\n    def step(self,d,valid=True,enable=True):\n        if not valid or not enable:\n            self.alert=False\n            return self.alert\n        if not self.alert and d<=35:self.alert=True\n        elif self.alert and d>=41:self.alert=False\n        return self.alert\nm=Monitor()\ninputs=[(45,True,True),(34,True,True),(38,True,True),(42,True,True),(30,False,True),(34,True,True),(34,True,False),(34,True,True)]\nprint([m.step(d,v,e) for d,v,e in inputs])",
+      "steps": [
+        "第0帧45不告警；第1帧34进入告警；第2帧38保持；第3帧42解除。",
+        "第4帧距离30虽然近，但valid=False，状态清零。",
+        "第5帧34有效重新告警；第6帧enable=False又清零；第7帧重新启用且34，再次告警。"
+      ],
+      "output": "[False, True, True, False, False, True, False, True]",
+      "mistakes": [
+        "这段只演示告警布尔值，完整工程另有状态INVALID/OFF/ACTIVE、age_ms字段。",
+        "每一帧重新创建Monitor会得到不同结果，不能当同一算法。"
+      ],
+      "exercise": "把第2帧38改为41，解释哪一次状态变化会不同。"
+    },
+    {
+      "title": "06｜Decision、asdict、results.append、json.dump的返回链",
+      "why": "monitor.step返回Decision实例，不是JSON文本。main需要先用dataclasses.asdict把实例变为dict，再append到列表，最后写到文件。每一个对象在哪一步创建、转换、保存，必须能够指出。",
+      "syntax": "decision→asdict(decision)→results.append(dict)→json.dump",
+      "tokens": [
+        [
+          "Decision(...)",
+          "创建数据类结果对象"
+        ],
+        [
+          "asdict(decision)",
+          "把dataclass实例的字段转换为普通字典"
+        ],
+        [
+          "results.append",
+          "保留每帧记录，不能在循环内清空results"
+        ],
+        [
+          "json.dumps / dump",
+          "序列化为JSON文本或写文件"
+        ],
+        [
+          "return results",
+          "run()返回完整记录列表给上层用于校验"
+        ]
+      ],
+      "code": "import json\nfrom dataclasses import dataclass,asdict\n@dataclass\nclass Decision:\n    status:str\n    alert:bool\nresults=[]\nfor alert in [False,True]:\n    d=Decision('ACTIVE',alert)\n    results.append(asdict(d))\nprint(json.dumps(results))\nprint(len(results))",
+      "steps": [
+        "每轮创建一个不同的Decision实例。",
+        "asdict转换成包含status与alert的字典，append到results。",
+        "循环完成后dumps输出两条结果组成的JSON数组字符串。"
+      ],
+      "output": "[{\"status\": \"ACTIVE\", \"alert\": false}, {\"status\": \"ACTIVE\", \"alert\": true}]\n2",
+      "mistakes": [
+        "不要直接对自定义Decision实例调用json.dumps而不转换。",
+        "把results=[]放进for内部会让前面帧记录全部丢失。"
+      ],
+      "exercise": "在记录里增加time_ms字段，并观察每条JSON对象的变化。"
+    },
+    {
+      "title": "07｜全工程如何在本地真正跑：入口、安装与文件位置",
+      "why": "完整九文件工程在网页源码面板可逐个查看和下载。进入下载后的python-foundation-project目录，先运行主程序，再运行单元测试，再用故障CSV确认异常。命令里的--input是命令行选项，不是Python代码。",
+      "syntax": "python main.py --input sample.csv --output output/results.json",
+      "tokens": [
+        [
+          "cd",
+          "先进入包含main.py与sample.csv的项目目录"
+        ],
+        [
+          "python main.py",
+          "从main.py入口执行，不是import main"
+        ],
+        [
+          "--input sample.csv",
+          "告诉脚本读取哪份CSV输入"
+        ],
+        [
+          "--output output/results.json",
+          "指定生成JSON路径"
+        ],
+        [
+          "python -m unittest",
+          "以测试框架执行测试模块"
+        ]
+      ],
+      "code": "# 命令行练习（不是Python源代码）\n# 进入 python-foundation-project 目录之后：\n# python main.py --input sample.csv --output output/results.json\n# python -m unittest -v test_pipeline\n# python main.py --input bad_string.csv\n# python main.py --input bad_missing.csv",
+      "steps": [
+        "第一条主程序命令会读8帧、逐帧监视并保存output/results.json。",
+        "第二条命令运行真实单元测试，并报告每条用例是否通过。",
+        "第三和第四条演示错误输入文件，main报告对应行号并返回非零退出码。"
+      ],
+      "output": "完整运行输出依设备路径和命令而变；真实样例预期8帧警告为False,True,True,False,False,True,False,True。",
+      "mistakes": [
+        "把注释中的终端命令直接粘进.py文件不会执行它们。",
+        "这一教学工程不是实时ASW软件，不应该据此宣称跑满真实20ms周期。"
+      ],
+      "exercise": "在本地完成三项真实证据：JSON文件、unittest输出、坏CSV行号。",
+      "kind": "noexec"
+    }
+  ]
+}

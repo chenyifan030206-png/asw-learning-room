@@ -139,3 +139,33 @@ footer{text-align:center;font-size:13px;color:var(--muted);padding-bottom:38px}
 .syntaxTable table{min-width:530px}
 .syntaxDetail .tip{margin-top:12px}
 @media(max-width:480px){.syntaxTable table{min-width:500px}.topicCode{font-size:12px}}
+
+
+/* Python Foundation V5: 15–23章深度讲解、逐步执行和笔记迁移提示 */
+.migrationStatus{margin:12px 0 0;padding:11px 14px;border-left:3px solid #2c76b7;border-radius:6px;background:#edf5ff;color:#224b74;line-height:1.7}
+.deepNav{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 18px}
+.deepNav button{font-size:12px;line-height:1.5;background:#f1f5fc;border:1px solid #d3e0f0;border-radius:8px;padding:7px 9px;color:#254568;text-align:left;cursor:pointer}
+.deepNav button:hover{border-color:#397bd2;background:#e9f2ff}
+.deepLesson{margin:12px 0;border:1px solid #cdddf0;border-radius:12px;background:#fff;overflow:hidden}
+.deepLesson>summary{padding:14px 17px;cursor:pointer;font-size:15px;font-weight:700;line-height:1.7;color:#163b67;background:#f0f6fe}
+.deepLesson[open]>summary{background:#e6f0ff;border-bottom:1px solid #d4e3f6}
+.deepBody{padding:16px 18px 20px;min-width:0}
+.deepBody h5{font-size:14px;margin:20px 0 8px;color:#20446e}
+.deepBody .syntaxTable{margin:10px 0;max-width:100%;overflow:auto}
+.deepBody .syntaxTable table{min-width:450px}
+.deepCode{background:#162338;color:#eef4ff;padding:15px;border-radius:8px;white-space:pre;overflow:auto;line-height:1.65;tab-size:4}
+.deepSteps{padding-left:26px}
+.deepSteps li{margin:7px 0;padding:7px 10px;border-left:3px solid transparent;line-height:1.75}
+.deepSteps li.activeStep{border-left-color:#397cdb;background:#f0f6ff;border-radius:4px}
+.deepStepper{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:11px 0 18px}
+.deepStepper button{padding:8px 12px;border:1px solid #bfd4ee;border-radius:7px;background:#edf4ff;cursor:pointer}
+.deepStepper button:disabled{opacity:.4;cursor:not-allowed}
+.deepStepper span{color:#50627a;font-size:12px}
+.deepReview{margin:17px 0 28px;border:1px solid #dbe4f0;border-radius:9px}
+.deepReview>summary{padding:12px 14px;cursor:pointer;background:#f6f8fc;font-weight:600}
+.deepReview>.topicMenu,.deepReview>.syntaxDetail,.deepReview>h3,.deepReview>p{margin-left:12px;margin-right:12px}
+.deepBody textarea{max-width:100%;width:100%;box-sizing:border-box;min-height:94px}
+@media(max-width:650px){.deepBody{padding:12px}.deepNav button{width:100%}.deepLesson>summary{padding:12px;font-size:14px}.deepCode{font-size:12px}}
+
+/* Both V4 (extra V5 link) and V5 topbars must wrap on narrow screens. */
+@media(max-width:810px){.toplinks{white-space:normal;flex-wrap:wrap;gap:7px 15px;max-width:100%}.toplinks a{overflow-wrap:anywhere}}

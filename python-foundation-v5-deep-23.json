@@ -1,0 +1,278 @@
+{
+  "scope": "第23章与原D15 NumPy/Matplotlib课程衔接",
+  "chapterId": "v2_21",
+  "lessons": [
+    {
+      "title": "01｜Python列表与NumPy数组，名字不同不是同一种数据结构",
+      "why": "你刚学的list可以存不同类型对象；NumPy ndarray则支持高效数值数组及按元素运算、形状和多维切片。在进入原D15前，先把list的长度与下标理解熟练，不要把NumPy的广播误认成普通Python列表操作。",
+      "syntax": "list + list / ndarray + ndarray",
+      "tokens": [
+        [
+          "list",
+          "Python内置有序容器，可保存多种对象"
+        ],
+        [
+          "[1,2]+[3,4]",
+          "列表的+表示拼接，不是逐项加法"
+        ],
+        [
+          "ndarray",
+          "NumPy的数值数组对象，具有shape等属性"
+        ],
+        [
+          "shape",
+          "NumPy数组各个维度长度组成的元组"
+        ]
+      ],
+      "code": "a=[1,2]\nb=[3,4]\nprint(a+b)\nprint([x+y for x,y in zip(a,b)])",
+      "steps": [
+        "a+b对Python列表进行拼接，得到四个元素。",
+        "zip按位置配对(1,3),(2,4)。",
+        "列表推导式x+y生成两个对应元素之和4,6。"
+      ],
+      "output": "[1, 2, 3, 4]\n[4, 6]",
+      "mistakes": [
+        "不能期待普通list加法自动执行NumPy那样的逐元素求和。",
+        "数组索引和切片不能只靠二维图形直觉，先追踪元素下标。"
+      ],
+      "exercise": "把两个列表长度改为不等，解释普通zip为何停止于短序列。"
+    },
+    {
+      "title": "02｜二维数据从列表开始，先理解行和列",
+      "why": "传感器多帧表格可以看成嵌套列表：外层每项是一帧，内层每项对应一列。先在没有NumPy的情况下用matrix[1][2]访问第二帧第三列，再过渡到ndarray的matrix[1,2]。",
+      "syntax": "matrix[row][column] 与 ndarray[row,column]",
+      "tokens": [
+        [
+          "matrix[1]",
+          "取外层列表的第二项，即第二行"
+        ],
+        [
+          "matrix[1][2]",
+          "再从第二行取第三列"
+        ],
+        [
+          "ndarray[1,2]",
+          "NumPy二维数组中的行列联合索引"
+        ],
+        [
+          "0起始索引",
+          "行与列均从0开始计数"
+        ]
+      ],
+      "code": "matrix=[[0,72,45],[20,72,34],[40,73,38]]\nprint(matrix[1])\nprint(matrix[1][2])\nprint(len(matrix))",
+      "steps": [
+        "matrix[1]得到第二帧整行[20,72,34]。",
+        "再[2]取得第三列34。",
+        "len(matrix)返回外层记录行数3。"
+      ],
+      "output": "[20, 72, 34]\n34\n3",
+      "mistakes": [
+        "Python嵌套列表一般不能直接用matrix[1,2]，NumPy支持它。",
+        "不要把列下标2误认为‘第二列’，因为索引从0开始。"
+      ],
+      "exercise": "分别打印matrix[0][1]和matrix[2][1]。"
+    },
+    {
+      "title": "03｜切片完整读法：start、stop、step以及不包含终点",
+      "why": "普通列表和NumPy都支持切片思想，a[1:4:2]取下标1与3，不包含4。理解stop不包含对处理固定窗口非常重要。省略起点/终点或使用负步长也应会读。",
+      "syntax": "a[start:stop:step]",
+      "tokens": [
+        [
+          "start",
+          "起始下标，通常包含"
+        ],
+        [
+          "stop",
+          "停止边界，通常不包含"
+        ],
+        [
+          "step",
+          "步长，正数向前、负数反向"
+        ],
+        [
+          "a[:3]",
+          "从开头到下标3之前"
+        ],
+        [
+          "a[::-1]",
+          "步长-1，常用来反转顺序"
+        ]
+      ],
+      "code": "a=[10,20,30,40,50]\nprint(a[1:4:2])\nprint(a[:3])\nprint(a[::-1])",
+      "steps": [
+        "a[1:4:2]从下标1取20，跳过一个到下标3取40。",
+        "a[:3]取0/1/2下标的前三个元素。",
+        "a[::-1]反向取得所有元素。"
+      ],
+      "output": "[20, 40]\n[10, 20, 30]\n[50, 40, 30, 20, 10]",
+      "mistakes": [
+        "stop=4不代表包含下标4。",
+        "步长不能为0，a[::0]会抛ValueError。"
+      ],
+      "exercise": "尝试a[-2:]，解释负下标的意义。"
+    },
+    {
+      "title": "04｜认识NumPy常用术语：array、shape、dtype、axis",
+      "why": "NumPy不是Python自带的标准库，进入原D15需先确认环境中安装。shape表示各维大小，dtype表示元素类型，axis指定沿哪个轴聚合。这里先用Python列表模拟数据，再给出NumPy完整示例供D15本地运行。",
+      "syntax": "np.array(matrix).shape / np.mean(arr,axis=0)",
+      "tokens": [
+        [
+          "import numpy as np",
+          "第三方库别名，np不是Python保留字"
+        ],
+        [
+          "np.array",
+          "构建ndarray"
+        ],
+        [
+          ".shape",
+          "读取各轴元素数量"
+        ],
+        [
+          ".dtype",
+          "查看数组元素数据类型"
+        ],
+        [
+          "axis=0",
+          "通常跨行沿列求均值，二维时每列得到一个结果"
+        ]
+      ],
+      "code": "# 这段需要在本地先安装numpy，原D15课程会验证环境：\n# import numpy as np\n# a=np.array([[0,72,45],[20,72,34]],dtype=float)\n# print(a.shape)\n# print(a.dtype)\n# print(np.mean(a,axis=0))",
+      "steps": [
+        "np.array将二维嵌套列表构造成2×3的数值数组。",
+        "a.shape将是(2,3)，即2行3列，dtype=float产生浮点元素。",
+        "np.mean(a,axis=0)沿第0轴归约行，得到每列的均值[10.,72.,39.5]。"
+      ],
+      "output": "需要NumPy环境；示例预期：(2, 3)，float64（常见平台），[10. 72. 39.5]。",
+      "mistakes": [
+        "这段是NumPy先修演示，不属于仅标准库可执行示例。",
+        "不要把NumPy数组点号shape理解成Python语言关键字；它是对象属性。"
+      ],
+      "exercise": "在原D15安装NumPy后解除注释运行，核对shape与均值。",
+      "kind": "noexec"
+    },
+    {
+      "title": "05｜二维切片`a[:,0]`逐字符拆解",
+      "why": "先把a[行索引,列索引]读懂：冒号:代表该轴所有行，0代表第0列。二维a[:,0]就是取所有行的第一列，适合从车辆矩阵提取时间戳或速度列。数组结果类型仍是ndarray。",
+      "syntax": "a[:,0] / a[1,:] / a[:,1:3]",
+      "tokens": [
+        [
+          "a[",
+          "对数组进行索引操作"
+        ],
+        [
+          ":",
+          "第一维选择所有行"
+        ],
+        [
+          ",",
+          "将行轴选择与列轴选择分开"
+        ],
+        [
+          "0",
+          "第二维选择下标0的第一列"
+        ],
+        [
+          "1:3",
+          "选择下标1和2两列，不包括3"
+        ]
+      ],
+      "code": "# NumPy完整演示，等进入原D15再本地执行：\n# import numpy as np\n# a=np.array([[0,72,45],[20,72,34],[40,73,38]])\n# print(a[:,0])\n# print(a[1,:])\n# print(a[:,1:3])",
+      "steps": [
+        "a[:,0]取全部三行的第0列，返回[0,20,40]。",
+        "a[1,:]取第1行的所有列，返回[20,72,34]。",
+        "a[:,1:3]取所有行的第1和2列，返回3×2子数组。"
+      ],
+      "output": "需要NumPy：预期三次打印分别是[ 0 20 40]、[20 72 34]和3×2数组。",
+      "mistakes": [
+        "逗号在这个下标里是不同维度之间的分隔，不是普通函数参数调用。",
+        "在普通嵌套list上直接写a[:,0]会抛TypeError。"
+      ],
+      "exercise": "先用列表推导式[row[0] for row in matrix]实现同样的第一列提取，再比较NumPy语法。",
+      "kind": "noexec"
+    },
+    {
+      "title": "06｜Matplotlib画图：先分清函数调用与对象方法",
+      "why": "Matplotlib的plt.plot、plt.step、plt.xlabel是第三方绘图库函数。它们不是Python语言自带语句。先用标准库准备x、y列表，之后进入原D15时再安装并执行画图。",
+      "syntax": "plt.plot(x,y) / plt.step(x,y,where='post')",
+      "tokens": [
+        [
+          "plt",
+          "matplotlib.pyplot模块的常用别名"
+        ],
+        [
+          ".plot",
+          "绘制折线的函数"
+        ],
+        [
+          ".step",
+          "绘制阶梯图的函数"
+        ],
+        [
+          "xlabel/ylabel",
+          "设置图表轴标题"
+        ],
+        [
+          "show()",
+          "在图形环境中显示图形；无界面环境可能需要保存"
+        ]
+      ],
+      "code": "# 原D15的完整Matplotlib练习，依赖第三方库与图形环境：\n# import matplotlib.pyplot as plt\n# x=[0,20,40,60]\n# y=[False,True,True,False]\n# plt.step(x,y,where='post')\n# plt.xlabel('time / ms')\n# plt.ylabel('alert')\n# plt.show()",
+      "steps": [
+        "import matplotlib.pyplot as plt将模块绑定为plt。",
+        "plt.step使用时间与布尔状态画阶梯关系，where='post'明确跳变保持方式。",
+        "plt.show尝试显示图形，与文件保存和Python普通print不同。"
+      ],
+      "output": "图形输出而非固定终端文本；依赖Matplotlib安装及图形环境。",
+      "mistakes": [
+        "图形工具不改变告警算法计算结果，只负责展示。",
+        "列表中每条时间必须与对应状态值按位置一致。"
+      ],
+      "exercise": "把y换成[False,True,False,False]绘图，观察阶梯改变。",
+      "kind": "noexec"
+    },
+    {
+      "title": "07｜衔接原D15前的自检：没有这五件事不要跳跃",
+      "why": "原D15将要使用numpy、CSV和绘图，但它们只是数据分析工具。你应先能独立解释import、def、class、for、文件r/w、DictReader到float，以及json.dump/loads，这样遇到np.mean不会被函数嵌套困住。",
+      "syntax": "CSV→Frame→Monitor.step→Decision→JSON→NumPy分析",
+      "tokens": [
+        [
+          "CSV",
+          "外部输入文本，字段原始值往往是str"
+        ],
+        [
+          "Frame",
+          "通过dataclass创建的结构化输入"
+        ],
+        [
+          "Monitor",
+          "需要记住上一帧状态的实例"
+        ],
+        [
+          "Decision",
+          "每帧业务结果对象"
+        ],
+        [
+          "JSON",
+          "保存与交换结构化数据"
+        ],
+        [
+          "ndarray",
+          "下一阶段用来做统计与图表的数值数组"
+        ]
+      ],
+      "code": "import json\nrows=[{'t':0,'alert':False},{'t':20,'alert':True}]\ntext=json.dumps(rows)\nprint(json.loads(text)[1]['alert'])\nprint([row['t'] for row in rows])",
+      "steps": [
+        "先从列表字典构造JSON文本。",
+        "loads再转回列表字典并读取第二条alert。",
+        "列表推导式抽出两条记录的时间戳0、20，为后续NumPy列处理做准备。"
+      ],
+      "output": "True\n[0, 20]",
+      "mistakes": [
+        "不必先学完复杂NumPy才理解最普通的Python列表/字典循环。",
+        "课程页面能打开不等于本地已经完成真实Python实验。"
+      ],
+      "exercise": "本地运行原D15前，自己写出四帧的输入字典列表并完成JSON往返。"
+    }
+  ]
+}

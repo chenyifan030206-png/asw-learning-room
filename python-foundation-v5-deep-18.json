@@ -1,0 +1,286 @@
+{
+  "scope": "第18章异常控制流与程序状态",
+  "chapterId": "v2_16",
+  "lessons": [
+    {
+      "title": "01｜语法错误与运行异常：程序在哪一刻失败",
+      "why": "SyntaxError通常让程序连正常执行都进不去；ValueError、TypeError、FileNotFoundError等是运行时遇到不合法操作才发生。先分清编写阶段、解析阶段和执行阶段，不要看到报错就一概当作变量赋值问题。",
+      "syntax": "try: ... except ValueError: ...",
+      "tokens": [
+        [
+          "SyntaxError",
+          "源代码不符合Python语法，解析时无法运行"
+        ],
+        [
+          "ValueError",
+          "传入值不能被所调用操作接受，例如float('oops')"
+        ],
+        [
+          "TypeError",
+          "对象类型与操作或参数要求不匹配"
+        ],
+        [
+          "FileNotFoundError",
+          "尝试打开不存在的输入文件时常见"
+        ]
+      ],
+      "code": "try:\n    speed=float('oops')\nexcept ValueError:\n    print('数字格式错误')\nprint('后续代码继续')",
+      "steps": [
+        "源文件语法正确，因此开始运行。",
+        "float('oops')在运行中抛ValueError，跳过try里后续语句。",
+        "匹配的except处理异常，之后继续打印后续代码继续。"
+      ],
+      "output": "数字格式错误\n后续代码继续",
+      "mistakes": [
+        "try/except通常不能用来修复当前文件本身的语法解析错误。",
+        "不要用except:pass吞掉所有异常并让错误数据变成假成功。"
+      ],
+      "exercise": "把'oops'改成'72.0'，预测except分支是否还会运行。"
+    },
+    {
+      "title": "02｜try/except/else/finally的精确执行顺序",
+      "why": "if/else按条件选择；try/except按异常路径选择。else仅在try顺利结束没有异常时执行，finally用于无论正常或异常退出都做收尾；两者都不是强制必写的。",
+      "syntax": "try: ... except ValueError: ... else: ... finally: ...",
+      "tokens": [
+        [
+          "try",
+          "尝试执行可能失败的代码块"
+        ],
+        [
+          "except ValueError",
+          "只处理匹配的数值异常"
+        ],
+        [
+          "else",
+          "仅当try块正常执行完毕时运行"
+        ],
+        [
+          "finally",
+          "无论发生匹配异常还是正常执行，通常都会执行的收尾块"
+        ]
+      ],
+      "code": "for text in ['72.0','oops']:\n    try:\n        value=float(text)\n    except ValueError:\n        print('转换失败')\n    else:\n        print('转换成功',value)\n    finally:\n        print('本轮结束')",
+      "steps": [
+        "第一轮72.0转换成功：except跳过，else打印成功，finally打印本轮结束。",
+        "第二轮oops转换失败：跳到except，else跳过，finally仍打印结束。",
+        "for所有轮完成，程序退出。"
+      ],
+      "output": "转换成功 72.0\n本轮结束\n转换失败\n本轮结束",
+      "mistakes": [
+        "finally里的return或新异常可能覆盖早先的返回/异常，初学时避免这么做。",
+        "else不能放在except之前；try的语法结构有固定顺序。"
+      ],
+      "exercise": "增加第三项'0'并预测所有输出顺序。"
+    },
+    {
+      "title": "03｜raise：主动拒绝非法值，而非‘打印一下就算处理完’",
+      "why": "文件读出来的雷达距离可能是-4，这从字符串转换角度是合法数字，但从物理业务约束角度可能是非法距离。用raise ValueError让调用者明确知道输入数据不满足规则。",
+      "syntax": "if distance<0: raise ValueError(...)",
+      "tokens": [
+        [
+          "raise",
+          "主动抛出异常并中断当前正常路径"
+        ],
+        [
+          "ValueError('...')",
+          "异常对象包含可读消息"
+        ],
+        [
+          "except ValueError as err",
+          "捕获异常实例，用名字err访问其消息"
+        ],
+        [
+          "str(err)",
+          "获得错误提示文本"
+        ]
+      ],
+      "code": "def parse_distance(text):\n    d=float(text)\n    if d<0:\n        raise ValueError('距离不能为负数')\n    return d\ntry:\n    print(parse_distance('-4'))\nexcept ValueError as err:\n    print('拒绝数据：',str(err))",
+      "steps": [
+        "parse_distance将'-4'转换成-4.0。",
+        "条件d<0成立，raise ValueError中止函数，不执行return d。",
+        "外层except捕获并显示错误原因。"
+      ],
+      "output": "拒绝数据： 距离不能为负数",
+      "mistakes": [
+        "不应把非法距离默默夹到0再当作有效真实测量。",
+        "raise不等于return：异常要被捕获或继续传播。"
+      ],
+      "exercise": "给parse_distance增加d>250的上限检查，再分别测试250和251。"
+    },
+    {
+      "title": "04｜捕获范围：谁负责发现、谁负责处理",
+      "why": "Python异常可以跨越函数调用向上传播：reader发现CSV坏数据，main决定停止并给出用户能理解的提示。不要在每一层都except然后隐藏原始错误，责任边界应清楚。",
+      "syntax": "def read(): raise ValueError(...); try:read() except ValueError:",
+      "tokens": [
+        [
+          "内层raise",
+          "函数内部发现问题后发出异常"
+        ],
+        [
+          "异常传播",
+          "内层没有匹配except时回到调用者继续寻找处理点"
+        ],
+        [
+          "外层except",
+          "程序边界层接住异常并决定如何提示用户"
+        ],
+        [
+          "return",
+          "仅在没有异常时给正常结果"
+        ]
+      ],
+      "code": "def parse(text):\n    return float(text)\ndef run():\n    return parse('oops')\ntry:\n    print(run())\nexcept ValueError:\n    print('主程序收到解析失败')",
+      "steps": [
+        "主程序调用run()，run()调用parse()。",
+        "parse里float('oops')抛ValueError，parse和run都没处理，异常向外传递。",
+        "最外层except捕获并显示统一提示。"
+      ],
+      "output": "主程序收到解析失败",
+      "mistakes": [
+        "不要以为只要函数定义有->float就能自动阻止异常。",
+        "异常未被捕获时会显示调用栈；有调用栈不代表发生了多次错误。"
+      ],
+      "exercise": "把'oops'改成'34'，解释返回值通过几层函数向外流动。"
+    },
+    {
+      "title": "05｜`raise ... from exc`：保留真正失败的来源",
+      "why": "当底层float失败时，上层需要补充‘是哪一列、哪一行’，同时还想保留原始ValueError。raise ... from exc能明确建立异常因果链。这里先看一次正常捕获后的抛出与再次捕获。",
+      "syntax": "raise ValueError('speed格式错误') from exc",
+      "tokens": [
+        [
+          "except ValueError as exc",
+          "把底层异常对象绑定给exc"
+        ],
+        [
+          "raise ... from exc",
+          "抛新的异常，并明确将exc设为直接原因"
+        ],
+        [
+          "except ValueError as err",
+          "外层接住新的异常"
+        ],
+        [
+          "err.__cause__",
+          "读取异常链的直接原因对象"
+        ]
+      ],
+      "code": "def parse(text):\n    try:\n        return float(text)\n    except ValueError as exc:\n        raise ValueError('speed字段格式错误') from exc\ntry:\n    parse('oops')\nexcept ValueError as err:\n    print(str(err))\n    print(type(err.__cause__).__name__)",
+      "steps": [
+        "float('oops')先抛底层ValueError。",
+        "parse捕获后抛新ValueError，并将原异常绑定成直接原因。",
+        "外层打印上层错误及原因的类型ValueError。"
+      ],
+      "output": "speed字段格式错误\nValueError",
+      "mistakes": [
+        "不要把新异常写成except:pass，否则丢掉上下文。",
+        "from exc是异常链语法，不是导入语句from module import name。"
+      ],
+      "exercise": "去掉from exc运行，观察err.__cause__有什么变化，并对比Traceback。"
+    },
+    {
+      "title": "06｜业务无效状态与程序异常：invalid≠崩溃",
+      "why": "雷达valid=False可能是算法必须处理的正常输入状态，不等于CSV文件格式损坏。业务层可以返回Decision(valid=False,alert=False)，而解析层发现缺少必要列则应抛异常。两种路径要清晰分开。",
+      "syntax": "return Decision(valid=False,alert=False) / raise ValueError",
+      "tokens": [
+        [
+          "valid=False",
+          "业务判定为无效信号，仍可形成一帧记录"
+        ],
+        [
+          "raise ValueError",
+          "拒绝不符合数据格式/约束的输入"
+        ],
+        [
+          "return",
+          "把正常业务结果传回上层"
+        ],
+        [
+          "实例状态",
+          "失效时按约定清除告警，而不依赖异常处理"
+        ]
+      ],
+      "code": "from dataclasses import dataclass\n@dataclass\nclass Decision:\n    valid:bool\n    alert:bool\ndef check(valid,d):\n    if not valid:\n        return Decision(False,False)\n    if d<0:\n        raise ValueError('非法距离')\n    return Decision(True,d<=35)\nprint(check(False,34))\nprint(check(True,34))",
+      "steps": [
+        "第一帧valid=False直接返回Decision(False,False)，不是异常。",
+        "第二帧valid=True、d=34合法，因此返回True告警。",
+        "两个结果都是Decision对象，表示不同业务情况。"
+      ],
+      "output": "Decision(valid=False, alert=False)\nDecision(valid=True, alert=True)",
+      "mistakes": [
+        "传感器invalid不等于数据行文本语法错误，不能无条件异常退出。",
+        "真实业务的失效处理规则需要来源于设计需求，这里只是离线教学约定。"
+      ],
+      "exercise": "增加try捕获check(True,-4)抛出的异常。"
+    },
+    {
+      "title": "07｜具体异常优先：不要`except:`一把抓",
+      "why": "异常处理应明确知道哪些错误可预期：float转换ValueError、文件FileNotFoundError、JSON文本JSONDecodeError。盲目捕获所有异常会掩盖程序错误，有时还会错误地记录成有效数据。",
+      "syntax": "except (ValueError,TypeError) as err:",
+      "tokens": [
+        [
+          "except ValueError",
+          "只捕获指定异常类型"
+        ],
+        [
+          "except (ValueError,TypeError)",
+          "用元组声明允许处理的多种异常"
+        ],
+        [
+          "except Exception",
+          "捕获大多数普通异常，边界层可用于记录后重新抛出；不建议随意静默处理"
+        ],
+        [
+          "pass",
+          "空操作，不能当成已经修好错误"
+        ]
+      ],
+      "code": "values=['72.0','oops','0']\nfor text in values:\n    try:\n        print(float(text))\n    except ValueError:\n        print('错误文本：',text)",
+      "steps": [
+        "72.0转换成功，打印72.0。",
+        "oops转换失败，匹配的except输出具体坏文本。",
+        "0转换成功，打印0.0。"
+      ],
+      "output": "72.0\n错误文本： oops\n0.0",
+      "mistakes": [
+        "不要为了通过测试把错误数据跳过但不记录位置。",
+        "不要用eval()读取原始数字文本；这是不必要且不安全的。"
+      ],
+      "exercise": "把except ValueError改成except (ValueError,TypeError)，并给列表追加None观察行为。"
+    },
+    {
+      "title": "08｜认识Traceback：最后一行告诉异常类型，上面是调用链",
+      "why": "初学者经常只看Traceback最后一行就去猜文件哪里错。应从最后异常类型确定问题类别，再沿File路径、行号与函数名往上追踪谁调用谁。可重复复现的最小代码是定位问题的第一步。",
+      "syntax": "traceback: File ... line ... in function",
+      "tokens": [
+        [
+          "File",
+          "出错相关源文件路径"
+        ],
+        [
+          "line",
+          "执行到对应源代码的行号"
+        ],
+        [
+          "in 函数名",
+          "调用路径上的函数"
+        ],
+        [
+          "最后一行",
+          "异常类型和消息，例如ValueError: could not convert string to float"
+        ]
+      ],
+      "code": "def parse(text):\n    return float(text)\ndef run():\n    return parse('72.0')\nprint(run())",
+      "steps": [
+        "main调用run()。",
+        "run调用parse('72.0')。",
+        "float成功返回72.0，再依次通过parse、run返回给print。"
+      ],
+      "output": "72.0",
+      "mistakes": [
+        "示例改成'oops'后Traceback是预期的故障演示，不是语法知识点失效。",
+        "不要只盯顶部文件名，最底部异常类型和具体出错行通常更关键。"
+      ],
+      "exercise": "将'72.0'替换成'oops'，把Traceback中出现的三个函数/顶层调用层级按顺序抄下来。"
+    }
+  ]
+}

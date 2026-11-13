@@ -1,0 +1,252 @@
+{
+  "scope": "第21章从故障复现到本地工程验收",
+  "chapterId": "v2_19",
+  "lessons": [
+    {
+      "title": "01｜开始真实练习前：工作目录与版本确认",
+      "why": "在Python多文件工程，运行错误很多来自当前工作目录不正确，而不是语法错误。先确认终端进入下载后包含main.py的目录，再用python --version确认解释器。Python标准库示例不需安装numpy。",
+      "syntax": "python --version / cd python-foundation-project",
+      "tokens": [
+        [
+          "cd",
+          "系统终端命令，用来改变工作目录，不是Python语句"
+        ],
+        [
+          "python --version",
+          "输出当前命令对应的Python解释器版本"
+        ],
+        [
+          "Path.cwd()",
+          "Python代码中查看当前工作目录"
+        ],
+        [
+          "Path('sample.csv').exists()",
+          "检查相对路径对应文件是否存在"
+        ]
+      ],
+      "code": "from pathlib import Path\nprint(Path('sample.csv').name)\nprint(Path.cwd().is_absolute())",
+      "steps": [
+        "Path('sample.csv')仅创建路径对象，name读取文件名。",
+        "Path.cwd()获得绝对的当前工作目录路径对象。",
+        "is_absolute()返回True，与实际文件是否存在无关。"
+      ],
+      "output": "sample.csv\nTrue",
+      "mistakes": [
+        "终端的cd不能当作.py源代码中的Python函数执行。",
+        "当你在错误目录运行main.py，出现找不到sample.csv的错误时应检查工作目录。"
+      ],
+      "exercise": "在实际下载工程目录执行print(Path('sample.csv').exists())并确认True。"
+    },
+    {
+      "title": "02｜读懂一条真实CSV错误：从原始行到raise",
+      "why": "reader.py先检查列数量和空字段，再转换类型，失败时保留reader.line_num并抛出说明。我们模拟一份有坏数据的CSV，看行号如何定位。",
+      "syntax": "raise ValueError(f'第{line}行...')",
+      "tokens": [
+        [
+          "reader.line_num",
+          "已读取的源CSV物理行数"
+        ],
+        [
+          "try",
+          "尝试转换字符串到数字"
+        ],
+        [
+          "except ValueError as exc",
+          "接住转换失败的异常"
+        ],
+        [
+          "raise ... from exc",
+          "补充业务上下文并保留失败原因"
+        ]
+      ],
+      "code": "import csv\nfrom io import StringIO\nraw='time_ms,distance_m\\n0,45\\n20,oops\\n'\nreader=csv.DictReader(StringIO(raw))\nfor row in reader:\n    try:\n        d=float(row['distance_m'])\n        print(d)\n    except ValueError:\n        print(f'第{reader.line_num}行距离字段错误')",
+      "steps": [
+        "第1行是表头，不作为数据记录输出。",
+        "第2行距离45转换为45.0。",
+        "第3行oops不能转换，except用line_num输出第3行。"
+      ],
+      "output": "45.0\n第3行距离字段错误",
+      "mistakes": [
+        "别把reader.line_num与enumerate从0开始的帧号混淆。",
+        "同一条CSV字段可能包含引号内换行，因此reader.line_num是物理行位置。"
+      ],
+      "exercise": "把字段改成空串，增加空字段检查并说明为什么float('')会失败。"
+    },
+    {
+      "title": "03｜阈值从<=35误写成<35：先预测正确结果再制造错误",
+      "why": "真正的测试应该在改变代码前明确记录期望。边界35恰好触发，而改成<35则漏掉这个点。练习顺序应为原始通过→人为破坏→确实失败→恢复通过。",
+      "syntax": "assert enter(35) is True",
+      "tokens": [
+        [
+          "<",
+          "严格小于，不包括等于"
+        ],
+        [
+          "<=",
+          "小于等于，包括35边界"
+        ],
+        [
+          "assert",
+          "断言被检查条件应成立"
+        ],
+        [
+          "AssertionError",
+          "断言不成立时报错"
+        ]
+      ],
+      "code": "def enter(d):\n    return d<=35\nexpected=[False,True,True]\nactual=[enter(d) for d in [36,35,34]]\nprint(actual)\nassert actual==expected",
+      "steps": [
+        "输入36比较失败，返回False。",
+        "输入35恰好满足<=，返回True；34也返回True。",
+        "实际列表与预定期望完全相同，assert通过。"
+      ],
+      "output": "[False, True, True]",
+      "mistakes": [
+        "改为d<35会让35的期望与实际不同。",
+        "不能为了让坏代码测试通过而随意把期望列表改成错误结果。"
+      ],
+      "exercise": "亲自改一次<，观察断言失败，再恢复<=并验收。"
+    },
+    {
+      "title": "04｜对象放在循环内的陷阱：同一实例必须跨帧保留",
+      "why": "如果每一轮都创建Monitor，会反复触发__init__将alert=False。37或38米在已告警情况下本该保持True，但重置后变成False。比较两种位置的实际结果。",
+      "syntax": "m=Monitor()在for外 / m=Monitor()在for内",
+      "tokens": [
+        [
+          "__init__",
+          "每创建新实例时初始化状态"
+        ],
+        [
+          "for之外创建",
+          "多帧共享同一实例，保留历史"
+        ],
+        [
+          "for之内创建",
+          "每次循环都获得新实例，丢失上一帧状态"
+        ],
+        [
+          "self.alert",
+          "对象中保存的历史布尔值"
+        ]
+      ],
+      "code": "class Monitor:\n    def __init__(self):self.alert=False\n    def step(self,d):\n        if not self.alert and d<=35:self.alert=True\n        elif self.alert and d>=41:self.alert=False\n        return self.alert\nvalues=[45,34,38,42]\nm=Monitor()\nprint([m.step(d) for d in values])\nprint([Monitor().step(d) for d in values])",
+      "steps": [
+        "单一m按四帧顺序输出False,True,True,False。",
+        "第二行每轮创建新的Monitor并重置，因此38得False。",
+        "两者差异说明实例保存历史状态的意义。"
+      ],
+      "output": "[False, True, True, False]\n[False, True, False, False]",
+      "mistakes": [
+        "不能把新的Monitor()写到每轮调用里当成等价简写。",
+        "在独立测试之间重新创建实例却是正确的测试隔离。"
+      ],
+      "exercise": "把38改成35，预测单实例与每帧新建实例的差异是否还会显现。"
+    },
+    {
+      "title": "05｜函数print与return：为什么主程序还要保存results",
+      "why": "print只是显示，函数结束后外部不一定还能取得显示过的值。return才把结果交给调用者。主程序通过results.append保存每帧结果，才能检查或输出JSON。",
+      "syntax": "return results / print(results)",
+      "tokens": [
+        [
+          "print",
+          "将字符串形式输出到终端，函数自身默认返回None"
+        ],
+        [
+          "return",
+          "明确结束函数并交回对象"
+        ],
+        [
+          "append",
+          "在列表里留下每帧结果"
+        ],
+        [
+          "results=[]",
+          "应该在循环外初始化，避免每帧清空"
+        ]
+      ],
+      "code": "def wrong():\n    print('处理完成')\ndef right():\n    return '处理完成'\na=wrong()\nb=right()\nprint(a is None)\nprint(b)",
+      "steps": [
+        "wrong()首先打印处理完成，但没有return，因此a=None。",
+        "right()返回字符串并赋给b。",
+        "最后分别打印a是否为None、b内容。"
+      ],
+      "output": "处理完成\nTrue\n处理完成",
+      "mistakes": [
+        "如果把print当return，后续json.dump可能得到None而不是期望列表。",
+        "不要把results=[]写在每帧循环内。"
+      ],
+      "exercise": "将right()改成return {'status':'ACTIVE'}，观察b类型从str变dict。"
+    },
+    {
+      "title": "06｜把多条结果真正保存再读回来：可复现的文件证据",
+      "why": "运行main后不能只截图终端：还应检查JSON记录数、字段名、数据类型，并从磁盘重新加载确认。用临时目录的小实例演示完整闭环，原工程另有固定output路径。",
+      "syntax": "with p.open('w') as f:json.dump(rows,f) / json.load",
+      "tokens": [
+        [
+          "Path",
+          "将输出文件路径封装成对象"
+        ],
+        [
+          "json.dump",
+          "把列表内字典写入JSON文件"
+        ],
+        [
+          "json.load",
+          "重新打开文件解析为Python对象"
+        ],
+        [
+          "loaded==rows",
+          "比较保存前和读回后的数据内容"
+        ]
+      ],
+      "code": "from tempfile import TemporaryDirectory\nfrom pathlib import Path\nimport json\nrows=[{'frame':0,'alert':False},{'frame':1,'alert':True}]\nwith TemporaryDirectory() as directory:\n    p=Path(directory)/'results.json'\n    with p.open('w',encoding='utf-8') as f:\n        json.dump(rows,f)\n    with p.open('r',encoding='utf-8') as f:\n        loaded=json.load(f)\n    print(len(loaded),loaded[1]['alert'])\n    print(loaded==rows)",
+      "steps": [
+        "在临时目录写入两帧的JSON数组。",
+        "重新读回成Python列表与字典。",
+        "检查总记录数2、第二帧True及整个列表相等。"
+      ],
+      "output": "2 True\nTrue",
+      "mistakes": [
+        "写入文件不代表真实业务正确，仍需检查算法输出序列。",
+        "临时文件会自动删除，正式学习报告应保存到自己指定目录。"
+      ],
+      "exercise": "把第一帧的alert改成True，重新运行并检查新文件。"
+    },
+    {
+      "title": "07｜交付前自检：不把网页看过当作本地通关",
+      "why": "这一章的学习验收需要你在自己的电脑实际执行三个动作：完整sample.csv得到八帧JSON；unittest全部通过；坏数据出现正确CSV行号。网页上点击‘掌握’仅是个人阅读记录，不是自动判定实机运行成功。",
+      "syntax": "python main.py ... / python -m unittest -v test_pipeline",
+      "tokens": [
+        [
+          "python main.py",
+          "运行完整工程的真实入口"
+        ],
+        [
+          "-m unittest",
+          "用Python测试框架运行测试模块"
+        ],
+        [
+          "sample.csv",
+          "固定八帧良性输入"
+        ],
+        [
+          "bad_string.csv",
+          "故意包含错误文本，用来验证解析失败路径"
+        ]
+      ],
+      "code": "# 本小节是终端命令清单，不是Python脚本：\n# python main.py --input sample.csv --output output/results.json\n# python -m unittest -v test_pipeline\n# python main.py --input bad_string.csv\n# python main.py --input bad_missing.csv",
+      "steps": [
+        "先确认当前工作目录包含main.py、sample.csv和reader.py。",
+        "运行正常八帧并打开output/results.json检查布尔轨迹。",
+        "执行单元测试；再输入坏CSV确认返回失败和精确行号。"
+      ],
+      "output": "本地运行会显示文件路径与测试详情；网页无法代替实测。",
+      "mistakes": [
+        "如果尚未在本地运行，不应因为CI通过就自认已经完成本地操作。",
+        "不要修改原有D15课程的历史成绩，只提交这个补充练习的独立验证。"
+      ],
+      "exercise": "在当前章节笔记写下四条命令的运行结果及输出路径。",
+      "kind": "noexec"
+    }
+  ]
+}

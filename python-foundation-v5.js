@@ -1,0 +1,717 @@
+'use strict';
+/* 独立零基础导学页：纯静态Pages，无浏览器内Python解释器；本地浏览器自动保存。 */
+const $ = id => document.getElementById(id);
+const STORE_KEY = 'asw-python-foundation-v1:' + location.pathname;
+const OLD_PAGE_KEY = 'asw-python-foundation-v1:' + location.pathname.replace(/python-foundation-v5\.html$/, 'python-foundation.html');
+let migrationReport = '';
+const stateDefault = () => ({schema:1,done:[],answers:{},notes:{},annotations:[],fileNotes:{},deepNotes:{},checklist:{},lastChapter:'start'});
+let book = null, state = stateDefault(), activeChapter = 'start', activePanel = 'chapter';
+let activeFile = 'main.py', currentFileText = '', lastSelection = '';
+let hasOpenedChapter = false;
+const fileCache = new Map();
+
+function validState(v){return v&&v.schema===1&&Array.isArray(v.done)&&v.notes&&typeof v.notes==='object'&&Array.isArray(v.annotations)&&v.fileNotes&&typeof v.fileNotes==='object';}
+function loadState(){
+  let current=null,old=null;
+  try{current=JSON.parse(localStorage.getItem(STORE_KEY)||'null');}catch(e){console.warn('V5记录读取失败',e);}
+  try{old=JSON.parse(localStorage.getItem(OLD_PAGE_KEY)||'null');}catch(e){console.warn('旧页记录读取失败',e);}
+  if(!validState(current))current=null;
+  if(!validState(old))old=null;
+  const result=Object.assign(stateDefault(),current||old||{});
+  result.deepNotes=Object.assign({},result.deepNotes||{});
+  if(old){
+    result.done=Array.from(new Set([...old.done,...result.done]));
+    for(const key of ['notes','answers','fileNotes','checklist']){
+      for(const [id,val] of Object.entries(old[key]||{})){
+        if(result[key][id]===undefined)result[key][id]=val;
+      }
+    }
+    const seen=new Set(result.annotations.map(x=>x.id));
+    for(const a of old.annotations)if(!seen.has(a.id)){result.annotations.push(a);seen.add(a.id);}
+    if(!current||!book.chapters.some(x=>x.id===result.lastChapter))result.lastChapter=old.lastChapter;
+    const ids=new Set(book.chapters.slice(0,14).map(c=>c.id));
+    const noteCount=Object.entries(old.notes).filter(([k,v])=>ids.has(k)&&String(v).trim()).length;
+    const doneCount=old.done.filter(id=>ids.has(id)).length;
+    migrationReport='已从当前浏览器旧页迁移第01–14章笔记 '+noteCount+' 条、已学标记 '+doneCount+' 条；旧记录仍留在旧页。';
+  }else if(current)migrationReport='已读取本页现有V5学习记录，旧版记录不会被清除。';
+  else migrationReport='当前浏览器未找到旧页笔记；若曾在另一设备学习，请到旧页导出JSON再在此恢复。';
+  return result;
+}
+function saveState(){
+  try{
+    localStorage.setItem(STORE_KEY,JSON.stringify(state));
+    $('saveStatus').textContent='已自动保存 · '+new Date().toLocaleTimeString('zh-CN');
+    $('fileSaveStatus').textContent='源码个人理解已自动保存 · '+new Date().toLocaleTimeString('zh-CN');
+  }catch(error){
+    $('saveStatus').textContent='浏览器本地保存失败，请立即导出JSON备份。';
+    console.error(error);
+  }
+  updateProgress();
+}
+function node(tag,text,cls){
+  const el=document.createElement(tag);
+  if(text!==undefined && text!==null)el.textContent=String(text);
+  if(cls)el.className=cls;
+  return el;
+}
+function quoteMarks(text){
+  const frag=document.createDocumentFragment();
+  const quotes=(state.annotations||[])
+    .filter(x=>x.chapter===activeChapter && typeof x.quote==='string' && x.quote.length>0)
+    .map(x=>x.quote).sort((a,b)=>b.length-a.length);
+  let rest=String(text);
+  while(rest.length){
+    let match=null,pos=-1;
+    for(const q of quotes){
+      const found=rest.indexOf(q);
+      if(found>=0 && (pos<0||found<pos)){pos=found;match=q;}
+    }
+    if(pos<0){frag.append(node('span',rest));break;}
+    if(pos)frag.append(node('span',rest.slice(0,pos)));
+    frag.append(node('mark',match,'noteMark'));
+    rest=rest.slice(pos+match.length);
+  }
+  return frag;
+}
+function paragraph(target,text,cls){
+  const p=node('p',undefined,cls);
+  p.append(quoteMarks(text));
+  target.append(p);
+  return p;
+}
+function heading(parent,title){
+  const h=node('h3',title);
+  parent.append(h);return h;
+}
+function safeDownload(name,data,mime){
+  const blob=new Blob([data],{type:mime||'text/plain;charset=utf-8'});
+  const href=URL.createObjectURL(blob),a=node('a');
+  a.href=href;a.download=name;document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(href),3000);
+}
+async function copyText(text){
+  try{await navigator.clipboard.writeText(text);return true;}
+  catch(error){alert('复制失败，可选择文本手动复制，或使用导出按钮。');return false;}
+}
+function updateProgress(){
+  if(!book)return;
+  const done=new Set(state.done);
+  const finished=book.chapters.filter(x=>done.has(x.id)).length;
+  $('progressLine').textContent='本页标记掌握 '+finished+' / '+book.chapters.length+
+    ' 章 · 标记仅表示自己已阅读/练习，不等同于本地Python运行。';
+  $('chapterCount').textContent='已标记 '+finished+' / '+book.chapters.length+' 章';
+  for(const b of $('chapterNav').querySelectorAll('[data-chapter]')){
+    b.classList.toggle('done',done.has(b.dataset.chapter));
+  }
+}
+function showPanel(type){
+  activePanel=type;
+  $('chapterPanel').hidden=type!=='chapter';
+  $('projectPanel').hidden=type!=='project';
+  $('atlasPanel').hidden=type!=='atlas';
+  $('bridgePanel').hidden=type!=='bridge';
+  $('resourcesPanel').hidden=type!=='resources';
+  $('finalPanel').hidden=type!=='final';
+  $('legacyPanel').hidden=type!=='legacy';
+  for(const b of $('chapterNav').querySelectorAll('[data-chapter]')){
+    b.classList.toggle('selected',type==='chapter' && b.dataset.chapter===activeChapter);
+  }
+  if(type==='bridge') renderBridge();
+  if(type==='atlas') renderAtlas();
+  if(type==='resources') renderResources();
+  if(type==='project') renderProject();
+  if(type==='final') renderFinal();
+  if(type==='legacy') renderLegacyNotes();
+}
+function renderSymbolGuide(card){
+  if(activeChapter!=='v2_02' || !Array.isArray(book.symbolGuide))return;
+  heading(card,'先查这张标点字典：相同符号的意义由位置决定');
+  paragraph(card,'表格先帮助你辨认符号，后面每节再用最小示例和执行步骤解释。你可以返回这一页查下划线、点号、方括号及其他符号。');
+  const wrap=node('div',undefined,'syntaxTable');wrap.dataset.role='symbol-guide';
+  const table=node('table'),head=node('tr');
+  for(const title of ['符号/写法','到底表示什么','一个最小例子','最容易误解的地方'])head.append(node('th',title));
+  const thead=node('thead');thead.append(head);table.append(thead);
+  const body=node('tbody');
+  for(const item of book.symbolGuide){
+    const tr=node('tr');
+    const first=node('td');first.append(node('code',item.token));tr.append(first);
+    tr.append(node('td',item.meaning));
+    const sample=node('td');sample.append(node('code',item.example));tr.append(sample);
+    tr.append(node('td',item.pitfall));
+    body.append(tr);
+  }
+  table.append(body);wrap.append(table);card.append(wrap);
+}
+function renderWalkthroughs(card,chapter){
+  if(!Array.isArray(chapter.walkthroughs)||!chapter.walkthroughs.length)return;
+  heading(card,'手算执行表：每一轮变量怎样变化（不是浏览器执行Python）');
+  paragraph(card,'看到输出之前，先用手指在表里逐轮移动：取得输入→检查条件→执行本轮代码→更新变量→再次判断或退出。');
+  for(const item of chapter.walkthroughs){
+    const wrap=node('section',undefined,'syntaxDetail');
+    wrap.append(node('h4',item.title));
+    const toolbar=node('div',undefined,'codeTop');
+    toolbar.append(node('span','独立的最小代码，可复制到本地运行'));
+    const copy=node('button','复制执行表代码');
+    copy.onclick=()=>copyText(item.code).then(ok=>{if(ok)copy.textContent='已复制';});
+    toolbar.append(copy);wrap.append(toolbar,node('pre',item.code));
+    const table=node('table'),header=node('tr');
+    for(const label of item.columns)header.append(node('th',label));
+    const head=node('thead');head.append(header);table.append(head);
+    const body=node('tbody');
+    for(const line of item.rows){
+      const tr=node('tr');
+      for(const v of line)tr.append(node('td',v));
+      body.append(tr);
+    }
+    table.append(body);const overflow=node('div',undefined,'syntaxTable');
+    overflow.append(table);wrap.append(overflow);
+    paragraph(wrap,'这一题要记住：'+item.point,'tip');
+    card.append(wrap);
+  }
+}
+
+function renderDeepLessons(card,chapter){
+  const lessons=chapter.deepLessons||[];
+  if(!lessons.length)return;
+  heading(card,'V5 逐字逐行精讲 · '+lessons.length+'个课题');
+  paragraph(card,'按顺序点击课题标题展开。每节都讲学习目的、符号和参数、完整源码、逐句执行、预期输出、典型错误和自己修改。多文件例子必须按文件名分别保存，本页不会执行Python。');
+  const nav=node('div',undefined,'deepNav');
+  for(const [i,lesson] of lessons.entries()){
+    const button=node('button',String(i+1).padStart(2,'0')+' · '+lesson.title);
+    button.type='button';
+    button.onclick=()=>{
+      const target=document.getElementById('deep-'+chapter.id+'-'+i);
+      if(target){target.open=true;target.scrollIntoView({block:'start',behavior:'smooth'});}
+    };
+    nav.append(button);
+  }
+  card.append(nav);
+  for(const [i,lesson] of lessons.entries()){
+    const sec=node('details',undefined,'deepLesson');
+    sec.id='deep-'+chapter.id+'-'+i;sec.open=i===0;
+    sec.append(node('summary',String(i+1).padStart(2,'0')+' · '+lesson.title));
+    const inner=node('div',undefined,'deepBody');
+    inner.append(node('h5','先理解：为什么需要这一节？'));
+    paragraph(inner,lesson.why,'detailedExplain');
+    inner.append(node('h5','准确的语法模板'));
+    inner.append(node('pre',lesson.syntax,'syntaxSignature'));
+    inner.append(node('h5','每一个关键符号 / 参数的实际作用'));
+    const table=node('table'),th=node('thead'),head=node('tr');
+    head.append(node('th','语法写法'),node('th','在当前例子中代表什么'));th.append(head);table.append(th);
+    const tb=node('tbody');
+    for(const [name,meaning] of lesson.tokens){
+      const tr=node('tr'),n=node('td'),m=node('td');
+      n.append(node('code',name));m.append(quoteMarks(meaning));
+      tr.append(n,m);tb.append(tr);
+    }
+    table.append(tb);const scroll=node('div',undefined,'syntaxTable');scroll.append(table);inner.append(scroll);
+    inner.append(node('h5','完整代码 / 完整步骤'));
+    const header=node('div',undefined,'codeTop');
+    header.append(node('span',lesson.kind==='noexec'?'这是结构说明或终端指令，不要当Python源码运行':lesson.kind==='multifile'?'多文件案例：下面按文件名提供全部真实代码':'复制后到本地Python运行，不是网页在线执行'));
+    const copy=node('button','复制本例');copy.onclick=()=>copyText(lesson.code).then(ok=>{if(ok)copy.textContent='已复制';});
+    header.append(copy);inner.append(header,node('pre',lesson.code,'deepCode'));
+    if(lesson.files&&lesson.files.length){
+      inner.append(node('h5','完整多文件源码（每份都要分别保存）'));
+      for(const source of lesson.files){
+        const bar=node('div',undefined,'codeTop');
+        bar.append(node('strong',source.name));
+        const b=node('button','复制 '+source.name);
+        b.onclick=()=>copyText(source.code).then(ok=>{if(ok)b.textContent='已复制';});
+        bar.append(b);
+        inner.append(bar,node('pre',source.code,'deepCode'));
+      }
+      if(lesson.command){
+        inner.append(node('h5','终端运行命令'));
+        inner.append(node('pre',lesson.command,'syntaxSignature'));
+      }
+    }
+    inner.append(node('h5','真实执行顺序：一条一条追踪'));
+    const steps=node('ol',undefined,'deepSteps');
+    for(const step of lesson.steps)steps.append(node('li',step));
+    inner.append(steps);
+    let pos=0;
+    const control=node('div',undefined,'deepStepper'),prev=node('button','上一步'),next=node('button','下一步'),status=node('span');
+    const update=()=>{
+      Array.from(steps.children).forEach((el,k)=>el.classList.toggle('activeStep',k===pos));
+      status.textContent='正在看第 '+(pos+1)+' / '+lesson.steps.length+' 步';
+      prev.disabled=pos===0;next.disabled=pos===lesson.steps.length-1;
+    };
+    prev.onclick=()=>{pos=Math.max(0,pos-1);update();};
+    next.onclick=()=>{pos=Math.min(lesson.steps.length-1,pos+1);update();};
+    control.append(prev,status,next);inner.append(control);update();
+    inner.append(node('h5','预期运行结果 / 测试口径'));
+    inner.append(node('pre',lesson.output,'expected'));
+    const errors=node('div',undefined,'topicErrors');
+    errors.append(node('strong','容易出错的地方'));
+    for(const err of lesson.mistakes)paragraph(errors,'· '+err);
+    inner.append(errors);
+    inner.append(node('h5','在本地改动一处，自己推算并运行'));
+    paragraph(inner,lesson.exercise,'task');
+    const key=chapter.id+'::'+i;
+    const note=node('textarea');note.rows=4;note.value=state.deepNotes?.[key]||'';
+    note.setAttribute('aria-label','精讲个人笔记：'+lesson.title);
+    note.placeholder='写下：每个形参对应什么、为什么输出这个结果、你修改后真实运行的输出。';
+    note.addEventListener('input',()=>{state.deepNotes[key]=note.value;saveState();});
+    inner.append(node('label','这道题的学习笔记（自动保存）','notelabel'),note);
+    sec.append(inner);card.append(sec);
+  }
+}
+
+function renderDetailedKnowledge(card,chapter){
+  const details=chapter.details||[];
+  if(!details.length)return;
+  heading(card,'从语法形式开始：本章逐项完整讲解（'+details.length+'个知识点）');
+  paragraph(card,'先看写法，再读符号拆解表，然后逐行推演、预测输出，最后到本地Python运行。本页代码可复制；浏览器不会执行Python。');
+  const menu=node('div',undefined,'topicMenu');
+  for(const [index,item] of details.entries()){
+    const btn=node('button',String(index+1).padStart(2,'0')+' · '+item.name);
+    btn.type='button';
+    btn.onclick=()=>document.getElementById('topic-'+chapter.id+'-'+index)?.scrollIntoView({block:'start',behavior:'smooth'});
+    menu.append(btn);
+  }
+  card.append(menu);
+  for(const [index,item] of details.entries()){
+    const section=node('section',undefined,'syntaxDetail');
+    section.id='topic-'+chapter.id+'-'+index;
+    section.append(node('h4',String(index+1).padStart(2,'0')+' · '+item.name));
+    const signature=node('pre',item.grammar,'syntaxSignature');
+    section.append(node('p','基本语法写法：','topicSmallTitle'),signature);
+    paragraph(section,item.explanation,'detailedExplain');
+    if((item.parts||[]).length){
+      const label=node('h5','逐项拆解：各符号或写法在这里的作用');
+      section.append(label);
+      const table=node('table'),thead=node('thead'),head=node('tr');
+      head.append(node('th','代码符号 / 写法'),node('th','实际含义'));
+      thead.append(head);table.append(thead);
+      const tbody=node('tbody');
+      for(const part of item.parts){
+        const row=node('tr'),name=node('td'),meaning=node('td');
+        name.append(node('code',part[0]));meaning.append(quoteMarks(part[1]));
+        row.append(name,meaning);tbody.append(row);
+      }
+      table.append(tbody);
+      const wrap=node('div',undefined,'syntaxTable');wrap.append(table);section.append(wrap);
+    }
+    const top=node('div',undefined,'codeTop');
+    top.append(node('span','完整小例子：先预测输出，再复制到本地Python运行'));
+    const copy=node('button','复制本例');
+    copy.onclick=()=>copyText(item.example).then(ok=>{if(ok)copy.textContent='已复制';});
+    top.append(copy);section.append(top);
+    const snippet=node('pre',item.example,'topicCode');
+    snippet.tabIndex=0;section.append(snippet);
+    section.append(node('h5','程序真正按照什么顺序执行'));
+    const trace=node('ol',undefined,'trace');
+    for(const step of item.trace||[])trace.append(node('li',step));
+    section.append(trace);
+    section.append(node('h5','期望输出 / 运行结果'));
+    section.append(node('pre',item.expected,'expected'));
+    const errors=node('div',undefined,'topicErrors');
+    errors.append(node('strong','容易出错的地方'));
+    for(const err of item.errors||[])paragraph(errors,'· '+err);
+    section.append(errors);
+    section.append(node('h5','自己独立修改并验证'));
+    paragraph(section,item.practice,'task');
+    card.append(section);
+  }
+}
+function renderChapterNav(filter=''){
+  $('chapterNav').replaceChildren();
+  const term=filter.trim().toLowerCase();
+  for(const chapter of book.chapters){
+    if(term && !(chapter.title+' '+chapter.phase+' '+chapter.goal+' '+(chapter.details||[]).map(x=>x.name+' '+x.grammar).join(' ')).toLowerCase().includes(term))continue;
+    const b=node('button',chapter.title);
+    b.type='button';b.dataset.chapter=chapter.id;
+    b.onclick=()=>openChapter(chapter.id);
+    $('chapterNav').append(b);
+  }
+  updateProgress();
+  for(const b of $('chapterNav').querySelectorAll('[data-chapter]')){
+    b.classList.toggle('selected',activePanel==='chapter' && b.dataset.chapter===activeChapter);
+  }
+}
+function openChapter(id){
+  const chapter=book.chapters.find(x=>x.id===id);
+  if(!chapter)return;
+  // 先保存离开前的笔记，不因切换章节而丢失。
+  if(hasOpenedChapter && activePanel==='chapter' && book.chapters.some(x=>x.id===activeChapter)){
+    state.notes[activeChapter]=$('chapterNote').value;
+    saveState();
+  }
+  activeChapter=id;state.lastChapter=id;saveState();showPanel('chapter');
+  const target=$('chapterPanel');target.replaceChildren();
+  const card=node('div',undefined,'chapter');
+  card.append(node('div',chapter.phase+' · 建议'+chapter.minutes+'分钟','phaseTag'));
+  card.append(node('h2',chapter.title));
+  paragraph(card,'本节要能做到：'+chapter.goal,'goal');
+  heading(card,'先把问题和场景讲清楚');
+  for(const p of chapter.story)paragraph(card,p,'explain');
+  renderSymbolGuide(card);
+  renderDeepLessons(card,chapter);
+  if((chapter.deepLessons||[]).length){
+    const review=node('details',undefined,'deepReview');
+    review.append(node('summary','点击展开旧版语法小节复习（'+chapter.details.length+'个）'));
+    renderDetailedKnowledge(review,chapter);
+    card.append(review);
+  }else{renderDetailedKnowledge(card,chapter);}
+  renderWalkthroughs(card,chapter);
+  heading(card,'本章综合示例 · 将刚学的语法连在一起');
+  const toolbar=node('div',undefined,'codeTop');
+  toolbar.append(node('span','逐行中文注释 · 复制后到本地Python执行'));
+  const copy=node('button','复制本节代码');
+  copy.onclick=()=>copyText(chapter.code).then(ok=>{if(ok)copy.textContent='已复制';});
+  toolbar.append(copy);
+  const pre=node('pre',chapter.code);
+  pre.tabIndex=0;
+  card.append(toolbar,pre);
+  heading(card,'按真正执行顺序逐步追踪');
+  const steps=node('ol',undefined,'trace');
+  for(const s of chapter.trace)steps.append(node('li',s));
+  card.append(steps);
+  heading(card,'应该看到什么');
+  card.append(node('pre',chapter.expected,'expected'));
+  heading(card,'和你已学的 C 语言有什么联系');
+  paragraph(card,chapter.compare);
+  card.append(node('p','容易出错：'+chapter.trap,'tip'));
+  heading(card,'自己改一遍');
+  card.append(node('p',chapter.task,'task'));
+  heading(card,'本节理解检测（自测，不执行Python）');
+  const box=node('div',undefined,'question');
+  paragraph(box,chapter.check.q);
+  for(const [i,opt] of chapter.check.options.entries()){
+    const label=node('label'),radio=document.createElement('input');
+    radio.type='radio';radio.name='check-'+id;radio.value=String(i);
+    if(state.answers[id]===i)radio.checked=true;
+    radio.onchange=()=>{state.answers[id]=i;saveState();renderQuestionHint();};
+    label.append(radio,node('span',opt));box.append(label);
+  }
+  const result=node('p',undefined,'questionResult');
+  box.append(result);
+  function renderQuestionHint(){
+    const selected=state.answers[id];
+    result.textContent=selected===undefined?
+      '请先选一个答案，再查看解释。':
+      (selected===chapter.check.answer?'✓ 理解正确。':'✗ 与本节解释不一致。')+chapter.check.why;
+  }
+  renderQuestionHint();card.append(box);
+  const controls=node('div',undefined,'chapterControls');
+  const prior=book.chapters.findIndex(x=>x.id===id);
+  const prev=node('button','上一章');
+  prev.disabled=prior===0;prev.onclick=()=>openChapter(book.chapters[prior-1].id);
+  const mark=node('button',state.done.includes(id)?'✓ 已标记掌握 · 点击取消':'标记本章已完成','primary');
+  mark.onclick=()=>{
+    const s=new Set(state.done);
+    if(s.has(id))s.delete(id);else s.add(id);
+    state.done=Array.from(s);saveState();mark.textContent=s.has(id)?'✓ 已标记掌握 · 点击取消':'标记本章已完成';
+  };
+  const next=node('button',prior===book.chapters.length-1?'查看能力清单':'下一章');
+  next.onclick=()=>prior===book.chapters.length-1?showPanel('final'):openChapter(book.chapters[prior+1].id);
+  controls.append(prev,mark,next);card.append(controls);
+  target.append(card);
+  $('chapterNote').value=state.notes[id]||'';
+  renderAnnotations();
+  $('selectionHint').textContent='在当前章节说明或代码中选择文字，再点击“为当前选中的文字做批注”。';
+  window.scrollTo({top:Math.max(0,target.getBoundingClientRect().top+window.scrollY-16),behavior:'auto'});
+  renderChapterNav($('chapterSearch').value);
+  hasOpenedChapter = true;
+}
+function renderAnnotations(){
+  const list=$('annotationList');list.replaceChildren();
+  const notes=(state.annotations||[]).filter(x=>x.chapter===activeChapter);
+  if(!notes.length){list.append(node('p','当前章节暂无划线批注。','smalltext'));return;}
+  for(const a of notes){
+    const wrap=node('div',undefined,'annotation');
+    wrap.append(node('q',a.quote));
+    const input=node('textarea');input.rows=3;input.value=a.note||'';
+    input.setAttribute('aria-label','编辑批注');
+    input.addEventListener('input',()=>{a.note=input.value;saveState();});
+    const remove=node('button','删除此条批注');
+    remove.onclick=()=>{
+      state.annotations=state.annotations.filter(x=>x.id!==a.id);
+      saveState();openChapter(activeChapter);
+    };
+    wrap.append(input,remove);list.append(wrap);
+  }
+}
+document.addEventListener('selectionchange',()=>{
+  const sel=window.getSelection();
+  if(!sel||sel.isCollapsed||!sel.anchorNode)return;
+  const parent=sel.anchorNode.nodeType===1?sel.anchorNode:sel.anchorNode.parentElement;
+  if(parent&&parent.closest('#chapterPanel')){
+    const value=sel.toString().trim();
+    if(value.length>0 && value.length<=240)lastSelection=value;
+  }
+});
+$('annotateSelection').onclick=()=>{
+  const quote=lastSelection;
+  if(!quote){$('selectionHint').textContent='先在章节正文或代码中选中一段文字。';return;}
+  const annotation=prompt('为这段文字写理解或疑问（可以先留空后编辑）：\n'+quote,'');
+  if(annotation===null)return;
+  state.annotations.push({id:Date.now()+'-'+Math.random().toString(36).slice(2),
+    chapter:activeChapter,quote,note:annotation,created:new Date().toISOString()});
+  lastSelection='';saveState();openChapter(activeChapter);
+};
+$('chapterNote').addEventListener('input',()=>{
+  state.notes[activeChapter]=$('chapterNote').value;saveState();
+});
+$('chapterSearch').addEventListener('input',()=>renderChapterNav($('chapterSearch').value));
+$('startFirst').onclick=()=>openChapter(book.chapters[0].id);
+$('startDeep').onclick=()=>openChapter(book.chapters[14].id);
+$('openLegacy').onclick=()=>{showPanel('legacy');$('legacyPanel').scrollIntoView({block:'start'});};
+$('openBridge').onclick=()=>{showPanel('bridge');$('bridgePanel').scrollIntoView({block:'start'});};
+$('openAtlas').onclick=()=>{showPanel('atlas');$('atlasPanel').scrollIntoView({block:'start'});};
+$('openProject').onclick=()=>{showPanel('project');$('projectPanel').scrollIntoView({block:'start'});};
+$('openResources').onclick=()=>{showPanel('resources');$('resourcesPanel').scrollIntoView({block:'start'});};
+function renderBridge(){
+  const root=$('bridgeTable');root.replaceChildren();
+  const table=node('table'),thead=node('thead'),tr=node('tr');
+  for(const header of ['对照主题','C语言写法','Python写法','关键差异'])tr.append(node('th',header));
+  thead.append(tr);table.append(thead);
+  const body=node('tbody');
+  for(const row of book.cBridge){
+    const tr=node('tr');
+    for(const value of row){
+      const td=node('td');
+      const code=node('code',value);
+      td.append(code);tr.append(td);
+    }
+    body.append(tr);
+  }
+  table.append(body);root.append(table);
+}
+function renderAtlas(){
+  const term=$('atlasSearch').value.trim().toLowerCase();
+  const root=$('atlasTable');root.replaceChildren();
+  const table=node('table'),thead=node('thead'),tr=node('tr');
+  for(const value of ['优先级','主题','语法与API','对应章节','ASW用途'])tr.append(node('th',value));
+  thead.append(tr);table.append(thead);
+  const tbody=node('tbody');
+  for(const entry of book.syntaxAtlas){
+    if(term && !entry.join(' ').toLowerCase().includes(term))continue;
+    const row=node('tr');
+    for(const v of entry)row.append(node('td',v));
+    tbody.append(row);
+  }
+  table.append(tbody);root.append(table);
+}
+$('atlasSearch').addEventListener('input',renderAtlas);
+function renderResources(){
+  const root=$('resourcesList');root.replaceChildren();
+  for(const r of book.resources){
+    const block=node('div',undefined,'resource');
+    const a=node('a',r.title);a.href=r.url;a.target='_blank';a.rel='noopener noreferrer';
+    block.append(a,node('small',r.type+' · '+r.topics));
+    block.append(node('p',r.why));
+    root.append(block);
+  }
+}
+async function fetchProjectFile(name){
+  if(!book.projectFiles.includes(name))throw Error('不在课程文件列表中');
+  if(!fileCache.has(name)){
+    const url=new URL('python-foundation-project/'+name,location.href);
+    const response=await fetch(url,{cache:'no-store'});
+    if(!response.ok)throw Error('读取源码失败：'+name);
+    fileCache.set(name,await response.text());
+  }
+  return fileCache.get(name);
+}
+async function openFile(name){
+  activeFile=name;
+  try{
+    currentFileText=await fetchProjectFile(name);
+    $('fileTitle').textContent=name+' · '+currentFileText.split('\n').length+'行';
+    $('fileCode').textContent=currentFileText;
+    $('fileNote').value=state.fileNotes[name]||'';
+    $('fileSaveStatus').textContent='已读取源码；个人理解在此自动保存。';
+    for(const b of $('fileNav').querySelectorAll('button')){
+      b.classList.toggle('active',b.dataset.file===name);
+    }
+  }catch(error){$('fileCode').textContent='文件读取失败：'+error.message;}
+}
+function renderProject(){
+  const flow=$('projectFlow');flow.replaceChildren();
+  for(const [i,row] of book.callchain.entries()){
+    if(i)flow.append(node('div','↓','flowArrow'));
+    const block=node('div',undefined,'flowStep');
+    block.append(node('strong',row.file+' · '+row.action),node('p',row.why));
+    flow.append(block);
+  }
+  const nav=$('fileNav');nav.replaceChildren();
+  for(const name of book.projectFiles){
+    const b=node('button',name);b.dataset.file=name;b.onclick=()=>openFile(name);nav.append(b);
+  }
+  openFile(activeFile);
+}
+$('fileNote').addEventListener('input',()=>{
+  state.fileNotes[activeFile]=$('fileNote').value;saveState();
+});
+$('copyFile').onclick=()=>copyText(currentFileText);
+$('downloadFile').onclick=()=>safeDownload(activeFile,currentFileText,'text/plain;charset=utf-8');
+
+function crc32(bytes){
+  let crc=0xffffffff;
+  for(const b of bytes){
+    crc^=b;
+    for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);
+  }
+  return (crc^0xffffffff)>>>0;
+}
+function concat(chunks){
+  const length=chunks.reduce((sum,x)=>sum+x.length,0),out=new Uint8Array(length);
+  let offset=0;for(const chunk of chunks){out.set(chunk,offset);offset+=chunk.length;}
+  return out;
+}
+/* 无第三方脚本依赖，生成标准ZIP STORE包；保留UTF-8源文件原样内容。 */
+function buildZip(files){
+  if(files.length>65535)throw Error('文件数量超出ZIP限制');
+  const enc=new TextEncoder(),parts=[],central=[];
+  let offset=0,centralSize=0;
+  for(const f of files){
+    const name=enc.encode(f.name),content=enc.encode(f.text),crc=crc32(content);
+    const local=new Uint8Array(30),d=new DataView(local.buffer);
+    d.setUint32(0,0x04034b50,true);d.setUint16(4,20,true);
+    d.setUint16(6,0x0800,true);d.setUint16(8,0,true);
+    d.setUint32(14,crc,true);d.setUint32(18,content.length,true);
+    d.setUint32(22,content.length,true);d.setUint16(26,name.length,true);
+    parts.push(local,name,content);
+    const cent=new Uint8Array(46),c=new DataView(cent.buffer);
+    c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);
+    c.setUint16(6,20,true);c.setUint16(8,0x0800,true);
+    c.setUint32(16,crc,true);c.setUint32(20,content.length,true);
+    c.setUint32(24,content.length,true);c.setUint16(28,name.length,true);
+    c.setUint32(42,offset,true);
+    central.push(cent,name);centralSize+=cent.length+name.length;
+    offset+=local.length+name.length+content.length;
+  }
+  const end=new Uint8Array(22),v=new DataView(end.buffer);
+  v.setUint32(0,0x06054b50,true);
+  v.setUint16(8,files.length,true);v.setUint16(10,files.length,true);
+  v.setUint32(12,centralSize,true);v.setUint32(16,offset,true);
+  return concat([...parts,...central,end]);
+}
+$('downloadProject').onclick=async()=>{
+  const b=$('downloadProject'),original=b.textContent;
+  b.disabled=true;b.textContent='正在打包完整源码……';
+  try{
+    const files=await Promise.all(book.projectFiles.map(async name=>({
+      name:'python-foundation-project/'+name,text:await fetchProjectFile(name)
+    })));
+    const zip=buildZip(files);
+    safeDownload('Python_ASW_零基础练习工程.zip',zip,'application/zip');
+  }catch(error){alert('下载失败：'+error.message);}
+  finally{b.disabled=false;b.textContent=original;}
+};
+function renderLegacyNotes(){
+  const root=$('legacyNotes');root.replaceChildren();
+  const keep=Object.entries(state.notes||{}).filter(([key,value])=>!key.startsWith('v2_')&&typeof value==='string'&&value.trim());
+  const oldAnnotations=(state.annotations||[]).filter(x=>!String(x.chapter||'').startsWith('v2_'));
+  root.append(node('p','发现旧版章节笔记'+keep.length+'条、旧版划线批注'+oldAnnotations.length+'条。以下只读显示，内容仍在浏览器存储中，完整备份可用顶部“导出学习笔记JSON”。'));
+  if(!keep.length&&!oldAnnotations.length){
+    root.append(node('p','没有发现旧版笔记；如果以前在另一台设备学习，请先用上方JSON导入。'));
+  }
+  for(const [key,text] of keep){
+    const block=node('div',undefined,'legacyNote');
+    block.append(node('h4','旧版章节标识：'+key),node('pre',text,'legacyText'));
+    root.append(block);
+  }
+  for(const a of oldAnnotations){
+    const block=node('div',undefined,'legacyNote');
+    block.append(node('h4','旧版批注 · '+a.chapter),node('p',a.quote),node('p',a.note||''));
+    root.append(block);
+  }
+}
+function renderFinal(){
+  const root=$('finalChecklist');root.replaceChildren();
+  for(const [i,label] of book.finalChecklist.entries()){
+    const wrap=node('label',undefined,'checkItem');
+    const check=document.createElement('input');check.type='checkbox';
+    check.checked=!!state.checklist[i];
+    check.onchange=()=>{state.checklist[i]=check.checked;saveState();};
+    wrap.append(check,node('span',label));root.append(wrap);
+  }
+}
+function makeSummary(){
+  const chapters=book.chapters.filter(x=>state.done.includes(x.id));
+  const lines=[
+    '# Python零基础工程导学学习反馈',
+    '章节自评：'+chapters.length+'/'+book.chapters.length,
+    '本地真实Python运行情况：请由本人填写，网页不会自动推断。',
+    '',
+    '## 已标记章节',
+    ...chapters.map(x=>'- '+x.title),
+    '',
+    '## 个人逐章笔记'
+  ];
+  for(const chapter of book.chapters){
+    if(state.notes[chapter.id]?.trim())
+      lines.push('### '+chapter.title,state.notes[chapter.id].trim());
+  }
+  lines.push('','## 划线批注');
+  for(const a of state.annotations){
+    lines.push('- '+a.chapter+'：'+a.quote+' / '+(a.note||''));
+  }
+  lines.push('','## 源码文件旁注');
+  for(const [filename,note] of Object.entries(state.fileNotes)){
+    if(note.trim())lines.push('### '+filename,note.trim());
+  }
+  lines.push('','## 本地验证待记录','- python main.py --input sample.csv：','- python -m unittest -v test_pipeline：','- 故障注入FAIL→修复PASS：');
+  return lines.join('\n');
+}
+$('copySummary').onclick=()=>copyText(makeSummary()).then(ok=>{
+  if(ok)alert('已复制学习反馈。打开原D15的笔记框粘贴保存后，可继续使用原D15的私有云同步。');
+});
+$('exportNotes').onclick=()=>{
+  const payload={app:'asw-python-foundation',version:1,exportedAt:new Date().toISOString(),
+    data:state};
+  safeDownload('python-零基础学习笔记.json',JSON.stringify(payload,null,2)+'\n','application/json;charset=utf-8');
+};
+$('importNotes').onchange=async()=>{
+  const input=$('importNotes'),file=input.files?.[0];
+  if(!file)return;
+  try{
+    if(file.size>2_000_000)throw Error('笔记文件过大');
+    const payload=JSON.parse(await file.text());
+    if(payload.app!=='asw-python-foundation'||payload.version!==1||
+       !payload.data||!Array.isArray(payload.data.done)||
+       !payload.data.notes||!Array.isArray(payload.data.annotations)||
+       !payload.data.fileNotes)throw Error('不是本导学页的正确笔记格式');
+    if(!confirm('恢复这份备份会替换当前导学页的本地笔记，是否继续？'))return;
+    state=Object.assign(stateDefault(),payload.data);saveState();
+    hasOpenedChapter=false;renderChapterNav();openChapter(book.chapters.some(x=>x.id===state.lastChapter)?state.lastChapter:book.chapters[0].id);
+    alert('笔记已恢复。原D15课程笔记未受到修改。');
+  }catch(error){alert('无法导入：'+error.message);}
+  finally{input.value='';}
+};
+async function init(){
+  try{
+    const response=await fetch('./python-foundation-v5-content.json?v=20261113-v5',{cache:'no-store'});
+    if(!response.ok)throw Error('V5教材内容无法加载');
+    book=await response.json();
+    if(book.chapters.length!==23||book.chapters.reduce((n,x)=>n+(x.details?.length||0),0)!==156)throw Error('原课程23章156项未保留');
+    const sections=await Promise.all(Array.from({length:9},async (_,i)=>{
+      const n=i+15;
+      const response=await fetch('./python-foundation-v5-deep-'+n+'.json?v=20261113-v5',{cache:'no-store'});
+      if(!response.ok)throw Error('第'+n+'章精讲无法加载');
+      return response.json();
+    }));
+    for(let i=0;i<9;i++){
+      if(sections[i].chapterId!==book.chapters[i+14].id)throw Error('章节映射不一致');
+      book.chapters[i+14].deepLessons=sections[i].lessons;
+    }
+    if(sections.reduce((n,x)=>n+x.lessons.length,0)!==84)throw Error('V5应有84项完整精讲');
+    $('heroIntro').textContent='V5：保留原23章156项语法专题；第15至23章新增84节逐行精讲，从import、self和dataclass到文件模式、CSV、JSON、异常和完整ASW项目。原第01–14章内容及章节ID不变，旧页学习记录会从同一浏览器自动复制。';
+    for(const t of book.principles)$('principles').append(node('p',t));
+    for(const item of book.schedule){
+      const card=node('div',undefined,'scheduleCard');
+      card.append(node('b',item.label),node('div',item.time+' · '+item.chapters),
+        node('div',item.outcome));$('scheduleCards').append(card);
+    }
+    state=loadState();$('migrationStatus').textContent=migrationReport;saveState();renderChapterNav();
+    openChapter(book.chapters.some(x=>x.id===state.lastChapter)?state.lastChapter:book.chapters[0].id);
+    document.body.dataset.foundationReady='yes';
+  }catch(error){
+    $('heroIntro').textContent='页面加载失败：'+error.message+'。请刷新页面或查看GitHub Pages部署状态。';
+    $('progressLine').textContent='课程资源加载异常，原D15及其笔记不受影响。';
+    console.error(error);
+  }
+}
+init();

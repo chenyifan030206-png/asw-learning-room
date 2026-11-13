@@ -1,0 +1,478 @@
+{
+  "scope": "第16章类、实例、dataclass与方法绑定",
+  "chapterId": "v2_14",
+  "lessons": [
+    {
+      "title": "01｜`class`定义类、`Monitor()`创建对象：不要混淆定义与实例",
+      "why": "可以把class看成制作某类对象的蓝图，Monitor()才得到具体对象。与C的struct一样都能组织数据，但Python类可以定义有状态的方法。先分清创建类型和调用类型创建实例。",
+      "syntax": "class Monitor: ... / m=Monitor()",
+      "tokens": [
+        [
+          "class",
+          "定义类的关键字"
+        ],
+        [
+          "Monitor",
+          "类名称，惯例采用首字母大写"
+        ],
+        [
+          ":和缩进",
+          "类的主体必须有合法的缩进代码块"
+        ],
+        [
+          "Monitor()",
+          "调用类创建一个实例，并不代表调用了某个同名普通函数"
+        ],
+        [
+          "pass",
+          "什么都不做的合法空语句"
+        ]
+      ],
+      "code": "class Monitor:\n    pass\n\nm = Monitor()\nprint(type(m).__name__)\nprint(m is Monitor)",
+      "steps": [
+        "class语句建立类对象Monitor，不会自动创建m。",
+        "Monitor()构造新的实例m。",
+        "type(m)是Monitor类型；m is Monitor是False，因为实例与类对象不是同一对象。"
+      ],
+      "output": "Monitor\nFalse",
+      "mistakes": [
+        "class Monitor:后面完全空着会报IndentationError，可用pass占位。",
+        "不要把类名Monitor和变量m当成同一个对象。"
+      ],
+      "exercise": "创建m2=Monitor()，比较m is m2的真假。"
+    },
+    {
+      "title": "02｜`__init__`什么时候运行：与每帧step区别",
+      "why": "初始化只应该发生在创建对象时，而不是每处理一帧时重新设置状态。用print确认创建对象、调用step和返回分别发生几次。",
+      "syntax": "def __init__(self): self.alert=False",
+      "tokens": [
+        [
+          "__init__",
+          "前后两个下划线，实例初始化特殊方法"
+        ],
+        [
+          "self",
+          "当前被初始化的实例，由实例创建机制提供"
+        ],
+        [
+          "self.alert",
+          "将属性alert保存在具体实例上"
+        ],
+        [
+          "Monitor()",
+          "触发实例创建并通常调用__init__"
+        ],
+        [
+          "step",
+          "普通实例方法，只有明确调用才运行"
+        ]
+      ],
+      "code": "class Monitor:\n    def __init__(self):\n        print('初始化')\n        self.alert = False\n    def step(self,d):\n        return self.alert\n\nm=Monitor()\nprint(m.step(45))\nprint(m.step(34))",
+      "steps": [
+        "创建m时打印一次‘初始化’，并存入False。",
+        "m.step(45)不会重新执行__init__，只调用step并返回False。",
+        "m.step(34)复用同一个实例，仍不重新初始化。"
+      ],
+      "output": "初始化\nFalse\nFalse",
+      "mistakes": [
+        "把m=Monitor()写进for会每帧重置状态。",
+        "__init__不负责返回业务结果，成功初始化时应返回None。"
+      ],
+      "exercise": "再创建m2=Monitor()，观察‘初始化’会再出现一次。"
+    },
+    {
+      "title": "03｜实例方法：`m.step(34)`为什么只传一个显式数值",
+      "why": "你曾把def step(self,d)误理解为需要手动传入两个参数。实例上的绑定方法会自动把调用实例作为第一个参数；其他位置仍与C函数形参按序对应。",
+      "syntax": "m.step(34) ≈ Monitor.step(m,34)",
+      "tokens": [
+        [
+          "self",
+          "约定名，不是Python关键字；接收调用方法的实例"
+        ],
+        [
+          "m.step",
+          "通过实例读取绑定方法"
+        ],
+        [
+          "(34)",
+          "显式传给第二个形参d"
+        ],
+        [
+          "Monitor.step(m,34)",
+          "从类上取原方法并显式传入m，效果等价"
+        ]
+      ],
+      "code": "class Monitor:\n    def step(self,d):\n        print(self is m)\n        return d + 1\nm=Monitor()\nprint(m.step(34))\nprint(Monitor.step(m,34))",
+      "steps": [
+        "m.step(34)将m自动绑定给self，d=34；self is m得到True。",
+        "返回35并由外部print打印。",
+        "Monitor.step(m,34)通过类调用，需要手动给第一个形参传m；得到相同输出。"
+      ],
+      "output": "True\n35\nTrue\n35",
+      "mistakes": [
+        "def step(alert,d)不是自动把m.alert传给alert；第一个形参仍接收整个m。",
+        "在m.step(34)里写成m.step(m,34)会多传一个参数。"
+      ],
+      "exercise": "把step定义改为def step(self,d1,d2)，写m.step(3,4)打印d1和d2。"
+    },
+    {
+      "title": "04｜局部变量alert与self.alert绝不是同一个东西",
+      "why": "你最先写的alert=True只改变当前函数里的局部变量。想保存跨帧状态，必须写self.alert=True，才能修改实例属性。用一个会误导人的错误例子实际对照。",
+      "syntax": "alert=True 与 self.alert=True",
+      "tokens": [
+        [
+          "alert",
+          "函数内一个普通局部名字，在函数返回后不负责持久保存"
+        ],
+        [
+          "self.alert",
+          "当前实例的属性，每次调用可读取"
+        ],
+        [
+          "=",
+          "右侧计算后把名字绑定到对象或变量"
+        ],
+        [
+          "m.alert",
+          "通过实例m读取曾保存的属性"
+        ]
+      ],
+      "code": "class Monitor:\n    def __init__(self):\n        self.alert = False\n    def wrong(self):\n        alert = True\n        return alert\n    def right(self):\n        self.alert = True\n        return self.alert\nm=Monitor()\nprint(m.wrong(),m.alert)\nprint(m.right(),m.alert)",
+      "steps": [
+        "初始化m.alert=False。",
+        "wrong定义局部alert=True并返回它；m.alert并没被修改，因此输出True False。",
+        "right修改m.alert=True，返回当前对象属性，因此输出True True。"
+      ],
+      "output": "True False\nTrue True",
+      "mistakes": [
+        "读return alert和return self.alert时要确认对应的存储位置。",
+        "将self省略并不是省略变量名的前缀，而是完全改变所访问的名字。"
+      ],
+      "exercise": "把wrong()加入print(locals())观察函数局部变量，再对比vars(m)。"
+    },
+    {
+      "title": "05｜类属性与实例属性：`alert=False`写在哪里差别很大",
+      "why": "class体内的alert=False首先属于类；实例通过属性查找可能读到它。self.alert赋值则会在实例自身创建/修改同名属性，覆盖类查找。初学时建议将状态放进__init__而不是直接写类属性。",
+      "syntax": "class Monitor: alert=False / self.alert=True",
+      "tokens": [
+        [
+          "Monitor.alert",
+          "类属性，被实例属性不存在时通过属性查找访问"
+        ],
+        [
+          "m1.alert",
+          "先查找m1自己的属性，再查找类相关属性"
+        ],
+        [
+          "m1.alert=True",
+          "为m1创建同名实例属性，不会修改m2的属性"
+        ],
+        [
+          "vars(m1)",
+          "查看m1自己持有的属性字典"
+        ]
+      ],
+      "code": "class Monitor:\n    alert = False\nm1=Monitor()\nm2=Monitor()\nprint(m1.alert,m2.alert)\nm1.alert=True\nprint(m1.alert,m2.alert)\nprint(vars(m1))",
+      "steps": [
+        "两个实例最初都通过类找到False。",
+        "m1.alert=True只给m1建立自身属性True。",
+        "m2仍通过类取False，vars(m1)显示实例自己的属性。"
+      ],
+      "output": "False False\nTrue False\n{'alert': True}",
+      "mistakes": [
+        "不可把类属性想成‘每个新实例都自动复制同一份成员’。",
+        "在类属性里放可变列表/字典还可能导致实例意外共享它，数据状态建议初始化实例字段。"
+      ],
+      "exercise": "比较vars(m2)，解释为什么可能是空字典。"
+    },
+    {
+      "title": "06｜`@dataclass`帮你自动写什么：__init__/__repr__/__eq__",
+      "why": "Frame/Decision主要用于装数据，不必每个字段手写self.x=x。dataclass装饰器在创建类后根据带注解的字段生成初始化等方法，同时仍保留普通Python类的能力。",
+      "syntax": "@dataclass class Frame: speed_kmh:float ...",
+      "tokens": [
+        [
+          "@dataclass",
+          "装饰器，使用字段注解加工类，默认生成初始化、友好显示和比较"
+        ],
+        [
+          "speed_kmh: float",
+          "声明字段与预期类型，不是变量赋值"
+        ],
+        [
+          "Frame(72.0,True)",
+          "调用类，自动生成的初始化接收两个值"
+        ],
+        [
+          "__repr__",
+          "对象打印时的表示形式"
+        ],
+        [
+          "__eq__",
+          "同类实例默认按相应字段比较"
+        ]
+      ],
+      "code": "from dataclasses import dataclass\n@dataclass\nclass Frame:\n    speed_kmh: float\n    valid: bool\nf=Frame(72.0,True)\nprint(f.speed_kmh)\nprint(f)\nprint(f==Frame(72.0,True))",
+      "steps": [
+        "dataclass识别两个字段并生成需要参数的初始化方法。",
+        "Frame(72.0,True)创建实例并保存两个属性。",
+        "自动生成的__repr__显示字段；__eq__比较字段相等。"
+      ],
+      "output": "72.0\nFrame(speed_kmh=72.0, valid=True)\nTrue",
+      "mistakes": [
+        "单写普通class字段注解不会自动生成接受这些参数的__init__。",
+        "类型注解float/bool不自动验证外来字符串是否类型正确。"
+      ],
+      "exercise": "删去@dataclass再运行，观察Frame(72.0,True)为什么抛TypeError。"
+    },
+    {
+      "title": "07｜没有默认值、明确默认值和必须传参",
+      "why": "写status:str只声明字段，不能当作status='OFF'。创建dataclass实例时，没有默认值的字段必须提供实参；写了默认值则调用时可省略。注意有默认值的字段在常规dataclass定义中应放在没有默认值字段后面。",
+      "syntax": "status:str / status:str='OFF' / Decision(...)",
+      "tokens": [
+        [
+          "status: str",
+          "未提供默认值的字段，初始化必须给值"
+        ],
+        [
+          "valid:bool=False",
+          "带默认值的字段，调用时可以省略"
+        ],
+        [
+          "Decision('ACTIVE')",
+          "首个位置实参绑定给status，valid使用默认False"
+        ],
+        [
+          "关键字实参",
+          "Decision(status='ACTIVE',valid=True)，按名字绑定字段"
+        ]
+      ],
+      "code": "from dataclasses import dataclass\n@dataclass\nclass Decision:\n    status: str\n    valid: bool = False\nprint(Decision('ACTIVE'))\nprint(Decision(status='ACTIVE',valid=True))",
+      "steps": [
+        "status没有默认值，所以至少要提供它。",
+        "第一个Decision只传status，valid使用False。",
+        "第二个Decision显示提供两个字段，得到True。"
+      ],
+      "output": "Decision(status='ACTIVE', valid=False)\nDecision(status='ACTIVE', valid=True)",
+      "mistakes": [
+        "Decision()会因缺少status抛TypeError。",
+        "把带默认值的valid字段写在必填status之前会导致dataclass字段定义错误。"
+      ],
+      "exercise": "改为status:str='OFF'，预测Decision()会显示什么。"
+    },
+    {
+      "title": "08｜`__init__`手写与dataclass自动生成：实现数据保存的对比",
+      "why": "初始化的意义是为新实例建立确定属性，而不是随机给值。普通class只写status:str并不会因此自动接受status参数；dataclass才会生成初始化方法。",
+      "syntax": "class Decision: def __init__(self,status,valid): ...",
+      "tokens": [
+        [
+          "def __init__(self,status,valid)",
+          "声明初始化方法，self自动接收新实例"
+        ],
+        [
+          "self.status=status",
+          "右侧是局部参数，左侧是实例属性"
+        ],
+        [
+          "Decision('ACTIVE',True)",
+          "创建实例并把两个值送给__init__"
+        ],
+        [
+          "result.status",
+          "读取初始化时保存的属性"
+        ]
+      ],
+      "code": "class Decision:\n    def __init__(self,status,valid):\n        self.status=status\n        self.valid=valid\nresult=Decision('ACTIVE',True)\nprint(result.status,result.valid)",
+      "steps": [
+        "创建Decision新实例，调用__init__。",
+        "self收到新对象，status和valid分别接收字符串与布尔值。",
+        "self.status与self.valid保存到对象，因此后续能通过result.status读取。"
+      ],
+      "output": "ACTIVE True",
+      "mistakes": [
+        "普通class只写status:str,valid:bool，调用Decision('ACTIVE',True)会报TypeError。",
+        "不要把__init__误当成静态方法；它通常在创建实例时自动运行。"
+      ],
+      "exercise": "换成dataclass定义，观察代码减少了哪两条赋值。"
+    },
+    {
+      "title": "09｜静态方法：没有自动self，并不负责初始化对象",
+      "why": "@staticmethod修饰的方法经由实例调用时不自动注入实例。它适合不需要对象状态的独立计算；初始化仍由__init__或dataclass负责。不要在每次step调用里重新写self.alert=False。",
+      "syntax": "@staticmethod def threshold(d): ...",
+      "tokens": [
+        [
+          "@staticmethod",
+          "将下面的函数包装成不自动绑定实例的方法"
+        ],
+        [
+          "Monitor.threshold(34)",
+          "显式传入34，d就收到34"
+        ],
+        [
+          "m.threshold(34)",
+          "即使通过实例访问，也不会自动传入m"
+        ],
+        [
+          "__init__",
+          "依然负责创建对象时的初始状态"
+        ]
+      ],
+      "code": "class Monitor:\n    def __init__(self):\n        self.alert=False\n    @staticmethod\n    def risky(d):\n        return d <= 35\nm=Monitor()\nprint(Monitor.risky(34))\nprint(m.risky(45))\nprint(m.alert)",
+      "steps": [
+        "m初始化时存m.alert=False。",
+        "Monitor.risky(34)只有d=34，返回True。",
+        "m.risky(45)同样只传45，返回False，不改变m.alert。"
+      ],
+      "output": "True\nFalse\nFalse",
+      "mistakes": [
+        "@staticmethod def step(self,d)配m.step(34)会缺少参数d，因为并不自动注入self。",
+        "static方法可以手动接收对象，但这样常常没有比普通实例方法更好的可读性。"
+      ],
+      "exercise": "把risky方法改名为is_close，并改为比较d<40，解释为什么不必有self。"
+    },
+    {
+      "title": "10｜类方法只做认识：cls接收类，不是实例",
+      "why": "@classmethod经由类或实例调用时自动接收类对象，惯用参数名cls。它经常用于创建对象的备用方法。现在先分清self、cls和staticmethod，不必过早使用复杂继承。",
+      "syntax": "@classmethod def inactive(cls): return cls(False)",
+      "tokens": [
+        [
+          "@classmethod",
+          "将方法绑定到类对象"
+        ],
+        [
+          "cls",
+          "惯例名，接收Monitor这个类，而不是实例m"
+        ],
+        [
+          "cls(False)",
+          "通过接收到的类创建新实例"
+        ],
+        [
+          "Monitor.off()",
+          "调用类方法，自动提供类对象"
+        ]
+      ],
+      "code": "class Monitor:\n    def __init__(self,alert=False):\n        self.alert=alert\n    @classmethod\n    def off(cls):\n        return cls(False)\nm=Monitor.off()\nprint(type(m).__name__,m.alert)",
+      "steps": [
+        "调用Monitor.off()时，cls自动接收Monitor类对象。",
+        "cls(False)等价于创建Monitor(False)实例。",
+        "m.alert初始化为False，打印类型名及状态。"
+      ],
+      "output": "Monitor False",
+      "mistakes": [
+        "cls不是Python保留关键字，但按约定应这样命名。",
+        "类方法与静态方法不同：类方法会自动收到cls，静态方法不会自动收到对象。"
+      ],
+      "exercise": "将off改成on并返回cls(True)，测试显示True。"
+    },
+    {
+      "title": "11｜完整滞环监控：实例只创建一次才不会丢历史状态",
+      "why": "你此前的四帧雷达练习要求在34米进入告警、在38米保持告警、在42米退出。需要记住上一次状态，最自然的写法是__init__在循环前初始化，step每帧修改self.alert。",
+      "syntax": "m=Monitor();for d in distances:m.step(d)",
+      "tokens": [
+        [
+          "self.alert=False",
+          "创建m时进行一次初始化"
+        ],
+        [
+          "not self.alert and d<=35",
+          "未告警且距离<=35则进入告警"
+        ],
+        [
+          "self.alert and d>=41",
+          "已告警且距离>=41则解除"
+        ],
+        [
+          "return self.alert",
+          "返回更新后的对象状态"
+        ],
+        [
+          "for",
+          "四轮复用同一个实例m"
+        ]
+      ],
+      "code": "class Monitor:\n    def __init__(self):\n        self.alert=False\n    def step(self,d):\n        if not self.alert and d<=35:\n            self.alert=True\n        elif self.alert and d>=41:\n            self.alert=False\n        return self.alert\nm=Monitor()\nfor distance in [45,34,38,42]:\n    print(m.step(distance))",
+      "steps": [
+        "45时未告警，<=35不成立，返回False。",
+        "34时进入告警，改m.alert=True，返回True。",
+        "38未达到解除阈值41，保留True。",
+        "42达到解除阈值，改False。"
+      ],
+      "output": "False\nTrue\nTrue\nFalse",
+      "mistakes": [
+        "把m=Monitor()移动到for内部会导致38这一帧的告警状态丢失。",
+        "把if not self写成if not self.alert，否则检查的是对象真假，不是告警状态。"
+      ],
+      "exercise": "给每帧再打印当前距离与self.alert，用表格验证四次状态。"
+    },
+    {
+      "title": "12｜返回一个Decision数据对象：类负责装数据，函数负责产生结果",
+      "why": "普通函数的->Decision仅是预期返回类型注解，不会自动实例化Decision。return Decision('ACTIVE', x>0)才是计算并创建新对象。这个区别与C的结构体返回值很接近。",
+      "syntax": "def check(x)->Decision: return Decision('ACTIVE', x>0)",
+      "tokens": [
+        [
+          "-> Decision",
+          "函数返回类型注解，不是构造调用"
+        ],
+        [
+          "Decision('ACTIVE', x>0)",
+          "创建数据类实例，位置参数依次绑定status与valid"
+        ],
+        [
+          "return",
+          "把新创建对象交给调用方"
+        ],
+        [
+          "result.valid",
+          "读取返回对象的valid属性"
+        ]
+      ],
+      "code": "from dataclasses import dataclass\n@dataclass\nclass Decision:\n    status: str\n    valid: bool\n\ndef check(x)->Decision:\n    return Decision('ACTIVE',x>0)\nresult=check(34)\nprint(result.status,result.valid)",
+      "steps": [
+        "check接到x=34，表达式x>0计算为True。",
+        "Decision('ACTIVE',True)初始化字段，得到一个新对象。",
+        "return把这个对象交给result，两个属性可随后读取。"
+      ],
+      "output": "ACTIVE True",
+      "mistakes": [
+        "不能把->Decision理解成‘自动返回一个Decision’，仍必须显式return。",
+        "普通class只写字段注解不会获得dataclass自动初始化能力。"
+      ],
+      "exercise": "把check(34)改成check(-1)，解释valid为什么变False而status仍是ACTIVE。"
+    },
+    {
+      "title": "13｜dataclass实例怎样保存成JSON：asdict与JSON不是一回事",
+      "why": "JSON标准库可以直接处理字典、列表、字符串和布尔值等，但不认识你自己定义的Decision对象。dataclasses.asdict先转换为字典，然后json.dumps才能生成字符串；读取回来也是dict而非自动生成Decision。",
+      "syntax": "json.dumps(asdict(decision), ensure_ascii=False)",
+      "tokens": [
+        [
+          "asdict(decision)",
+          "将dataclass实例转换成包含字段的Python字典"
+        ],
+        [
+          "json.dumps",
+          "将可序列化的Python对象转换成JSON字符串"
+        ],
+        [
+          "True→true",
+          "布尔值按照JSON语法小写表示"
+        ],
+        [
+          "json.loads",
+          "把JSON文本解析回字典，默认不会自动重建dataclass"
+        ]
+      ],
+      "code": "import json\nfrom dataclasses import dataclass,asdict\n@dataclass\nclass Decision:\n    status:str\n    valid:bool\nresult=Decision('ACTIVE',True)\ntext=json.dumps(asdict(result),ensure_ascii=False)\nprint(text)\nloaded=json.loads(text)\nprint(type(loaded).__name__,loaded['valid'])",
+      "steps": [
+        "创建Decision('ACTIVE',True)。",
+        "asdict生成{'status':'ACTIVE','valid':True}字典。",
+        "dumps把它序列化为带小写true的JSON字符串，loads再解析成dict。"
+      ],
+      "output": "{\"status\": \"ACTIVE\", \"valid\": true}\ndict True",
+      "mistakes": [
+        "json.dumps(result)直接传入dataclass实例默认会抛TypeError。",
+        "json.loads后的loaded是dict；不能直接loaded.status，应该写loaded['status']。"
+      ],
+      "exercise": "增加alert:bool=False，观察asdict和JSON新增字段的内容。"
+    }
+  ]
+}
