@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Python零基础V5逐行精讲。第01–14章完整继承原版，第15–23章新增84节超详细函数、类、文件、CSV、JSON、调试与ASW案例，自带同浏览器笔记迁移和本地真实验证。">
+<title>Python零基础逐行精讲 V5 · 智驾学习室</title>
+<link rel="stylesheet" href="./python-foundation.css?v=20261113-v5">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="eyebrow">智驾学习室 / 第3周先修</span><h1>Python 零基础逐行精讲 · V5</h1>
+  <p>原第01–14章保留；第15–23章从每个符号、参数、执行顺序开始深入讲透</p></div>
+  <div class="toplinks"><a href="./python-foundation.html">返回V4旧页与旧记录</a><a href="./index.html">返回84天课程</a><a href="./index.html" id="day15Link">进入原D15</a></div>
+</header>
+<main>
+  <section class="hero" aria-labelledby="introTitle">
+    <div><span class="eyebrow">可独立学习 · 不占用新的课程天数</span>
+      <h2 id="introTitle">从第15章开始重学：定义、调用、对象、文件、异常与工程</h2>
+      <p id="heroIntro">教程资源加载中……</p>
+      <div class="actions">
+        <button id="startFirst" class="primary">从第01章复习</button>
+        <button id="startDeep" class="secondary">直接进入第15章精讲</button>
+        <button id="downloadProject" class="secondary">下载完整练习工程 ZIP</button>
+        <button id="exportNotes">导出学习笔记 JSON</button>
+      </div>
+      <p class="smalltext" id="progressLine" aria-live="polite">读取学习进度……</p>
+      <p id="migrationStatus" class="migrationStatus" role="status">正在核对旧版学习笔记……</p>
+    </div>
+    <aside class="principles" id="principles"><h3>本页学习原则</h3></aside>
+  </section>
+
+  <section class="schedule" aria-labelledby="scheduleHeading">
+    <h2 id="scheduleHeading">由浅入深的学习次序</h2>
+    <p>第01–14章继续保留作为基础复习；第15章以后不要求一天学完。每个主题都要先预测输出，再阅读逐行解释、亲自复制运行、修改并复核。</p>
+    <div id="scheduleCards" class="scheduleCards"></div>
+  </section>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="sidebar-content">
+        <h2>章节导航</h2>
+        <p class="smalltext" id="chapterCount"></p>
+        <input id="chapterSearch" placeholder="搜索章节标题或阶段" aria-label="搜索章节">
+        <nav id="chapterNav" aria-label="教程章节"></nav>
+        <div class="asideActions">
+          <button id="openLegacy">旧版笔记与批注（保留）</button>
+          <button id="openBridge">C语言 → Python 对照表</button>
+          <button id="openAtlas">全部语法索引</button>
+          <button id="openProject">完整工程与执行链</button>
+          <button id="openResources">参考资料与视频</button>
+        </div>
+      </div>
+    </aside>
+
+    <article class="content">
+      <section id="chapterPanel" aria-live="polite"></section>
+      <section id="projectPanel" class="panel" hidden>
+        <h2>完整工程与真正的跨文件调用链</h2>
+        <p>下面显示的是仓库里的完整源文件，不是从真实代码中省略了关键语句的伪代码。点击文件名阅读或下载；ZIP包含所有文件。</p>
+        <div id="projectFlow" class="flow"></div>
+        <div class="projectLayout">
+          <nav id="fileNav" class="fileNav" aria-label="项目文件"></nav>
+          <div>
+            <div class="filetoolbar"><strong id="fileTitle">请选择文件</strong>
+              <button id="copyFile">复制源码</button><button id="downloadFile">下载此文件</button></div>
+            <pre id="fileCode" tabindex="0">请选择项目文件。</pre>
+            <label class="notelabel" for="fileNote">这个文件的个人理解与代码注释（自动保存）</label>
+            <textarea id="fileNote" rows="5" placeholder="例如：main.py 的 run()在for循环外创建Monitor；reader.py只负责CSV校验。"></textarea>
+            <p class="smalltext" id="fileSaveStatus"></p>
+          </div>
+        </div>
+      </section>
+      <section id="legacyPanel" class="panel" hidden>
+        <h2>旧版学习笔记与划线批注</h2>
+        <p>V5保留第01–14章原有章节ID，在同一浏览器中自动复制旧页面的逐章笔记、已学标记与批注；旧页面本地记录原样保留。更早V1旧章节标识仍可在此查看。不同设备需导出与导入JSON。</p>
+        <div id="legacyNotes"></div>
+      </section>
+      <section id="bridgePanel" class="panel" hidden>
+        <h2>C语言 → Python 工程语法对照</h2>
+        <p>你已经学习过C的main、结构体、函数、数组、跨文件调用，所以这里先抓住相同的程序思路，再区分Python对象、引用、返回值和模块导入的不同运行机制。</p>
+        <div id="bridgeTable"></div>
+      </section>
+      <section id="atlasPanel" class="panel" hidden>
+        <h2>未来 Python 语法全景索引</h2>
+        <p>当天优先掌握“入门必会”。后续关键语法可以查询、不必当天全部背熟；这个索引陪伴后面的84天课程。</p>
+        <input id="atlasSearch" placeholder="搜索语法：如 async、slice、字典、NumPy">
+        <div id="atlasTable"></div>
+      </section>
+      <section id="resourcesPanel" class="panel" hidden>
+        <h2>经过核对的学习资源</h2>
+        <p>官方文档用于核实语法；视频可用来模仿输入、运行、调试动作；中文开源教材用于补课和阅读。下面链接到原始课程或仓库，我们的工程案例是另行编写的。</p>
+        <div id="resourcesList"></div>
+      </section>
+      <section id="finalPanel" class="panel" hidden>
+        <h2>完成前的能力清单</h2>
+        <p>勾选代表你自己已验证。网页自测和学员本地真实Python运行是两回事。</p>
+        <div id="finalChecklist"></div>
+        <button id="copySummary" class="primary">复制这一天的学习反馈</button>
+      </section>
+    </article>
+
+    <aside class="notebook">
+      <div class="notebookSticky">
+        <h2>我的 Python 学习笔记</h2>
+        <p class="smalltext">V5从同一浏览器旧页自动复制已有逐章笔记和已学标记，逐题精讲可额外记笔记；旧数据不删除。不同设备/浏览器不能自动跨设备迁移，请用旧页导出JSON再在本页导入。仍独立于原D15私有云同步。</p>
+        <label for="chapterNote">当前章节笔记</label>
+        <textarea id="chapterNote" rows="9" placeholder="今天这段代码从哪进入？谁调用谁？传什么？返回什么？"></textarea>
+        <button id="annotateSelection">为当前选中的文字做批注</button>
+        <p id="selectionHint" class="smalltext">在左侧正文或代码中选中一句话，然后点击上方按钮。</p>
+        <div id="annotationList"></div>
+        <p id="saveStatus" class="smalltext" role="status">未修改</p>
+        <hr>
+        <label for="importNotes">恢复先前导出的笔记 JSON</label>
+        <input id="importNotes" type="file" accept="application/json,.json">
+      </div>
+    </aside>
+  </div>
+</main>
+<footer>
+  <p>本页是原创的教学材料和离线 ASW 示例，不能用于实际车辆控制。浏览器不执行 Python，真实学习验收在本地完成。</p>
+  <p><a href="./index.html">返回课程主页面</a> · <a href="https://docs.python.org/zh-cn/3/tutorial/index.html" target="_blank" rel="noopener noreferrer">Python 官方中文教程</a></p>
+</footer>
+<script src="./python-foundation-v5.js?v=20261113-v5" defer></script>
+</body></html>
