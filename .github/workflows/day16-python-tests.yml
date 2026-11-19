@@ -1,0 +1,160 @@
+name: Day16 real Python coordinate frames and Pages regression
+
+on:
+  pull_request:
+    paths:
+      - 'courses.json'
+      - 'pages-runtime.js'
+      - 'app.js'
+      - 'index.html'
+      - 'day16-project/**'
+      - 'tests/day16_browser.py'
+      - '.github/workflows/day16-python-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'courses.json'
+      - 'pages-runtime.js'
+      - 'app.js'
+      - 'index.html'
+      - 'day16-project/**'
+      - 'tests/day16_browser.py'
+      - '.github/workflows/day16-python-tests.yml'
+
+jobs:
+  real-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python and Chinese plotting font
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-noto-cjk
+          python -m pip install -r day16-project/requirements.txt
+      - name: Cross-check complete D16 embedded assets against source files
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          b=json.loads(Path('courses.json').read_text(encoding='utf-8'))
+          assert b['release']=='day16-20261119-coordinate-frames-v1'
+          assert len(b['lessons'])==16
+          assert b['lessons']['15']['runner']=='python_numpy_logs_day15'
+          assert b['lessons']['16']['runner']=='coordinate_frames_day16'
+          assert b['curriculum'][15]['主题']=='线性代数与坐标系'
+          lesson=b['lessons']['16']
+          assert len(lesson['assets'])==7
+          assert len(lesson['questions'])==12
+          assert len(lesson['practice']['fields'])==7
+          assert len(lesson['experiments'])==7
+          assert len(lesson['code_sections'])>=12
+          assert len(b['rules']['16']['needed'])==7
+          for asset in lesson['assets']:
+              actual=Path('day16-project',asset['name']).read_text(encoding='utf-8')
+              assert asset['text']==actual,asset['name']
+          for code in lesson['code_sections']:
+              source=next(a['text'] for a in lesson['assets'] if a['name']==code['file'])
+              assert code['start'] in source,(code['file'],code['title'],'start')
+              assert code['end'] in source,(code['file'],code['title'],'end')
+          print('PASS D16 lesson/project data, 7 scenarios, Q12/P7 and unchanged D15')
+          PY
+      - name: Execute actual NumPy geometry math and Matplotlib PNG tests
+        run: |
+          cd day16-project
+          python -m compileall -q .
+          python -m unittest -v test_geometry
+          python demo.py --scenario 0 --out charts
+          python demo.py --scenario 1 --out charts
+          python demo.py --scenario 2 --out charts
+          python demo.py --scenario 4 --out charts
+          python demo.py --scenario 6 --out charts
+          test -s charts/coordinate_frames.png
+      - name: Compare all seven real Python case outputs
+        run: |
+          python - <<'PY'
+          import json
+          import math
+          import subprocess
+          from pathlib import Path
+          folder=Path('day16-project')
+          result={}
+          for scenario in range(7):
+              cmd=['python','demo.py','--scenario',str(scenario),
+                   '--out','charts/ci-'+str(scenario)]
+              p=subprocess.run(cmd,cwd=folder,capture_output=True,text=True)
+              expected_exit=2 if scenario in (3,5) else 0
+              assert p.returncode==expected_exit,(scenario,p.stdout,p.stderr)
+              line=next(x for x in p.stdout.splitlines()
+                        if x.startswith('diagnostic_json=') or x.startswith('result_json='))
+              obj=json.loads(line.split('=',1)[1])
+              assert obj['scenario']==scenario
+              assert obj['valid']==(0 if scenario in (3,5) else 1)
+              result[scenario]=obj
+              if scenario in (3,5):
+                  assert 'world_point' not in obj
+                  assert not (folder/'charts'/('ci-'+str(scenario))/'coordinate_frames.png').exists()
+              else:
+                  assert (folder/'charts'/('ci-'+str(scenario))/'coordinate_frames.png').stat().st_size>10000
+          assert math.dist(result[0]['world_point'],[0,1])<1e-12
+          assert math.dist(result[1]['world_point'],[10,6])<1e-12
+          assert math.dist(result[2]['world_point'],[2,1])<1e-12
+          assert math.dist(result[2]['swapped_point'],[0,3])<1e-12
+          assert result[3]['status']==-3 and result[3]['error_m']>0.4
+          assert result[4]['roundtrip_error_m']<1e-9
+          assert result[5]['status']==-2
+          assert result[6]['points_shape']==[5,2]
+          print('PASS 7 real Python cases: degrees, ordering, inverse, invalid and batch')
+          PY
+      - name: Browser JavaScript syntax and all day regressions including D16
+        run: |
+          node --check pages-runtime.js
+          node --check app.js
+          node <<'JS'
+          const fs=require('fs'),vm=require('vm');
+          const data=JSON.parse(fs.readFileSync('courses.json','utf8'));
+          const cx=vm.createContext({
+            location:{href:'http://127.0.0.1:8765/index.html'},
+            document:{documentElement:{dataset:{courseVersion:data.release}}},
+            localStorage:{getItem:()=>null,setItem:()=>{}},
+            fetch:async()=>({ok:true,json:async()=>data}),
+            window:{dispatchEvent:()=>{}},crypto:{randomUUID:()=>''},
+            Event:class{},URL,console,Date,Number,Math,JSON,
+          });
+          vm.runInContext(fs.readFileSync('pages-runtime.js','utf8'),cx);
+          let n=0;
+          for(let day=1;day<=16;day++){
+            const regressions=vm.runInContext('pagesRegression('+day+')',cx);
+            for(const item of regressions){
+              if(!item.passed)throw Error('D'+day+' '+item.name+': '+JSON.stringify(item.actual));
+              n++;
+            }
+          }
+          const r=vm.runInContext('pagesSimulate(16,[4])',cx);
+          if(r.roundtrip_error_m>=1e-9||r.valid!==1)
+            throw Error('D16 browser inverse regression failed');
+          const d=vm.runInContext('pagesSimulate(16,[3])',cx);
+          if(d.status!==-3||d.valid!==0||'world_point' in d)
+            throw Error('D16 wrong-unit fault displayed as valid coordinate');
+          const nans=vm.runInContext('pagesSimulate(16,[5])',cx);
+          if(nans.status!==-2||nans.valid!==0)
+            throw Error('D16 nonfinite input not rejected');
+          console.log('PASS '+n+' browser regressions D01–D16; D16 inverse and failure semantics');
+          JS
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Playwright and Chromium
+        run: |
+          python3 -m pip install --user playwright
+          python3 -m playwright install chromium --with-deps
+      - name: Verify actual D16 Pages interactions and existing note autosave
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/asw-day16-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          python3 tests/day16_browser.py
