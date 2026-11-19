@@ -43,12 +43,12 @@ def main():
         assert "先自己想" in page.locator("#reading").inner_text()
         assert "3×3" in page.locator("#reading").inner_text()
         unit=page.locator("#reading [data-diagram='unit-circle']").first
-        assert "θ = 30°" in unit.locator("svg").inner_text()
+        assert "θ = 30°" in unit.locator("svg").text_content()
         unit.locator("button[data-angle='90']").click()
         assert unit.locator("button[data-angle='90']").get_attribute("aria-pressed")=="true"
-        assert "θ = 90°" in unit.locator("svg").inner_text()
+        assert "θ = 90°" in unit.locator("svg").text_content()
         unit.locator("button[data-angle='180']").click()
-        assert "θ = 180°" in unit.locator("svg").inner_text()
+        assert "θ = 180°" in unit.locator("svg").text_content()
         # 图文之后可直接跳到相应的Python代码段。
         page.locator("#d16-concept-4 .d16-code-jump").click()
         assert "构造2×2旋转矩阵" in page.locator("#stepTitle").inner_text()
