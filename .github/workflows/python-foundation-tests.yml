@@ -171,8 +171,9 @@ jobs:
           import json
           b=json.loads(Path('courses.json').read_text(encoding='utf-8'))
           assert b['lessons']['15']['runner']=='python_numpy_logs_day15'
-          assert b['release']=='day15-20261109-python-numpy-csv-v1'
-          assert len(b['lessons'])==15
+          assert b['release']=='day16-20261119-coordinate-frames-v1'
+          assert len(b['lessons'])>=16
+          assert b['lessons']['16']['runner']=='coordinate_frames_day16'
           print('PASS: D01–D15 untouched; supplement does not overwrite original course')
           PY
 
