@@ -15,7 +15,7 @@ def main():
         js_errors = []
         page.on("pageerror", lambda error: js_errors.append(str(error)))
         # D01–D15均已完成浏览器课程才允许打开D16；模拟已知学习进度。
-        page.add_init_script("""() => {
+        page.add_init_script("""(() => {
           const db = {notes:[{day:15,notes:'D15浏览器通过且个人注释保留',
              feedback:'',updated:'2026-11-19T00:00:00Z',
              annotations:'[]',file_notes:'{}'}],
@@ -23,7 +23,7 @@ def main():
                detail:'在线练习',updated:'2026-11-19T00:00:00Z'})),
              runs:[], attempts:[]};
           localStorage.setItem('asw-pages-v1:/',JSON.stringify(db));
-        }""")
+        })()""")
         page.goto(PAGE, wait_until="networkidle")
         page.wait_for_function("document.querySelector('#courseStatus')?.textContent.includes('D16')")
         assert "线性代数与坐标系" in page.locator("#courseTitle").inner_text() if page.locator("#courseTitle").count() else             "线性代数与坐标系" in page.locator("body").inner_text()
@@ -44,7 +44,7 @@ def main():
             page.locator("#runButton").click()
             page.wait_for_function(
                 "(n)=>document.querySelector('#output')?.textContent.includes('S'+String(n+1).padStart(2,'0'))",
-                scenario)
+                arg=scenario)
             text = page.locator("#output").inner_text()
             assert "status" in text and "valid" in text, (scenario,text[:400])
             if scenario in (3, 5):
