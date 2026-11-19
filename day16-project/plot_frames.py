@@ -1,8 +1,12 @@
-"""D16绘图：以世界系x/y展示车辆坐标轴方向及离线地标点。"""
+"""画一张可核对计算结果的坐标图：世界轴、车体轴和五个地标。
+
+同样的数值既能在表里查看，也能在图上检查方向、距离和单位。
+画图采用离线教学点，不连接车辆或实时传感器。
+"""
 from pathlib import Path
 
 import matplotlib
-matplotlib.use("Agg")  # CI/WSL无GUI环境可保存PNG。
+matplotlib.use("Agg")  # 只需保存PNG，即使运行环境没有图形桌面也能生成文件。
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
 import numpy as np
@@ -12,7 +16,11 @@ from scenarios import LANDMARKS_V
 
 
 def _font():
-    """按存在的CJK字体设定中文；缺字体时提醒使用README安装Noto字体。"""
+    """从本机已安装字体里选择能显示中文的字体。
+
+    不同电脑安装的字体不同，所以依次尝试常见中文字体；
+    找不到时仍保存图，但需要按README补装字体才能正确显示中文。
+    """
     installed = {f.name for f in font_manager.fontManager.ttflist}
     for name in ("Noto Sans CJK SC", "Microsoft YaHei", "SimHei", "PingFang SC",
                  "WenQuanYi Micro Hei"):
@@ -26,10 +34,15 @@ def _font():
 
 def save_frame_plot(angle_deg: float, tx_m: float, ty_m: float,
                     output_dir: str | Path) -> Path:
-    """独立保存一张世界/车体坐标及地标图；所有坐标单位为米。"""
+    """用统一的世界x/y坐标画车辆朝向和五个地标点。
+
+    输入是车辆航向（度）和车体原点的位置（米）。
+    每个地标先转到世界坐标，再放到同一张图中观察。
+    """
     _font()
     transform = rigid_transform_deg(angle_deg, tx_m, ty_m)
     points_world = transform_points(transform, LANDMARKS_V)
+    # 第2列前两行就是车体原点的世界坐标；左上2×2则是旋转R。
     origin_vehicle_world = transform[:2, 2]
     rotation = transform[:2, :2]
 
@@ -42,6 +55,8 @@ def save_frame_plot(angle_deg: float, tx_m: float, ty_m: float,
               color="#42638c", width=0.006)
     ax.annotate("世界系 x_W", (1.08, 0.03), fontsize=10, color="#42638c")
     ax.annotate("世界系 y_W", (0.05, 1.06), fontsize=10, color="#42638c")
+    # 先把车体两根单位坐标轴旋转到世界方向。
+    # 它们是方向，不应加上车体原点的位置；画箭头时才把起点放到车上。
     x_axis = rotation @ np.array([1.0, 0.0])
     y_axis = rotation @ np.array([0.0, 1.0])
     ax.quiver(*origin_vehicle_world, *x_axis, angles="xy", scale_units="xy",
@@ -62,7 +77,8 @@ def save_frame_plot(angle_deg: float, tx_m: float, ty_m: float,
     ax.set_xlabel("世界坐标 x_W（m）")
     ax.set_ylabel("世界坐标 y_W（m）")
     ax.set_title(f"二维车体—世界坐标变换 | 航向角 {angle_deg:g}°")
-    ax.axis("equal")  # 等比例坐标，不让90°在画面上看起来像斜角。
+    # x轴1米和y轴1米必须画得一样长，否则直角会被视觉拉歪。
+    ax.axis("equal")
     ax.grid(alpha=0.22)
     ax.legend(loc="best", fontsize=9)
     fig.tight_layout()
