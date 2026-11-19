@@ -22,7 +22,9 @@ def main():
              progress:Array.from({length:15},(_,i)=>({day:i+1,method:'test',
                detail:'在线练习',updated:'2026-11-19T00:00:00Z'})),
              runs:[], attempts:[]};
-          localStorage.setItem('asw-pages-v1:/',JSON.stringify(db));
+          // 只在首次打开本测试页面时初始化；刷新不得覆盖真实保存的D16笔记。
+          if(!localStorage.getItem('asw-pages-v1:/'))
+            localStorage.setItem('asw-pages-v1:/',JSON.stringify(db));
         })()""")
         page.goto(PAGE, wait_until="networkidle")
         page.wait_for_function("document.querySelector('#courseStatus')?.textContent.includes('D16')")
