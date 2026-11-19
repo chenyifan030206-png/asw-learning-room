@@ -1,4 +1,4 @@
-"""D16可直接运行入口：场景→二维坐标运算→诊断→保存可视化。
+"""D16运行入口：按场景编号，调用数学模块，再决定是否保存坐标图。
 
 运行方式：
     python demo.py --scenario 0 --out charts
@@ -20,17 +20,22 @@ def main() -> int:
     parser.add_argument("--out", default="charts", help="输出坐标PNG的目录")
     args = parser.parse_args()
 
-    result = run_scenario(args.scenario)  # scenarios.py调用geometry2d.py。
+    # 这里才真正开始算坐标。main先等待run_scenario返回结果字典；
+    # 场景函数内部再调用geometry2d.py。import本身不会执行这些案例。
+    result = run_scenario(args.scenario)
     print(f"scenario={args.scenario} status={result['status']} valid={result['valid']}")
     if not result["valid"]:
         print(f"error_kind={result['error_kind']}")
         print(result["diagnostic"])
-        # 故障场景仍返回完整诊断，但不提供可消费的世界坐标或PNG。
+        # status和valid要一起看。角度错误或NaN时不能拿诊断里的错误点绘图；
+        # 返回2是向命令行说明本次案例按正常坐标计算的路径未成功。
         print("diagnostic_json=" + json.dumps(result, ensure_ascii=False))
         return 2
 
     print("result_json=" + json.dumps(result, ensure_ascii=False))
     print(f"roundtrip_error_m={result.get('roundtrip_error_m', 'n/a')}")
+    # 只有成功的五个场景才会走到绘图模块。
+    # 这里的角度和位移与scenarios.py所用的教学数据一一对应。
     if args.scenario in (0, 1, 2, 4, 6):
         if args.scenario == 0:
             angle, tx, ty = 90.0, 0.0, 0.0

@@ -29,6 +29,29 @@ def main():
         page.goto(PAGE, wait_until="networkidle")
         page.wait_for_function("document.querySelector('#courseStatus')?.textContent.includes('D16')")
         assert "线性代数与坐标系" in page.locator("#courseTitle").inner_text() if page.locator("#courseTitle").count() else             "线性代数与坐标系" in page.locator("body").inner_text()
+        # 新页面先讲理论再讲代码：真正按DOM位置和可见图数验收。
+        assert page.locator("#reading .d16-concept").count() == 14
+        assert page.locator("#reading .d16-figure svg").count() == 14
+        assert page.locator("#reading [data-diagram='frames']").count() == 2
+        assert page.locator("#reading .d16-chapter-links a").count() == 14
+        assert page.evaluate("""() => {
+          const a=document.querySelector('#reading'),
+                b=document.querySelector('#architecture');
+          return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+        }"""), "D16理论必须出现在工程架构和完整代码之前"
+        assert "世界坐标" in page.locator("#reading").inner_text()
+        assert "先自己想" in page.locator("#reading").inner_text()
+        assert "3×3" in page.locator("#reading").inner_text()
+        unit=page.locator("#reading [data-diagram='unit-circle']").first
+        assert "θ = 30°" in unit.locator("svg").text_content()
+        unit.locator("button[data-angle='90']").click()
+        assert unit.locator("button[data-angle='90']").get_attribute("aria-pressed")=="true"
+        assert "θ = 90°" in unit.locator("svg").text_content()
+        unit.locator("button[data-angle='180']").click()
+        assert "θ = 180°" in unit.locator("svg").text_content()
+        # 图文之后可直接跳到相应的Python代码段。
+        page.locator("#d16-concept-4 .d16-code-jump").click()
+        assert "构造2×2旋转矩阵" in page.locator("#stepTitle").inner_text()
         assert page.locator("#fileTabs button[data-file]").count() == 7
         page.locator("#fileTabs button[data-file='geometry2d.py']").click()
         assert "def rotation_deg" in page.locator("#code").inner_text()
@@ -91,8 +114,19 @@ def main():
         page.locator("#fileTabs button[data-file='geometry2d.py']").click()
         page.locator("#editCodeNotes").click()
         assert "我的D16副本批注" in page.locator("#codeNotes").input_value()
+        # 手机布局：SVG允许在图自己的容器内滚动，而不撑宽整个页面。
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.wait_for_timeout(250)
+        sizes=page.evaluate("""() => ({
+          viewport:window.innerWidth,
+          width:document.documentElement.scrollWidth,
+          fig:document.querySelector('.d16-figure-canvas').scrollWidth,
+          box:document.querySelector('.d16-figure-canvas').clientWidth
+        })""")
+        assert sizes["width"] <= sizes["viewport"] + 2, sizes
+        assert sizes["fig"] >= sizes["box"], sizes
         assert not js_errors, js_errors
-        print("PASS D16 real browser: 7 scenarios, statuses, SVG, ZIP, notes, D15 preservation")
+        print("PASS D16 theory-first browser: 14 concepts, interactive SVG, 7 cases, ZIP, mobile and saved notes")
         browser.close()
 
 

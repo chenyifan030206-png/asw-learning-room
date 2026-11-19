@@ -78,3 +78,53 @@
 #workspace.day12-mode #stepExplanation{font-size:15px;line-height:1.85}
 #workspace.day12-mode #stepCode{font-size:13px;line-height:1.75}
 @media(max-width:600px){#workspace.day12-mode #day12Primer{padding:12px}#workspace.day12-mode .d12-symbols button{min-width:85px}}
+
+/* D16理论优先：图文一体、可复核的推导，不改变其它课程布局。 */
+#learn.theory-first #reading{margin:22px 0 38px;display:grid;grid-template-columns:minmax(0,1fr);gap:19px;min-width:0;max-width:100%}
+#learn.theory-first #reading .d16-concept{border:1px solid var(--border);border-radius:13px;
+  padding:26px 25px 25px;background:var(--panel);margin:0;min-width:0;max-width:100%;scroll-margin-top:18px}
+#learn.theory-first #reading .d16-concept h3{margin:8px 0 13px;font-size:20px;line-height:1.48}
+#learn.theory-first .d16-step-number{font-size:13px;color:var(--accent);font-weight:700}
+#learn.theory-first #reading .d16-lead{font-size:16px;font-weight:600;line-height:1.8;margin:12px 0 18px}
+#learn.theory-first #reading .d16-prose{margin:14px 0;line-height:1.95;font-size:15.7px}
+#learn.theory-first #reading .d16-figure{margin:18px 0 22px;border:1px solid var(--border);
+  border-radius:11px;padding:12px;background:var(--panel);min-width:0;max-width:100%}
+#learn.theory-first #reading .d16-figure-canvas{overflow-x:auto;width:100%;min-width:0;max-width:100%;-webkit-overflow-scrolling:touch}
+#learn.theory-first #reading .d16-figure svg{display:block;min-width:610px;width:100%;height:auto}
+#learn.theory-first #reading figcaption{padding:10px 7px 1px;font-size:13px;line-height:1.7;color:var(--muted)}
+#learn.theory-first #reading .d16-angle-buttons{display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  padding:10px 6px 4px;font-size:14px}
+#learn.theory-first #reading .d16-angle-buttons button{padding:5px 13px}
+#learn.theory-first #reading .d16-angle-buttons button[aria-pressed=true]{border-color:var(--accent);
+ background:var(--soft);color:var(--accent);font-weight:700}
+#learn.theory-first #reading .d16-formula-box{border-left:3px solid var(--accent);
+  background:var(--soft);padding:14px 16px;border-radius:0 8px 8px 0;margin:19px 0}
+#learn.theory-first #reading .d16-formula-box h4{margin:0 0 9px;font-size:15px}
+#learn.theory-first #reading .d16-formula{white-space:pre-wrap;overflow-x:auto;border:0;border-radius:6px;
+  padding:12px 15px;max-height:none;font-size:14px;line-height:1.8}
+#learn.theory-first #reading .d16-worked{padding-left:28px;margin:12px 0 18px}
+#learn.theory-first #reading .d16-worked li{margin:10px 0;line-height:1.78}
+#learn.theory-first #reading .d16-selfcheck{border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);padding:14px 5px;margin:18px 0}
+#learn.theory-first #reading .d16-selfcheck summary{font-weight:600}
+#learn.theory-first #reading .d16-selfcheck p{margin:11px 4px}
+#learn.theory-first #reading .d16-code-jump{margin-top:6px;font-size:14px}
+#learn.theory-first #reading .d16-source{font-size:13px}
+#learn.theory-first #reading .d16-chapter-index{margin:0;padding:19px 22px;
+ border:1px solid var(--border);border-radius:12px;background:var(--soft)}
+#learn.theory-first #reading .d16-chapter-index h3{margin:0 0 12px;font-size:19px}
+#learn.theory-first #reading .d16-chapter-index p{margin:0 0 13px;line-height:1.75}
+#learn.theory-first #reading .d16-chapter-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#learn.theory-first #reading .d16-chapter-links a{display:block;padding:8px 10px;
+ border:1px solid var(--border);border-radius:7px;text-decoration:none;
+ color:var(--fg);background:var(--panel);font-size:13px;overflow-wrap:anywhere}
+#learn.theory-first #reading .d16-chapter-links a:hover{border-color:var(--accent);color:var(--accent)}
+#learn.theory-first #architecture{margin:28px 0;background:var(--soft)}
+@media(max-width:680px){
+ #learn.theory-first #reading .d16-concept{padding:17px 13px}
+ #learn.theory-first #reading .d16-chapter-index{padding:15px 13px}
+ #learn.theory-first #reading .d16-chapter-links{grid-template-columns:1fr}
+ #learn.theory-first #reading .d16-figure{padding:8px}
+ #learn.theory-first #reading .d16-figure svg{min-width:670px}
+ #learn.theory-first #reading .d16-formula{font-size:12.5px}
+}

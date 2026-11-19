@@ -9305,13 +9305,13 @@
     },
     "16": {
       "day": 16,
-      "revision": "2026-11-19-day16-coordinate-frames-v1",
+      "revision": "2026-11-19-d16-theory-first-v2",
       "title": "线性代数与坐标系：二维旋转、齐次变换和车体—世界坐标",
       "source": "demo.py",
       "runner": "coordinate_frames_day16",
       "project_name": "day16_numpy_coordinate_frames",
-      "time": "建议3–4小时：坐标轴与弧度25分钟、矩阵/NumPy运算45分钟、齐次变换与顺序45分钟、逆变换/多点45分钟、浏览器7案例30分钟、本地Python/图片与unittest60分钟。",
-      "summary": "按照第3周既定路线，用NumPy把车体系二维点转换到世界坐标；逐步讲角度/弧度、R的形状、@与*、齐次w=1和w=0、矩阵不交换、正逆闭环与批量点。网页七案例显示明确status/valid，真实Python在本地运行。",
+      "time": "建议分两次完成（共4–6小时）：先理解坐标与图（60–90分钟），推导R/齐次矩阵/逆变换（75分钟），逐行阅读Python源码（60分钟），再做7组在线案例、本地真实Python测试与绘图（90分钟）。可以暂停，不需要一次背完。",
+      "summary": "D16采用理论先行的图解课程：从车体前方1米在世界哪里开始，逐步画出两套坐标轴、单位圆和旋转基准向量，手算R、平移和齐次矩阵，解释矩阵顺序、逆变换、批量地标，再进入中文注释Python代码和七组实作。保留原有在线练习、个人注释与保存。",
       "goals": [
         "能明确二维W世界系与V车体系的x/y轴、单位m和逆时针正角，并解释p_W=R_WV@p_V+t_WV。",
         "能解释np.deg2rad、np.cos/sin，手算R90@(1,0)≈(0,1)与旋转后的平移(10,5)得到(10,6)。",
@@ -9323,14 +9323,14 @@
         "能识别度数误当弧度和NaN角度，输出明确status/valid/错误原因，不生成有效位置。",
         "在本地实际执行Python、unittest及中文坐标PNG；网页案例通过不视为本地Python或历史C通关。"
       ],
-      "flow_text": "【数学链】车体点p_V=(1,0)m→先把yaw_deg转换为rad→R_WV(2×2)→T_WV(3×3)→拼齐次点(x,y,1)→用@乘到世界p_W→T_VW做逆变换→欧氏误差。 【程序链】终端python demo.py→main()读取--scenario→scenarios.run_scenario()选择7种坐标输入→geometry2d.rotation_deg/rigid_transform_deg/transform_point/inverse_rigid/transform_points→返回字典status/valid/坐标→main根据有效性决定是否调用plot_frames.save_frame_plot→坐标PNG。错误场景仅输出诊断；test_geometry.py独立执行unittest。",
-      "remediation_title": "第3周D16：先从坐标约定和最简单的2×2乘法讲起，再进入完整工程",
+      "flow_text": "【先读理论】雷达目标在车体系的相对位置 → 定义车体/世界两套坐标轴 → 画单位圆确定cos/sin → 两列单位箭头构成R → 加车辆位置t → 齐次T → 顺序/逆变换/批量点 → 核对数学结果。【再读程序】demo.py main读取场景→scenarios.run_scenario→geometry2d.rotation_deg/rigid_transform_deg→transform_point或inverse_rigid/transform_points→返回状态与坐标→仅有效时调用plot_frames.save_frame_plot输出PNG。",
+      "remediation_title": "读完图与手算推导后，再看这里的代码执行链",
       "project_intro": {
         "title": "为什么前车目标坐标不能直接当作地图坐标",
         "paragraphs": [
-          "本课不针对D15没有填写的笔记设计补习，而是按原84天路线进入二维坐标与矩阵。D15的NumPy数组shape和列索引仍然有用，但本课从p=(1,0)的二维单位点开始逐步解释角度和矩阵。",
-          "同一个点，在车体系V中可能是车头正前方1米；车辆转向90°并位于世界坐标(10,5)m后，它在世界系中是(10,6)m。两个坐标系有不同原点和朝向，直接把(1,0)当世界坐标会定位错误。",
-          "先掌握二维列向量约定、旋转R、平移t、齐次T，再比较T的乘法顺序，最后用测试验证角度单位错误、逆变换和多点转换。网页显示JS模拟；本地运行NumPy/Matplotlib工程才能生成真正的图片。"
+          "第一步先理解一个目标为什么会有“车体坐标”和“世界坐标”两种表示。我们先用图示、单位圆和具体数字推导旋转与平移，后面才进入Python源码。",
+          "这节课不是为了记住一串矩阵符号，而是学会自己判断输入点属于哪个坐标系、车辆转动后点怎样移动、平移加在何处，以及结果如何变回原来的坐标。",
+          "建议先完成理论的14个小节和每节的自测问题，再查看完整工程。页面里可以自由来回翻阅；浏览器演算不会运行真实Python，已完成的D15笔记也不会被改写。"
         ]
       },
       "architecture": {
@@ -9504,60 +9504,262 @@
       ],
       "reading": [
         {
-          "title": "01 · 从D15 NumPy到D16二维坐标",
-          "text": "D15学会了matrix.shape和matrix[:,1]，这一课先复习二维数组形状，再用2×2和3×3矩阵表达一个地标点的旋转与平移。不要先写复杂ASW状态机；先知道数据在哪个坐标系，单位是什么。"
+          "title": "01｜为什么需要两套坐标：车前方1米，在地图上是什么位置？",
+          "lead": "想象一辆车停在停车场，雷达告诉程序：“目标在车头前方1米。”只知道这句话，你还不能在停车场地图上标出目标。因为“前方”是相对于车说的，而地图上的方向不随车转动。",
+          "text": "先从最简单的情况理解：车头向着地图的右方，车体原点正好在地图原点。车体系的(1,0)就对应地图里的(1,0)。如果车原地左转90°，车的“前方”变为地图的“上方”，同一个相对位置(1,0)，在地图里应写成(0,1)。点没有突然从车的前方跑到别处，变的是我们描述它时使用的坐标系。\n\n如果车还停在地图的(10,5)米处，目标相对于车仍在(1,0)，但在地图里变成(10,6)。因此，地图坐标受到两个因素影响：车的朝向决定“车前方”指向地图哪里，车的位置决定整体放在哪里。只做其中一步都会给出不完整的结果。\n\n这就是D16要解决的问题：把车体坐标中的已知位置换算成世界坐标，反过来也可以把地图上的位置换回车体坐标。我们先用一张图和简单数字认清变化，再用公式表达，最后写成Python函数。本课数据都是离线教学数值，暂不涉及真实传感器的标定或定位误差。",
+          "diagram": "frames",
+          "worked": [
+            "先固定一根不随车辆旋转的世界坐标轴：右是世界x正向，上是世界y正向。",
+            "让车的原点与世界原点重合，车朝右时(1,0)_V对应(1,0)_W。",
+            "车原地左转90°后，目标在车体系仍为(1,0)_V，但世界坐标已经是(0,1)_W。",
+            "再把车移动到(10,5)_W，不改变朝向，目标世界坐标成为(10,6)_W。"
+          ],
+          "formula": "先记住：世界中的位置 = 按车辆朝向改写的相对位置 + 车辆在世界中的位置。\n这一句话之后会写成：p_W = R_WV @ p_V + t_WV",
+          "check": {
+            "question": "车向北开，前方1米的目标在车体坐标是什么？在世界坐标也一定是(1,0)吗？",
+            "answer": "在车体坐标仍是(1,0)。世界坐标要看车在地图中的位置与朝向，不能直接照抄(1,0)。"
+          },
+          "code_step": 7
         },
         {
-          "title": "02 · 世界坐标W和车体坐标V是什么",
-          "text": "世界坐标系W：在本例中的固定参照系，x向右、y向上；车体坐标系V：车体原点附近的坐标，x指向车头、y指向左侧。二维教学采用正角逆时针、列向量约定。车体的(x_V,y_V)不等于世界的(x_W,y_W)，要结合车辆位置和朝向才能转换。"
+          "title": "02｜先把坐标系画清楚：原点、方向和“同一个点”",
+          "lead": "数学公式里写p_V、p_W，最重要的下标不是字母好不好记，而是它告诉你“这组数字相对于哪个原点、哪组坐标轴”。同一物理位置在不同坐标系里可以有不同数字。",
+          "text": "我们给世界坐标系取名W，给车体坐标系取名V。为了让图好读，本课统一规定：图中世界x_W向右、世界y_W向上；车辆在未旋转时，车体x_V朝车头前方、y_V朝左侧。角度从世界x正方向逆时针增加。这里的“右、上、前、左”只是这套二维教学约定，不自动等于所有实车传感器或软件平台的坐标标准。\n\n坐标由两个数构成，例如p_V=(1,0)米：第一个1表示沿车体x正方向走1米，第二个0表示沿车体y方向不移动。如果p_V=(2,-1)，则从车体原点向前2米、向右1米（因为负的车体y指向右侧）。这个点已经有具体意义，但尚未告诉我们车在世界的什么位置。\n\n做坐标转换时，请在脑中反复问三个问题：点是在哪里测得的？希望用哪套坐标表示？这两套坐标轴的原点和朝向相差多少？只要能回答这三个问题，即便还不认识矩阵，也能判断结果大致应该落在哪个方向。",
+          "diagram": "frames",
+          "worked": [
+            "点p_V=(2,-1)：x_V为2米，y_V为-1米。",
+            "车未旋转且原点在世界(10,5)时，目标世界位置为(12,4)。",
+            "车转过90°后，车体x正方向变为世界y正方向；车体y负方向变为世界x正方向。",
+            "所以同一个相对点(2,-1)旋转后为(1,2)，再加位置(10,5)得到(11,7)。"
+          ],
+          "formula": "车体点：p_V = (x_V, y_V)\n世界点：p_W = (x_W, y_W)\n坐标单位：米（m）；角度正方向：逆时针。",
+          "check": {
+            "question": "本课车体系里，点(2,-1)代表在车头右侧还是左侧？",
+            "answer": "车头前方2米、右侧1米。因为y_V正方向朝车左侧，-1表示向车右侧。"
+          },
+          "code_step": 4
         },
         {
-          "title": "03 · 一个点、一个向量与shape",
-          "text": "p_V=np.array([1.0,0.0])形状(2,)，只有两个元素；R=np.array([[...],[...]])形状(2,2)。R@p_V形状仍是(2,)；同一数组的.是属性访问，shape不是调用函数。"
+          "title": "03｜先学会转一根箭头，再学“旋转矩阵”",
+          "lead": "暂时把矩阵放一边。想象有一根长度为1米的箭头，箭尾始终在原点，箭头沿圆周逆时针转动。它转到了哪里，可以用终点的水平和竖直坐标描述。",
+          "text": "箭头最初指向x正方向时，箭头终点是(1,0)。转过90°后指向y正方向，终点是(0,1)；转过180°则指向x负方向，终点(-1,0)。若只转30°，这根箭头还没有指向某一条坐标轴，而是同时具有向右、向上的分量，这时就需要正弦和余弦。\n\n在半径为1的单位圆上，转角θ对应的箭头终点是(cosθ, sinθ)。cosθ给出水平方向的投影长度，sinθ给出竖直方向的投影长度。对于30°，cos30°≈0.866，sin30°=0.5，所以箭头终点大约是(0.866,0.5)。这里的0.866和0.5是坐标系方向上的分量，不是“角度拆成了两份”。\n\n先看下方可调角度的图。按0°、30°、90°和180°，观察箭头终点与两条虚线投影怎样移动；再回到下面的公式。理解一根箭头的旋转，才容易理解为什么矩阵里出现正弦和余弦。",
+          "diagram": "unit-circle",
+          "worked": [
+            "θ=0°：cos0°=1，sin0°=0，箭头终点(1,0)。",
+            "θ=30°：cos≈0.866，sin=0.5，箭头斜向右上。",
+            "θ=90°：cos≈0，sin=1，箭头指向世界y正方向。",
+            "θ=180°：cos=-1，sin≈0，箭头指向世界x负方向。"
+          ],
+          "formula": "单位长度的箭头旋转θ后：\n e_x' = (cos θ, sin θ)\n先不要背二维矩阵，只记“水平投影cos，竖直投影sin”。",
+          "check": {
+            "question": "把一根沿x正方向的单位箭头逆时针转过90°，新箭头的x分量接近多少？",
+            "answer": "接近0。因为cos90°=0；实际浮点运算可能得到非常小的近零数。"
+          },
+          "code_step": 2
         },
         {
-          "title": "04 · sin/cos为什么必须用弧度",
-          "text": "角度90°与弧度π/2表示同一个角，但np.sin和np.cos需要弧度输入。代码中angle_rad=np.deg2rad(angle_deg)，然后计算cos/sin。跳过转换却传90，会得到错误方向，不能仅用程序没有报错判断有效。"
+          "title": "04｜为什么旋转矩阵一定长成这四个数字？",
+          "lead": "刚才只转了沿x方向的一根箭头。要转换任意二维点，还必须知道沿y方向的箭头旋转后指向哪里。把两根旋转后的单位箭头并排放进一张表，就是二维旋转矩阵。",
+          "text": "沿x正方向的单位箭头(1,0)，逆时针转θ后是(cosθ,sinθ)。沿y正方向的单位箭头(0,1)，本来就比x箭头多转了90°，转同一个θ后是(-sinθ,cosθ)。想象把两根新箭头并排：第一列表示原先x方向的单位长度转到了哪里，第二列表示原先y方向的单位长度转到了哪里。\n\n任何点(x,y)都可以看作x份x方向单位箭头，加上y份y方向单位箭头。旋转后，新x坐标= x·cosθ + y·(-sinθ)，新y坐标= x·sinθ + y·cosθ。把这两行计算写在一起，就得到R=[[cosθ,-sinθ],[sinθ,cosθ]]。负号来自“原y正方向转到左上后，它的世界x投影是负的”，不是为了套公式强行规定。\n\n拿p=(1,0)和θ=90°验算：R≈[[0,-1],[1,0]]；第一行0×1 + (-1)×0=0，第二行1×1 +0×0=1，所以得到(0,1)。再验算(0,1)：第一行0×0+(-1)×1=-1，第二行1×0+0×1=0，所以得到(-1,0)。两根基准箭头都符合图，旋转矩阵的数字才有了来源。",
+          "diagram": "rotation-basis",
+          "worked": [
+            "第一根基准箭头(1,0)旋转90°，得到(0,1)。它成为矩阵的第1列。",
+            "第二根基准箭头(0,1)旋转90°，得到(-1,0)。它成为矩阵的第2列。",
+            "把两列合并：R90 = [[0,-1],[1,0]]。",
+            "让p=(2,-1)：新x=0×2+(-1)×(-1)=1，新y=1×2+0×(-1)=2。"
+          ],
+          "formula": "R(θ) = [[ cosθ, -sinθ ],\n        [ sinθ,  cosθ ]]\np_rot = R(θ) @ [x, y]\nx_rot = x·cosθ − y·sinθ\ny_rot = x·sinθ + y·cosθ",
+          "check": {
+            "question": "为什么R(90°)的右上角是-1，而不是+1？",
+            "answer": "该位置代表原y单位箭头旋转后在世界x方向的分量。逆时针90°后它指向左，x分量是-1。"
+          },
+          "code_step": 2
         },
         {
-          "title": "05 · 逆时针二维旋转矩阵R怎么读",
-          "text": "R=[[cosθ,-sinθ],[sinθ,cosθ]]。R@(1,0)得到(cosθ,sinθ)，所以90°→(0,1)。另一列R@(0,1)→(-sinθ,cosθ)。x/y分别是分量，不是两个独立角度；R只改变点的方向，不改变所在原点的位置。"
+          "title": "05｜角度的“度”和“弧度”不是同一个数字",
+          "lead": "现实生活说“向左转90度”。但NumPy的sin、cos函数接受的角度是弧度。如果直接写np.cos(90)，程序可以计算，却算成了另一个角度。这类错误比语法报错更难发现。",
+          "text": "一整圈既可以说是360度，也可以说是2π弧度，因此180度对应π弧度、90度对应π/2弧度。弧度不是另一种旋转方向，它只是描述同一角度的另一种计量方式。换算：弧度=角度（度）×π/180。Python标准库math和NumPy的sin/cos都使用弧度输入；所以D16的rotation_deg()先用np.deg2rad(angle_deg)，再把返回值交给np.cos和np.sin。\n\n实际计算：np.deg2rad(90)≈1.57079632679；np.cos(π/2)≈0；np.sin(π/2)=1。而np.cos(90)≈-0.448、np.sin(90)≈0.894，因为90在这里被理解为90弧度。这组结果看起来也像一个长度约1的向量，所以不能只检查模长是否为1，更不能以“程序没有抛异常”就断言角度正确。\n\n随后再看数组的形状。p=np.array([1.0,0.0])是一组两个数，shape=(2,)；R=np.array([[c,-s],[s,c]])是两行两列，shape=(2,2)。R@p按矩阵乘法得到shape=(2,)的结果；R*p是NumPy逐元素乘法并发生广播，可能得到一个(2,2)数组。这不是同一种运算。",
+          "diagram": "unit-circle",
+          "worked": [
+            "先写出90°×π/180 = π/2≈1.5708弧度。",
+            "将π/2代入sin/cos，得到正确方向(0,1)。",
+            "故意不换算，直接把数字90交给sin/cos，得到约(-0.448,0.894)。",
+            "同样的旋转意图，输出完全不同；必须检查角度单位和计算链条。"
+          ],
+          "formula": "θ_rad = θ_deg × π / 180\nR = np.array([[cos(θ_rad), -sin(θ_rad)], [sin(θ_rad), cos(θ_rad)]])\n@：矩阵乘法；*：NumPy数组逐元素乘法（可能触发广播）。",
+          "check": {
+            "question": "np.cos(90)的结果不等于0，是Python算错了吗？",
+            "answer": "没有。np.cos的参数是弧度，90表示90弧度。应先做np.deg2rad(90)，再求np.cos。"
+          },
+          "code_step": 1,
+          "sources": [
+            {
+              "title": "NumPy官方：三角函数与角度换算",
+              "url": "https://numpy.org/doc/stable/reference/ufuncs.html"
+            }
+          ]
         },
         {
-          "title": "06 · NumPy的@与*区别",
-          "text": "在ndarray中，@是矩阵乘法，运算遵循维度和求和规则；*通常逐元素运算。如果R.shape=(2,2)，p.shape=(2,)，R@p输出(2,)；R*p会按广播规则产生(2,2)，并不是旋转后的二维点。"
+          "title": "06｜先旋转，再搬到地图上的位置：平移从哪里来？",
+          "lead": "旋转只改变方向，仍然围绕原点。车辆在地图中的位置如果不是(0,0)，还需要把旋转后的点整体挪过去。这个“挪过去”就是平移。",
+          "text": "我们沿用同一个点：目标在车体前方1米，p_V=(1,0)。如果车辆朝向为90°，它相对于车原点的世界方向变成(0,1)。但现在车体原点位于世界(10,5)，所以目标真正的世界坐标应为(0+10,1+5)=(10,6)。\n\n这里的(10,5)被写成平移向量t_WV，意思是“车体原点在世界坐标系里的位置”，单位是米。相对旋转后的点(0,1)必须加上这个原点的位置。把这两步合起来，公式就是p_W=R_WV@p_V + t_WV。注意公式从右往左理解：先用R处理车体系相对位置，再加t把结果移到世界中的实际位置。\n\n图里先显示车体原点、车前1米的点以及旋转后的相对位置；再把整组坐标轴移动到(10,5)，就能看到为什么不加t时得到(0,1)，加t以后才得到(10,6)。我们接下来要解决的新问题是：能不能把“旋转”和“平移”写成一次矩阵运算，减少多次转换时的出错机会？",
+          "diagram": "translation",
+          "worked": [
+            "p_V=(1,0)，车相对于世界逆时针转90°。",
+            "先算R90@p_V=(0,1)，这是旋转后的相对位置。",
+            "车体原点在t=(10,5)米，逐分量相加：(0+10,1+5)。",
+            "世界最终位置p_W=(10,6)米。"
+          ],
+          "formula": "p_W = R_WV @ p_V + t_WV\n  = R(90°) @ (1,0) + (10,5)\n  = (0,1) + (10,5)\n  = (10,6) m",
+          "check": {
+            "question": "如果车在世界(10,5)，朝向90°，前方1米的点世界坐标是(0,1)还是(10,6)？",
+            "answer": "是(10,6)。前者仅完成围绕原点的旋转，没有加入车体原点在世界坐标中的位置。"
+          },
+          "code_step": 3
         },
         {
-          "title": "07 · 平移为什么要用齐次矩阵",
-          "text": "二维旋转加平移是p_W=R@p_V+t。可把二维点扩展成(x,y,1)的三维齐次坐标，并把R和t放入3×3矩阵T，写成p_W_h=T@p_V_h。T最后一行固定(0,0,1)。这是让旋转和平移统一参与矩阵乘法的表示方法。"
+          "title": "07｜为什么多写一个1，就能把旋转和平移合成一次乘法？",
+          "lead": "原公式R@p+t需要两个计算动作。所谓“齐次坐标”听起来抽象，实际做法很简单：给二维点后面补一个数字1，让平移也能写进矩阵。",
+          "text": "原来二维点只有(x,y)。现在把它写成(x,y,1)，也就是把一个二维点放进含三个数字的数组里。前两项仍是原来的x、y，最后的1是为数学运算准备的辅助量，不是高度1米，也不是多出一个实际空间方向。与此同时，矩阵从2×2扩展成3×3：左上角仍放旋转矩阵R，最右列的上两项放平移tx、ty，最后一行固定(0,0,1)。\n\n把矩阵T与(x,y,1)相乘，第一行得到cosθ·x−sinθ·y+tx·1，第二行得到sinθ·x+cosθ·y+ty·1。这恰好等于先旋转再平移的公式。最后一行算得1，表示结果仍是“点的齐次表示”。需要普通二维坐标时，把第三个数字去掉，就得到世界系(x_W,y_W)。\n\n如果输入的不是某个具体位置，而是一根方向箭头，例如“车头朝前的单位方向”(1,0)，它不应该因为车身向右移动10米就变成(11,5)。所以方向向量补的是0，写成(1,0,0)。矩阵右侧平移项乘以0，不会影响方向向量。区分点w=1与方向w=0，是理解坐标变换的重要一步。",
+          "diagram": "homogeneous",
+          "worked": [
+            "把点(1,0)写成齐次形式(1,0,1)。",
+            "旋转90°、平移(10,5)，写成矩阵[[0,-1,10],[1,0,5],[0,0,1]]。",
+            "矩阵乘点第一行：0×1−1×0+10×1=10；第二行1×1+0×0+5×1=6；第三行=1。",
+            "同一个矩阵乘方向向量(1,0,0)，得到(0,1,0)：没有平移。"
+          ],
+          "formula": "T_WV = [[ cosθ, -sinθ, tx ],\n        [ sinθ,  cosθ, ty ],\n        [  0,       0,   1 ]]\n点：T @ [x,y,1] → 包含平移\n方向：T @ [x,y,0] → 不含平移",
+          "check": {
+            "question": "为什么齐次点写(x,y,1)，方向写(x,y,0)？",
+            "answer": "矩阵最右侧的平移列需要乘最后一项。点要加平移，所以用1；方向与位置无关，所以用0。"
+          },
+          "code_step": 4
         },
         {
-          "title": "08 · 点与方向向量为何不同",
-          "text": "地标点(p_x,p_y,1)有具体位置，平移会改变其坐标；方向向量(v_x,v_y,0)只表示方向/位移，不该加车辆平移。因此本课transform_point用w=1，transform_direction用w=0。不要把距离向量与地标点坐标混为一谈。"
+          "title": "08｜为什么矩阵相乘不能随便换顺序？",
+          "lead": "日常加法里2+3和3+2相等，因此容易以为两个变换先做谁都一样。坐标旋转和平移却不是这样：把点挪过去再绕原点转，与先转完再挪过去，会得到不同的位置。",
+          "text": "还是p=(1,0)，定义R为逆时针90°旋转，A为沿世界x正方向平移2米。第一条路线：先R旋转，(1,0)→(0,1)，再A平移，得到(2,1)。第二条路线：先A平移，(1,0)→(3,0)，再R旋转，得到(0,3)。你能在图里看见，二者并不是一点数值误差，而是两个物理操作发生的顺序不同。\n\nD16统一使用列向量，变换矩阵放在点左边：A @ R @ p。计算时右侧R先与p相乘，然后左侧A再作用于结果；因此A@R就是“先R后A”。反过来R@A就是“先A后R”。遇到多坐标系调用链时，应先用口头语言确定每一步的方向和目标，再用列向量规则从右往左写矩阵，避免见到两个矩阵就任意交换。\n\n请不要仅靠记忆“矩阵乘法一般不交换”应付这节内容。更有用的能力是看到A@R@p，能够说清楚输入点在哪一系、先做旋转还是平移、每一步计算后的中间点是什么。随后才检查Python里两次@相乘与NumPy数组的shape。",
+          "diagram": "composition",
+          "worked": [
+            "路线一：p=(1,0)→先R90旋转得(0,1)→后A平移(2,0)得(2,1)。",
+            "路线二：p=(1,0)→先A平移得(3,0)→后R90旋转得(0,3)。",
+            "用列向量写：路线一A@R@p；路线二R@A@p。",
+            "两结果距离sqrt((2−0)^2+(1−3)^2)=sqrt(8)≈2.828米。"
+          ],
+          "formula": "先旋转，再平移：p₁ = A @ R @ p = (2,1)\n先平移，再旋转：p₂ = R @ A @ p = (0,3)\nA @ R ≠ R @ A（一般情况下）",
+          "check": {
+            "question": "A@R@p按本课列向量约定先执行A还是R？",
+            "answer": "先执行最右边的R@p，再执行左边的A。不能把矩阵乘法随意调换顺序。"
+          },
+          "code_step": 8
         },
         {
-          "title": "09 · 矩阵乘法顺序不能随意换",
-          "text": "按列向量约定，右侧变换先执行：Translation @ Rotation @ p表示先旋转再平移。以p=(1,0)、R=90°、t=(2,0)，正确结果(2,1)，交换矩阵得(0,3)。矩阵乘法一般不满足交换律，这个差异不是浮点误差。"
+          "title": "09｜坐标怎样变回来：逆变换不只是给平移加负号",
+          "lead": "地图上有一个目标位置，想算它相对于车辆在哪儿，就要把刚才的转换反过来。既然正向是“先旋转再平移”，那么回去时必须先撤销平移、再撤销旋转。",
+          "text": "已知p_W=R@p_V+t。把车的位置t从两边减去，得p_W−t=R@p_V。下一步要把旋转还原。旋转矩阵的两根列向量互相垂直且长度都为1，因此R的逆矩阵等于它的转置R.T；在几何上，这相当于将原先的旋转方向反过来。于是p_V=R.T@(p_W−t)。\n\n把括号展开：p_V=R.T@p_W−R.T@t。这告诉我们，逆变换矩阵左上角放R.T，而平移位置应放−R.T@t。不能简单把t改成(-tx,-ty)，因为我们需要先按反向旋转的坐标轴表达原来的平移。\n\nD16的数值案例取角度30°、t=(10,5)米，车辆相对点p_V=(3,-2)米。先旋转后平移得到世界点约(13.5981,4.7679)；逆向先减去(10,5)，再乘R.T，回到约(3,-2)。由于计算机浮点近似，恢复值可能差最后几位小数。代码将恢复点与原始点相减，求欧氏距离，要求误差小于10⁻⁹米。",
+          "diagram": "inverse",
+          "worked": [
+            "正向：角度30°，p_V=(3,-2)，R30@p_V≈(3.5981,-0.2321)。",
+            "加平移(10,5)得到p_W≈(13.5981,4.7679)。",
+            "逆向先做p_W−(10,5)≈(3.5981,-0.2321)。",
+            "再乘R30.T得到约(3,-2)；两点差的长度应小于1e-9米。"
+          ],
+          "formula": "p_W = R@p_V + t\np_V = R.T@(p_W − t)\nT_VW 的旋转部分 = R.T\nT_VW 的平移部分 = −R.T@t",
+          "check": {
+            "question": "逆变换为什么要把平移写成−R.T@t？",
+            "answer": "先减平移，再在反向旋转的坐标轴中表示这个位移；单纯写−t没有处理旋转。"
+          },
+          "code_step": 6
         },
         {
-          "title": "10 · 逆变换怎样返回原坐标",
-          "text": "若p_W=R@p_V+t，则p_V=R.T@(p_W-t)。所以逆矩阵包含R.T和-R.T@t，而不是简单把t改成负数。先前向后逆向得到的欧氏误差应小于1e-9m；由于浮点计算，0附近的小残差是正常的。"
+          "title": "10｜一次计算五个地标：理解shape、转置和切片",
+          "lead": "一辆车周围可能同时有很多目标。学会转换一个点之后，不必为每个点复制一遍代码；NumPy可以把多个点放在一张表里一次计算。",
+          "text": "先把五个地标的车体系坐标写成五行、每行两个数：[[0,0],[1,0],[0,1],[2,-1],[-1,2]]，因此shape是(5,2)。每一行代表一个点，两列依次为x和y。为了使用刚才的3×3齐次矩阵，先给每行补上1，变成(5,3)。程序中np.ones((points.shape[0],1))创建五行一列的1，np.concatenate((points,ones),axis=1)把这列放到右侧。\n\n接下来是最容易看晕的一步。T的shape为(3,3)，而点表目前是(5,3)。按照矩阵乘法规则，T不能直接乘这张(5,3)表。把点表转置成(3,5)，意味着每一列是一个点，T@(3,5)便得到(3,5)。再次转置回(5,3)，去掉末尾那列辅助的1，最终返回世界坐标shape=(5,2)。\n\n以R90和t=(10,5)米为例，五个车体系点依次得到世界(10,5)、(10,6)、(9,5)、(11,7)、(8,4)。逐行手算前两个点作为对照，再运行代码看全部结果。这里的.T就是数组转置的属性，[:, :2]表示保留全部行、只取前两列。",
+          "diagram": "batch",
+          "worked": [
+            "原始points.shape=(5,2)，每行一个车体系地标。",
+            "添加最后一列全1，points_h.shape=(5,3)。",
+            "转置后shape=(3,5)；T.shape=(3,3)，矩阵乘法得到(3,5)。",
+            "再转置到(5,3)，取[:, :2]得到(5,2)世界点坐标。"
+          ],
+          "formula": "points        shape=(5,2)\npoints_h      shape=(5,3)\npoints_h.T    shape=(3,5)\nT@points_h.T  shape=(3,5)\n(...).T[:,:2] shape=(5,2)",
+          "check": {
+            "question": "为什么直接执行T@(5×3的点表)不合适？",
+            "answer": "T是3×3矩阵，右侧点表的第一维是5，不符合矩阵乘法内侧维度相同的要求；先转置成3×5即可。"
+          },
+          "code_step": 5
         },
         {
-          "title": "11 · 从一个点到五个地标",
-          "text": "D15中学过matrix[:,0]取整列。D16把五个车体系点放到shape=(5,2)数组，一次拼上5个1得到(5,3)，转置后乘以3×3的T，再转回来为(5,3)并去掉最后一列，得到(5,2)世界坐标。"
+          "title": "11｜故意做错一次：程序能运行，方向也可能完全错",
+          "lead": "工程里的危险不只是语法错误。比如误把90°当成90弧度，函数仍能返回一个看似正常的二维点；输入NaN时，某些运算甚至会继续传递异常数值。它们都需要明确的验收标准。",
+          "text": "第一种错误是单位错。前面已经看到，sin(90)、cos(90)并不代表90°的正弦和余弦。D16的S04故障案例故意不做角度换算，让错误坐标约为(-0.448,0.894)，并把它与正确(0,1)比较；案例返回status=-3、valid=0。这里显示错误点只为了说明故障的后果，不能把它当作有效世界位置。\n\n第二种错误是输入不合法。比如角度是NaN（不是一个有效数字），系统不应继续输出“有效世界坐标”。S06通过_finite_number()检查输入是否为有限数，发现NaN就返回明确诊断，status=-2、valid=0，且不生成有效坐标或PNG。两类错误的区别是：一个数字在数学运算层面成立，却违反了角度单位；另一个输入本身就不能用于计算。\n\n还有一种常见误解是浮点近似：理论cos90°=0，程序可能得到约6.12×10⁻¹⁷。它非常接近0，不是方向错。实际验收应使用绝对容差，例如np.allclose(actual,expected,atol=1e-12)，而不能要求每一位浮点数都等于0。错误单位和浮点尾差应分别诊断。",
+          "diagram": "failure",
+          "worked": [
+            "正确90°：角度先转弧度，结果约(0,1)。",
+            "故意漏掉换算：得到约(-0.448,0.894)，与预期存在可见偏差。",
+            "NaN输入：在构造R前拒绝，禁止输出有效点。",
+            "cos(π/2)产生极小尾差：在1e-12范围内仍可通过正确性测试。"
+          ],
+          "formula": "合法角度：status=0，valid=1\n错误单位示范：status=-3，valid=0\n非有限角度：status=-2，valid=0\n浮点验收：|actual−expected| ≤ 合理容差",
+          "check": {
+            "question": "cos(π/2)得到6.12e−17和cos(90)得到−0.448，哪一种是严重错误？",
+            "answer": "后者是角度单位错误；前者只是接近0的浮点近似，应按允许误差判断。"
+          },
+          "code_step": 9
         },
         {
-          "title": "12 · 网页案例状态必须完整展示",
-          "text": "S01/S02/S03/S05/S07属于正常有效变换，status=0、valid=1，显示结果和图像参考。S04误把度当弧度，status=-3、valid=0，显示错误计算和诊断而不作为有效世界点。S06角度NaN，status=-2、valid=0，没有合法世界点。"
+          "title": "12｜现在才打开Python：每个函数怎样接到刚才的推导？",
+          "lead": "理论已经回答了点为什么会旋转、为什么加平移、为什么用3×3矩阵。现在看代码时，你不必一上来背NumPy函数，只需要知道“这一行对应刚才哪一步”。",
+          "text": "先读geometry2d.py里的rotation_deg(angle_deg)。def表示定义函数，括号里的angle_deg是调用者提供的角度，单位是度；箭头后的np.ndarray是返回类型提示，告诉你成功时会返回NumPy数组，而不是C语言那种只能return int或void的形式。函数先检查数值，再用np.deg2rad转换，最后用np.array([...],dtype=np.float64)构造2×2矩阵。return把这个矩阵交回调用者。\n\nrigid_transform_deg(angle_deg,tx_m,ty_m)再次调用rotation_deg，并先建立单位矩阵np.eye(3)。代码里的transform[:2,:2]=rotation是“把第0、1行与第0、1列的四个位置换成旋转矩阵”；transform[:2,2]=[tx,ty]是“在第2列前两行填入平移”。你可以直接把源码与上一节3×3矩阵逐格对照。\n\ntransform_point()调用_checked_transform()确认输入是合法的刚体矩阵，再用_point2()检查目标是不是两个有限数，随后把(x,y)补成(x,y,1)并执行matrix@p_h，最终通过[:2]取得世界x、y。inverse_rigid()则从矩阵中读出R和t，按前面推导的R.T、−R.T@t构造返回路径。每个函数负责一件清楚的事，彼此组合形成完整程序。",
+          "diagram": "code-map",
+          "worked": [
+            "demo.py的main读取场景号，调用scenarios.run_scenario。",
+            "场景函数调用rotation_deg、rigid_transform_deg等数学函数。",
+            "transform_point处理矩阵和点，return返回结果数组给场景函数。",
+            "场景函数组织成含status、valid等字段的dict返回给main；只有有效结果才调用绘图。"
+          ],
+          "formula": "demo.main()\n  → scenarios.run_scenario(id)\n  → geometry2d.rigid_transform_deg() / transform_point()\n  → return dict(status,valid,world_point或诊断)\n  → demo.main() → plot_frames.save_frame_plot()",
+          "check": {
+            "question": "geometry2d.rotation_deg()中的return np.array(...)究竟返回什么？",
+            "answer": "返回一个2行2列的NumPy数组，用于表示角度对应的二维旋转；np.ndarray是函数定义上的返回类型提示。"
+          },
+          "code_step": 2
         },
         {
-          "title": "13 · 图像应如何看",
-          "text": "横轴是世界x_W（m），纵轴是世界y_W（m）；世界原点O_W和车体原点O_V都应显示。车体系x_V、y_V轴旋转后的位置与方向应在世界图上画出来，地标点叠加到世界系，且二维坐标保持等比例显示。网页图是SVG示意，本地Python才生成Matplotlib PNG。"
+          "title": "13｜绘图不是装饰：怎么用一张坐标图核对计算？",
+          "lead": "如果计算结果只有一串数字，很容易漏掉轴方向和单位。D16要求把世界坐标系、车辆坐标系和地标放在同一张图中，让图与数值计算互相校验。",
+          "text": "图中的世界原点O_W固定在(0,0)，世界x_W指向右、y_W指向上；车体原点O_V在世界坐标(10,5)附近，车体x_V和y_V轴根据车辆角度旋转。每个地标先以车体坐标保存在LANDMARKS_V中，随后用相同的T转换到世界坐标，再由Matplotlib按照(x_W,y_W)画出。坐标轴标题必须写明米(m)，这样你才能判断“看起来离得很远”是否只是比例误导。\n\nplot_frames.py调用ax.axis('equal')是关键：它让x和y方向的1米在图上占据相同长度，否则圆可能看成椭圆，90°也可能被画得不像直角。网页提供可交互的示意图，但不会运行Matplotlib；只有在本地执行demo.py，才能在指定目录生成真正的coordinate_frames.png。\n\n验证图的时候，先找车体原点，再沿车体x_V正方向看P1是否在前方1米；接着找P2，它应该位于车体y_V正方向1米的位置。把图上的点与S07数值表逐项对照。图和表不一致时，应检查转换函数、角度约定和画图输入，而不是直接调整图使它“看起来更合理”。",
+          "diagram": "batch",
+          "worked": [
+            "世界原点与车体原点明确区分：O_W=(0,0)，O_V=(10,5)。",
+            "航向90°时车体x轴应向世界上方，车体y轴应向世界左方。",
+            "五个地标结果应为(10,5),(10,6),(9,5),(11,7),(8,4)。",
+            "检查两轴的1米相同长度、单位写m、点与坐标标注一致。"
+          ],
+          "formula": "图上一个点：横坐标 = x_W (m)\n              纵坐标 = y_W (m)\n图中比例：1米 x 方向的长度 = 1米 y 方向的长度",
+          "check": {
+            "question": "为什么不能把坐标图的x轴1米画成y轴1米的两倍？",
+            "answer": "这样会让转角和点间距离在视觉上失真。保持等比例坐标轴才能按几何关系检查变换。"
+          },
+          "code_step": 11
         },
         {
-          "title": "14 · 本地工程的执行链与验收",
-          "text": "运行python demo.py --scenario 1，进入main→scenarios.run_scenario→geometry2d.rigid_transform_deg→rotation_deg→transform_point→返回main→plot_frames.save_frame_plot→保存PNG。另行运行python -m unittest -v test_geometry，检查全部案例。浏览器在线通过不代表本地Python，也不代表此前C课程本地通过。"
+          "title": "14｜完成这节课的顺序：先手算，再动代码，最后测试",
+          "lead": "现在再看完整工程时，已知道每个模块在做什么。真正掌握D16的标准，不是复制运行命令后看到一张图，而是面对一个新角度、新位置，你能先预测结果，并用程序核对。",
+          "text": "第一轮先不改程序，完成S01与S02。你应该能手算(1,0)经过90°旋转得到(0,1)，再加(10,5)得到(10,6)。然后看S03：说清楚为什么交换矩阵顺序后从(2,1)变为(0,3)。这三个简单场景掌握后，再进入逆变换、批量点与角度错误场景。\n\n第二轮在自己的本地副本中运行测试。打开终端进入D16工程目录，建立虚拟环境、安装requirements.txt，然后运行demo.py各个案例和python -m unittest -v test_geometry。单元测试会检查二维旋转、乘法顺序、点与方向、逆向误差、五个地标和真实PNG。失败时先根据报错定位对应源文件，理解错误原因后再修改，而不是为了让测试通过而降低容差或改变题目期望。\n\n第三轮亲自制造和修复一个错误：暂时删掉np.deg2rad观察旋转怎样变错，再恢复；或交换S03矩阵顺序，比较中间点。保存修改前后的终端输出。网页案例只提供JavaScript教学演算，GitHub Actions只是参考工程自动检验；你的本地Python通关要以自己机器上的运行与分析为准，之前C语言的真实本地验收也仍是独立任务。",
+          "diagram": "code-map",
+          "worked": [
+            "先手算再运行S01、S02、S03，记录预测与实际。",
+            "再运行S04和S06，确认错误诊断不输出有效坐标。",
+            "运行S05逆变换、S07批量点，检查闭环与坐标图。",
+            "在本地运行unittest并做一次故障注入，保留失败→恢复的证据。"
+          ],
+          "formula": "数学目标：R(90°)@(1,0)≈(0,1)\n数值目标：正逆闭环误差 < 10⁻⁹ m\n工程目标：真实Python测试 + 正确PNG + 故障诊断",
+          "check": {
+            "question": "只在浏览器把S01–S07跑通，算不算本地Python完整通关？",
+            "answer": "不算。浏览器执行JavaScript示例；还需要在本地真实运行Python工程、单元测试、绘图及故障注入。"
+          },
+          "code_step": 12
         }
       ],
       "code_sections": [
@@ -9566,126 +9768,126 @@
           "file": "demo.py",
           "start": "def main() -> int:",
           "end": "    result = run_scenario",
-          "pattern": "CLI选择0–6，import模块不等于执行函数。",
-          "text": "Python main函数返回整数，错误场景打印状态和诊断。",
-          "trace": "CLI选择0–6，import模块不等于执行函数。"
+          "pattern": "从脚本入口理解函数与参数，而不是先背def语法",
+          "text": "当在终端输入python demo.py --scenario 1时，Python先加载import引用的模块定义，随后执行文件末尾的__name__判断，才调用main。main中的argparse.ArgumentParser负责理解命令行写的--scenario，它不是C里的printf或scanf，也不是系统自动创建的变量。add_argument说明这个选项必须是整数且只允许0到6。parse_args之后，args.scenario拿到你真正选择的案例号。",
+          "trace": "先带着--scenario 1看一次：args.scenario是整数1，传给run_scenario(1)。main会暂时等待这个函数返回；场景函数在另外一个文件里按编号准备90°旋转和(10,5)平移，最后把status、valid和计算坐标放进dict交回main。main() -> int中的int是返回类型提示，真正返回的0或2要在函数后面找return。"
         },
         {
           "title": "02 · 角度单位检查与显式转换",
           "file": "geometry2d.py",
           "start": "def _finite_number",
           "end": "def rigid_transform_deg",
-          "pattern": "先检查有限性，np.deg2rad把度变弧度，再构造2×2的R。",
-          "text": "重要：np.cos(np.deg2rad(90))≈0而np.cos(90)≈-0.448。",
-          "trace": "先检查有限性，np.deg2rad把度变弧度，再构造2×2的R。"
+          "pattern": "先校验输入，再把度换成弧度",
+          "text": "_finite_number(value,name)接收两项参数：value是要转换的数字，name用于报错时指出是角度还是位移。try里的float(value)尝试转换；如果文本不能表示数字，except捕获TypeError或ValueError，抛出更容易理解的报错。math.isfinite进一步排除NaN和正负无穷大。数学公式不会主动保护坏输入，这一步给后面的矩阵计算建立前提。",
+          "trace": "假设rotation_deg(90)接到的是角度90度，_finite_number先返回90.0，再执行np.deg2rad(90.0)，得到约1.5708弧度。随后np.cos得到接近0，np.sin得到接近1。如果删掉这次转换，把90直接交给三角函数，程序仍可能输出数字，却已经不是90°旋转。先弄懂输入单位，才能判断返回的R是否可靠。"
         },
         {
           "title": "03 · 构造2×2旋转矩阵R",
           "file": "geometry2d.py",
           "start": "def rotation_deg",
           "end": "def rigid_transform_deg",
-          "pattern": "矩阵[[cos,-sin],[sin,cos]]使用列向量、正角逆时针。",
-          "text": "R的shape=(2,2)，p_V是(2,)形状的一维向量。",
-          "trace": "矩阵[[cos,-sin],[sin,cos]]使用列向量、正角逆时针。"
+          "pattern": "把两根旋转后的坐标轴放进2×2的NumPy数组",
+          "text": "rotation_deg里c=float(np.cos(radians))与s=float(np.sin(radians))分别计算单位箭头在世界x、y方向的投影。return np.array([[c,-s],[s,c]],dtype=np.float64)不是返回四个独立数字，而是返回一个含两行两列的NumPy数组；最外层方括号表示两行，内层每个方括号表示一行。第一列(c,s)是车前方向，第二列(-s,c)是车左方向。",
+          "trace": "以90°举例：c≈0，s≈1，返回R≈[[0,-1],[1,0]]，shape=(2,2)。调用者拿到R后，可以执行R@np.array([1,0])，用矩阵乘法得到(0,1)。不能把@误写成*：在NumPy ndarray上，*通常按对应元素相乘，还可能发生广播，结果形状和物理意义都可能变。"
         },
         {
           "title": "04 · 用3×3齐次矩阵容纳平移",
           "file": "geometry2d.py",
           "start": "def rigid_transform_deg",
           "end": "def _checked_transform",
-          "pattern": "先建立np.eye(3)，左上角填R，最后一列填tx/ty。",
-          "text": "p_h=(x,y,1)，T@p_h把R与t一次计算。",
-          "trace": "先建立np.eye(3)，左上角填R，最后一列填tx/ty。"
+          "pattern": "从单位矩阵填出齐次T：逐个解释两个切片",
+          "text": "rigid_transform_deg接收航向角和两个位置分量。先通过rotation_deg获得R，然后np.eye(3,dtype=np.float64)创建对角线为1、其余为0的3×3单位矩阵。这里的eye取自identity matrix的命名习惯，返回的是矩阵，不是图像。transform[:2,:2]中的冒号属于切片：第0和第1行、同时第0和第1列，也就是左上角的四个格子。赋值rotation后，这四格正好放R。",
+          "trace": "接下来transform[:2,2]选择第2列中前两行，把车的世界位置tx、ty放进去。注意索引从0开始，所以第2列实际上是第三列。最后一行的[0,0,1]没有被改动；这样传入点(x,y,1)时，前两行同时完成旋转和平移。对于90°、(10,5)米，T应约为[[0,-1,10],[1,0,5],[0,0,1]]，可以与理论图直接对照。"
         },
         {
           "title": "05 · 点的齐次乘法与向量区别",
           "file": "geometry2d.py",
           "start": "def transform_point",
           "end": "def transform_points",
-          "pattern": "点拼上w=1，因此会加平移；方向向量w=0，平移不起作用。",
-          "text": "Python的@是矩阵乘法，不是逐元素*。",
-          "trace": "点拼上w=1，因此会加平移；方向向量w=0，平移不起作用。"
+          "pattern": "理解函数调用、合法性检查、点的补1和方向的补0",
+          "text": "transform_point(transform,point_vehicle_m)先调用_checked_transform确认矩阵的尺寸、有效数和旋转性质，再调用_point2确认点里只有两个有限数字。随后p[0]、p[1]分别取点的x、y，并构造[p[0],p[1],1.0]。这个最后的1是为了让矩阵的平移列参与计算；不是高程或时间。result_h=matrix@p_h会得到三个分量，return result_h[:2]则取前两个，交给调用者作为世界x和y。",
+          "trace": "如果计算的是箭头的朝向而非某个位置，transform_direction使用[p[0],p[1],0.0]。同一个T乘这个向量时，平移列乘最后的0，所以不会把车的位置加进去。用R90、t=(10,5)对比：点(1,0)变成(10,6)，方向(1,0)变成(0,1)。差别不在于NumPy“自动识别点”，而是我们明确选择了最后一项为1或0。"
         },
         {
           "title": "06 · 一次转换N个二维点",
           "file": "geometry2d.py",
           "start": "def transform_points",
           "end": "def inverse_rigid",
-          "pattern": "输入(N,2)→拼一列1→(N,3)→转置(3,N)→乘法→转置(N,3)。",
-          "text": "切片[:, :2]表示取所有行的前两列。",
-          "trace": "输入(N,2)→拼一列1→(N,3)→转置(3,N)→乘法→转置(N,3)。"
+          "pattern": "从五行两列到三行N列：每次shape究竟怎么变化",
+          "text": "transform_points接收N行2列的点表，每行一处地标。points.ndim和points.shape[1]先确认它确实是二维数组并且第二维大小是2；同时拒绝非有限值。points.shape[0]是行数N。np.ones((N,1))生成N行1列的一串1，再用np.concatenate((points,ones),axis=1)沿列拼到原表右边，得到(N,3)。axis=1是按列拼接，不是重复叠加一行。",
+          "trace": "接下来points_h.T把N行3列变成3行N列。因为T是3×3，T@points_h.T才能按照矩阵乘法逐列计算每个点。结果形状仍是(3,N)，末尾再.T恢复成(N,3)，最后[:, :2]保留所有行的前两列。以五点为例：5×2→5×3→3×5→3×5→5×3→5×2；可以依次写在纸上，而不是把代码当作一个看不懂的整体。"
         },
         {
           "title": "07 · 求逆：R转置与反向平移",
           "file": "geometry2d.py",
           "start": "def inverse_rigid",
           "end": "def roundtrip_error_m",
-          "pattern": "R是正交矩阵，R^{-1}=R.T；逆平移是-R.T@t。",
-          "text": "闭环计算p_V→p_W→p_V，欧氏误差单位m。",
-          "trace": "R是正交矩阵，R^{-1}=R.T；逆平移是-R.T@t。"
+          "pattern": "为什么逆矩阵的平移项是-R.T@t，而不是简单的-t",
+          "text": "inverse_rigid首先从T里切出R=matrix[:2,:2]和t=matrix[:2,2]。R.T不是函数调用而是数组的转置属性；对二维纯旋转矩阵，R.T与R的逆矩阵相同。程序先用np.eye(3)创建一张新矩阵，将R.T填入左上角四格，再将-(R.T@t)放到第三列上两格。这里的括号表示先计算R.T@t，再对两个分量同时取负。",
+          "trace": "把公式写开就容易看懂：正向p_W=R@p_V+t。要找回p_V，先从p_W减去t，再用R.T将方向旋回来，所以p_V=R.T@(p_W-t)。展开括号恰好得到-R.T@t这一项。roundtrip_error_m再把恢复点减去原点，用np.linalg.norm计算两点差的长度。结果理想为0，浮点情况下要求小于1e-9米。"
         },
         {
           "title": "08 · S01/S02坐标结果逐步计算",
           "file": "scenarios.py",
           "start": "    if scenario == 0:",
           "end": "    if scenario == 2:",
-          "pattern": "S01旋转(1,0)到(0,1)；S02加平移(10,5)，得到(10,6)。",
-          "text": "小数尾差来自浮点计算，不应强求绝对0。",
-          "trace": "S01旋转(1,0)到(0,1)；S02加平移(10,5)，得到(10,6)。"
+          "pattern": "S01与S02：从一个点认识返回字典里的实际数值",
+          "text": "run_scenario里scenario==0时先构造R90、零平移的T，再建立一维数组point=[1,0]。调用transform_point得到世界点约[0,1]。结果不是只return一个坐标，而是return一个dict：scenario说明是哪一例，status=0/valid=1说明可用，rotation_shape与transform_shape说明矩阵形状，world_point存坐标，roundtrip_error_m记录闭环误差。main按字段名读取这些值。",
+          "trace": "scenario==1沿用同一个车前1米点，但把平移改成(10,5)。你应该先从前一例的(0,1)推算出(10,6)，再看Python输出。这样的安排是为了让新场景只增加一个概念：车辆在世界中的位置，而不是在不理解旋转时直接改变一大堆参数。浏览器模拟和本地Python都应该满足同一预期值。"
         },
         {
           "title": "09 · S03为什么矩阵顺序不可交换",
           "file": "scenarios.py",
           "start": "    if scenario == 2:",
           "end": "    if scenario == 4:",
-          "pattern": "translate @ rotate得到(2,1)，rotate @ translate得到(0,3)。",
-          "text": "右边变换先作用；不是把@两边换个位置而结果不变。",
-          "trace": "translate @ rotate得到(2,1)，rotate @ translate得到(0,3)。"
+          "pattern": "S03：两个@顺序变了，具体在哪一步改变了位置",
+          "text": "这个案例分别构造旋转矩阵rotate和纯平移矩阵translate。correct=translate@rotate表示在列向量约定下先旋转、后平移；swapped=rotate@translate表示先平移、后旋转。随后分别对同一个point=[1,0]调用transform_point。两个变量名只是在帮助阅读，真正决定意义的是左右矩阵的运算顺序。",
+          "trace": "请按中间步骤核对：正确顺序(1,0)先到(0,1)，再加(2,0)得到(2,1)。交换后先从(1,0)移到(3,0)，再绕世界原点转90°，得到(0,3)。composition_gap_m用np.linalg.norm求这两个最终位置的距离。若某天结果反过来，应先检查乘法约定与代码顺序，而不是调换坐标轴文字把图伪装正确。"
         },
         {
           "title": "10 · S04错误角度与S06非有限值",
           "file": "scenarios.py",
           "start": "    if scenario == 5:",
           "end": "    if scenario == 0:",
-          "pattern": "对NaN直接拒绝；对误用90弧度仅产生诊断，不作为有效坐标。",
-          "text": "status=-2和-3、valid=0时不能显示为有效位置。",
-          "trace": "对NaN直接拒绝；对误用90弧度仅产生诊断，不作为有效坐标。"
+          "pattern": "S04和S06：错误案例返回什么、为什么不能继续绘图",
+          "text": "S04故意把90直接交给math.cos和math.sin。这两个函数按90弧度理解数字，而不是90°，因此得到约(-0.448,0.894)，与参考[0,1]明显不同。场景函数把错误值放入wrong_point仅供比较，使用error_kind='degree_as_radian'注明原因，并返回status=-3、valid=0。没有合法world_point字段，main看到valid=0便不调用绘图。",
+          "trace": "S06则用float('nan')模拟无效角度，调用rigid_transform_deg时被_finite_number拒绝。try/except捕获此处预期的ValueError，返回error_kind='nonfinite_angle'、status=-2、valid=0；如果本应拒绝却没有拒绝，就主动抛AssertionError提醒开发者检查。两类故障要分清：一个数字合法但单位错，另一个角度值本身非法；任何一种都不应被显示成有效世界坐标。"
         },
         {
           "title": "11 · S05数值闭环/S07批量点",
           "file": "scenarios.py",
           "start": "    if scenario == 4:",
-          "end": "    # S07 一个坐标系",
-          "pattern": "验证正逆变换误差<1e-9，五个地标点按shape=(5,2)批量转换。",
-          "text": "记住点w=1，方向向量w=0。",
-          "trace": "验证正逆变换误差<1e-9，五个地标点按shape=(5,2)批量转换。"
+          "end": "    # S07用相同的变换一次计算五个点，不必手写五次transform_point。",
+          "pattern": "S05验证逆向，S07一次转换五个地标",
+          "text": "S05构造30°旋转、(10,5)平移和点(3,-2)。world=transform_point(transform,point)是正向计算；restored=transform_point(inverse_rigid(transform),world)是逆向计算。结果字典分别存world_point与restored_point，roundtrip_error_m提供能否回到原点的数值证据。你应先手算世界点约(13.5981,4.7679)，再看恢复点为什么接近(3,-2)。",
+          "trace": "S07把五个车体系点放在LANDMARKS_V矩阵中，调用transform_points一次得到五个世界点，shape=(5,2)。随后另外调用transform_direction处理车头朝向的单位向量。请注意场景中的points_shape和world_points都是基于计算结果返回的，不是网页硬填的一行状态文字；图像与表格都必须与这一组世界坐标一致。"
         },
         {
           "title": "12 · 中文坐标图与等比例坐标轴",
           "file": "plot_frames.py",
           "start": "def save_frame_plot",
           "end": "    fig.savefig",
-          "pattern": "世界系x/y、车体系旋转轴、原点和地标均在一张图中标明。",
-          "text": "ax.axis('equal')避免水平/垂直尺寸不等造成视觉误导。",
-          "trace": "世界系x/y、车体系旋转轴、原点和地标均在一张图中标明。"
+          "pattern": "从世界和车体两套坐标轴理解Matplotlib绘图语句",
+          "text": "save_frame_plot先调用rigid_transform_deg计算车辆在世界里的T，再用transform_points得到地标的世界坐标。origin_vehicle_world=transform[:2,2]取得车体原点的世界位置，rotation=transform[:2,:2]取得旋转方向。ax.quiver用一条带箭头的线绘出世界坐标轴和车体坐标轴，ax.scatter根据地标世界坐标画点，ax.annotate在各个点旁写编号。",
+          "trace": "ax.set_xlabel与set_ylabel明确写世界x/y轴的单位是米。ax.axis('equal')要求x和y轴的1米在图上具有相同长度，避免直角看起来歪斜。fig.savefig真正把图片保存到磁盘，plt.close释放绘图对象。浏览器会显示SVG演算图，但不执行这里的Matplotlib，因此本地一定要打开生成的PNG检查坐标、方向、标题和中文字体。"
         },
         {
           "title": "13 · 独立单元测试",
           "file": "test_geometry.py",
           "start": "class TestGeometry2D",
           "end": "if __name__ == \"__main__\":",
-          "pattern": "unittest对90°、变换顺序、逆变换、NaN、多点图像等逐条验证。",
-          "text": "必须在本地运行python -m unittest -v test_geometry才能算自己完成。",
-          "trace": "unittest对90°、变换顺序、逆变换、NaN、多点图像等逐条验证。"
+          "pattern": "真正的测试不是“运行没报错”：要把输出与独立期望比较",
+          "text": "test_geometry.py里的TestGeometry2D继承unittest.TestCase，相当于给一组真实Python测试提供运行入口。方法名以test_开头会被unittest识别，例如test_90deg_unit_point会调用rotation_deg(90)并用np.testing.assert_allclose检查与[0,1]是否在允许误差内。其他测试分别检查T的shape、矩阵顺序、点和方向的区别、逆变换、非有限输入、批量点及PNG文件确实生成。",
+          "trace": "这些断言的期望值来自你能手算的几何关系，而不是从被测试函数复制来的结果。这样当代码错把度当弧度，或者把A@R改成R@A，测试就有能力发现。执行python demo.py只运行示例；运行python -m unittest -v test_geometry才会独立执行测试集合。GitHub的自动化结果只是参考工程通过，不代表你的电脑已经完成这一步。"
         },
         {
           "title": "14 · 正常与错误场景从main返回",
           "file": "demo.py",
           "start": "    result = run_scenario",
           "end": "if __name__ == \"__main__\":",
-          "pattern": "main遇到错误状态返回2，成功才调用绘图和返回0。",
-          "text": "浏览器有独立状态/有效性展示，不能代替真正Python运行。",
-          "trace": "main遇到错误状态返回2，成功才调用绘图和返回0。"
+          "pattern": "从run_scenario返回main后，状态怎样决定是否画图",
+          "text": "demo.py的result=run_scenario(args.scenario)得到的是字典，main读取result['status']和result['valid']判断本次是否有可用坐标。字典里的方括号不是NumPy矩阵索引，而是按键提取数据：result['status']拿到状态码，result['error_kind']拿到错误类别。若valid为0，main打印诊断JSON并return 2；raise SystemExit(main())随后将这个整数作为脚本退出码。",
+          "trace": "如果valid为1，main输出计算结果与误差，然后根据场景中的角度和平移调用save_frame_plot保存坐标PNG，最后return 0。文件末尾if __name__ == '__main__'的意义是：直接运行demo.py才启动main，其他模块import它时不会自动执行所有场景。这样你可以按需要导入数学函数做测试，而不会每次导入就生成图。"
         }
       ],
       "experiments": [
@@ -9965,22 +10167,22 @@
         {
           "name": "demo.py",
           "group": "主入口",
-          "text": "\"\"\"D16可直接运行入口：场景→二维坐标运算→诊断→保存可视化。\n\n运行方式：\n    python demo.py --scenario 0 --out charts\n    python -m unittest -v test_geometry\n网页只用JS展示参考数值；本文件必须由本地Python实际执行。\n\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\n\nfrom plot_frames import save_frame_plot\nfrom scenarios import run_scenario\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description=\"D16 NumPy二维旋转和车体/世界坐标\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(7), default=0,\n                        help=\"0旋转，1平移，2顺序，3角度故障，4逆变换，5NaN，6多点\")\n    parser.add_argument(\"--out\", default=\"charts\", help=\"输出坐标PNG的目录\")\n    args = parser.parse_args()\n\n    result = run_scenario(args.scenario)  # scenarios.py调用geometry2d.py。\n    print(f\"scenario={args.scenario} status={result['status']} valid={result['valid']}\")\n    if not result[\"valid\"]:\n        print(f\"error_kind={result['error_kind']}\")\n        print(result[\"diagnostic\"])\n        # 故障场景仍返回完整诊断，但不提供可消费的世界坐标或PNG。\n        print(\"diagnostic_json=\" + json.dumps(result, ensure_ascii=False))\n        return 2\n\n    print(\"result_json=\" + json.dumps(result, ensure_ascii=False))\n    print(f\"roundtrip_error_m={result.get('roundtrip_error_m', 'n/a')}\")\n    if args.scenario in (0, 1, 2, 4, 6):\n        if args.scenario == 0:\n            angle, tx, ty = 90.0, 0.0, 0.0\n        elif args.scenario == 2:\n            angle, tx, ty = 90.0, 2.0, 0.0\n        elif args.scenario == 4:\n            angle, tx, ty = 30.0, 10.0, 5.0\n        else:\n            angle, tx, ty = 90.0, 10.0, 5.0\n        saved = save_frame_plot(angle, tx, ty, Path(args.out))\n        print(\"chart=\" + str(saved))\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n"
+          "text": "\"\"\"D16运行入口：按场景编号，调用数学模块，再决定是否保存坐标图。\n\n运行方式：\n    python demo.py --scenario 0 --out charts\n    python -m unittest -v test_geometry\n网页只用JS展示参考数值；本文件必须由本地Python实际执行。\n\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\n\nfrom plot_frames import save_frame_plot\nfrom scenarios import run_scenario\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description=\"D16 NumPy二维旋转和车体/世界坐标\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(7), default=0,\n                        help=\"0旋转，1平移，2顺序，3角度故障，4逆变换，5NaN，6多点\")\n    parser.add_argument(\"--out\", default=\"charts\", help=\"输出坐标PNG的目录\")\n    args = parser.parse_args()\n\n    # 这里才真正开始算坐标。main先等待run_scenario返回结果字典；\n    # 场景函数内部再调用geometry2d.py。import本身不会执行这些案例。\n    result = run_scenario(args.scenario)\n    print(f\"scenario={args.scenario} status={result['status']} valid={result['valid']}\")\n    if not result[\"valid\"]:\n        print(f\"error_kind={result['error_kind']}\")\n        print(result[\"diagnostic\"])\n        # status和valid要一起看。角度错误或NaN时不能拿诊断里的错误点绘图；\n        # 返回2是向命令行说明本次案例按正常坐标计算的路径未成功。\n        print(\"diagnostic_json=\" + json.dumps(result, ensure_ascii=False))\n        return 2\n\n    print(\"result_json=\" + json.dumps(result, ensure_ascii=False))\n    print(f\"roundtrip_error_m={result.get('roundtrip_error_m', 'n/a')}\")\n    # 只有成功的五个场景才会走到绘图模块。\n    # 这里的角度和位移与scenarios.py所用的教学数据一一对应。\n    if args.scenario in (0, 1, 2, 4, 6):\n        if args.scenario == 0:\n            angle, tx, ty = 90.0, 0.0, 0.0\n        elif args.scenario == 2:\n            angle, tx, ty = 90.0, 2.0, 0.0\n        elif args.scenario == 4:\n            angle, tx, ty = 30.0, 10.0, 5.0\n        else:\n            angle, tx, ty = 90.0, 10.0, 5.0\n        saved = save_frame_plot(angle, tx, ty, Path(args.out))\n        print(\"chart=\" + str(saved))\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n"
         },
         {
           "name": "geometry2d.py",
           "group": "数学函数",
-          "text": "\"\"\"D16：二维坐标、旋转和齐次变换的数学实现（NumPy，列向量约定）。\n\n约定：车体系 V 中的点 p_V（单位m）映射到世界系 W：\n    p_W = R_WV @ p_V + t_WV\n    pW_h = T_WV @ pV_h\n角度从世界系+x轴逆时针为正；输入角度用度数，函数内部显式转为弧度。\n不是实车定位、控制指令或ROS tf2实现。\n\"\"\"\nimport math\n\nimport numpy as np\n\n\ndef _finite_number(value: float, name: str) -> float:\n    \"\"\"把标量转成浮点数，拒绝字符串非法、NaN和无穷大。\"\"\"\n    try:\n        number = float(value)\n    except (TypeError, ValueError) as exc:\n        raise ValueError(f\"{name}必须是数字\") from exc\n    if not math.isfinite(number):\n        raise ValueError(f\"{name}必须是有限数\")\n    return number\n\n\ndef rotation_deg(angle_deg: float) -> np.ndarray:\n    \"\"\"逆时针二维旋转矩阵R，shape=(2,2)；角度单位度。\"\"\"\n    angle = _finite_number(angle_deg, \"angle_deg\")\n    radians = np.deg2rad(angle)  # np.cos/sin要求弧度，这一步不能省。\n    c = float(np.cos(radians))\n    s = float(np.sin(radians))\n    # 每行的两个数是矩阵的两列元素，不是两个点。\n    return np.array([[c, -s], [s, c]], dtype=np.float64)\n\n\ndef rigid_transform_deg(angle_deg: float, tx_m: float, ty_m: float) -> np.ndarray:\n    \"\"\"T_WV：把车体系点转到世界系；平移单位米。\"\"\"\n    tx = _finite_number(tx_m, \"tx_m\")\n    ty = _finite_number(ty_m, \"ty_m\")\n    rotation = rotation_deg(angle_deg)\n    transform = np.eye(3, dtype=np.float64)  # 初始单位矩阵3×3。\n    transform[:2, :2] = rotation             # 左上角2×2放R。\n    transform[:2, 2] = [tx, ty]             # 最后一列上两项放平移。\n    return transform\n\n\ndef _checked_transform(transform: np.ndarray) -> np.ndarray:\n    \"\"\"明确检查3×3齐次刚体变换，避免形状和非有限数被继续使用。\"\"\"\n    matrix = np.asarray(transform, dtype=np.float64)\n    if matrix.shape != (3, 3) or not np.isfinite(matrix).all():\n        raise ValueError(\"变换矩阵必须是3×3有限数矩阵\")\n    if not np.allclose(matrix[2], [0.0, 0.0, 1.0], rtol=0, atol=1e-12):\n        raise ValueError(\"齐次矩阵最后一行必须是[0,0,1]\")\n    rotation = matrix[:2, :2]\n    if not np.allclose(rotation.T @ rotation, np.eye(2), rtol=0, atol=1e-9):\n        raise ValueError(\"左上角2×2矩阵不是正交旋转矩阵\")\n    if not np.isclose(np.linalg.det(rotation), 1.0, rtol=0, atol=1e-9):\n        raise ValueError(\"旋转矩阵行列式必须为+1\")\n    return matrix\n\n\ndef _point2(point: np.ndarray) -> np.ndarray:\n    vector = np.asarray(point, dtype=np.float64)\n    if vector.shape != (2,) or not np.isfinite(vector).all():\n        raise ValueError(\"二维点必须含两个有限数[x_m,y_m]\")\n    return vector\n\n\ndef transform_point(transform: np.ndarray, point_vehicle_m: np.ndarray) -> np.ndarray:\n    \"\"\"把单个车体系点转换到世界系，返回shape=(2,)的坐标。\"\"\"\n    matrix = _checked_transform(transform)\n    p = _point2(point_vehicle_m)\n    p_h = np.array([p[0], p[1], 1.0], dtype=np.float64)\n    result_h = matrix @ p_h   # @为矩阵乘法；不是NumPy逐元素*。\n    return result_h[:2]       # 去掉齐次最后的1，仅保留x、y米。\n\n\ndef transform_direction(transform: np.ndarray, direction_vehicle: np.ndarray) -> np.ndarray:\n    \"\"\"向量（不是点）齐次分量w=0，因此不受平移影响。\"\"\"\n    matrix = _checked_transform(transform)\n    v = _point2(direction_vehicle)\n    v_h = np.array([v[0], v[1], 0.0], dtype=np.float64)\n    return (matrix @ v_h)[:2]\n\n\ndef transform_points(transform: np.ndarray, points_vehicle_m: np.ndarray) -> np.ndarray:\n    \"\"\"同时变换N个点：输入(N,2)，输出(N,2)；不用逐行手写for。\"\"\"\n    matrix = _checked_transform(transform)\n    points = np.asarray(points_vehicle_m, dtype=np.float64)\n    if points.ndim != 2 or points.shape[1] != 2 or not np.isfinite(points).all():\n        raise ValueError(\"批量点数组必须是(N,2)有限数矩阵\")\n    ones = np.ones((points.shape[0], 1), dtype=np.float64)\n    points_h = np.concatenate((points, ones), axis=1)  # 每点拼上w=1。\n    transformed_h = (matrix @ points_h.T).T            # 每列是一个点。\n    return transformed_h[:, :2]\n\n\ndef inverse_rigid(transform: np.ndarray) -> np.ndarray:\n    \"\"\"解析构造逆变换T_VW：R转置，平移为-R.T@t。\"\"\"\n    matrix = _checked_transform(transform)\n    r = matrix[:2, :2]\n    t = matrix[:2, 2]\n    inverse = np.eye(3, dtype=np.float64)\n    inverse[:2, :2] = r.T\n    inverse[:2, 2] = -(r.T @ t)\n    return inverse\n\n\ndef roundtrip_error_m(transform: np.ndarray, point: np.ndarray) -> float:\n    \"\"\"p_V→p_W→p_V，返回欧氏误差（米）；理论上零，数值允许浮点尾差。\"\"\"\n    original = _point2(point)\n    forward = transform_point(transform, original)\n    recovered = transform_point(inverse_rigid(transform), forward)\n    return float(np.linalg.norm(recovered - original))\n"
+          "text": "\"\"\"D16：二维坐标、旋转和齐次变换的数学实现（NumPy，列向量约定）。\n\n约定：车体系 V 中的点 p_V（单位m）映射到世界系 W：\n    p_W = R_WV @ p_V + t_WV\n    pW_h = T_WV @ pV_h\n角度从世界系+x轴逆时针为正；输入角度用度数，函数内部显式转为弧度。\n不是实车定位、控制指令或ROS tf2实现。\n\"\"\"\nimport math\n\nimport numpy as np\n\n\ndef _finite_number(value: float, name: str) -> float:\n    \"\"\"把调用者传进来的角度或位移变成有限浮点数。\n\n    先用float转换，再检查是否为NaN或无穷大。这样错误会在\n    构造矩阵之前被发现，避免把无效坐标继续传给后面的计算。\n    \"\"\"\n    try:\n        number = float(value)\n    except (TypeError, ValueError) as exc:\n        raise ValueError(f\"{name}必须是数字\") from exc\n    if not math.isfinite(number):\n        raise ValueError(f\"{name}必须是有限数\")\n    return number\n\n\ndef rotation_deg(angle_deg: float) -> np.ndarray:\n    \"\"\"输入角度（度），返回把车体系方向表示到世界系的2×2矩阵。\n\n    约定：正角逆时针，两维点用列向量。比如角度为90°时，\n    R @ [1,0] 应接近 [0,1]，也就是车前方转到了世界的上方。\n    \"\"\"\n    angle = _finite_number(angle_deg, \"angle_deg\")\n    # 日常说的90°不是三角函数要用的数字。先换成π/2弧度，\n    # 再让cos、sin求出箭头在世界x、y轴上的两个投影。\n    radians = np.deg2rad(angle)\n    c = float(np.cos(radians))\n    s = float(np.sin(radians))\n    # 第一列(c,s)：车体x单位箭头旋转后的世界方向；\n    # 第二列(-s,c)：车体y单位箭头旋转后的世界方向。\n    # 例如90°时，两列分别是(0,1)和(-1,0)。\n    return np.array([[c, -s], [s, c]], dtype=np.float64)\n\n\ndef rigid_transform_deg(angle_deg: float, tx_m: float, ty_m: float) -> np.ndarray:\n    \"\"\"把车辆的朝向和位置放到同一张3×3变换矩阵里。\n\n    angle_deg是车头相对世界x轴的角度（度）。tx_m、ty_m\n    是车体原点在世界系里的坐标，单位都是米。\n    例如90°、(10,5)会把车前方(1,0)转换成世界(10,6)。\n    \"\"\"\n    tx = _finite_number(tx_m, \"tx_m\")\n    ty = _finite_number(ty_m, \"ty_m\")\n    rotation = rotation_deg(angle_deg)\n    # 先准备3×3单位矩阵：对角线是1，其余位置是0。\n    # [:2,:2]代表第0、1行与第0、1列交叉的四个格子。\n    # [:2,2]代表第2列中的第0、1行，正好放车的世界位置。\n    transform = np.eye(3, dtype=np.float64)\n    transform[:2, :2] = rotation\n    transform[:2, 2] = [tx, ty]\n    return transform\n\n\ndef _checked_transform(transform: np.ndarray) -> np.ndarray:\n    \"\"\"检查这是否真的是可用于二维刚体坐标转换的3×3矩阵。\n\n    除了形状和NaN，还要求最后一行是[0,0,1]；\n    旋转部分不能拉伸或翻转坐标，否则R.T就不再是这里假设的逆旋转。\n    \"\"\"\n    matrix = np.asarray(transform, dtype=np.float64)\n    if matrix.shape != (3, 3) or not np.isfinite(matrix).all():\n        raise ValueError(\"变换矩阵必须是3×3有限数矩阵\")\n    # matrix[2]取第2行，也就是齐次变换最下面那三个格子。\n    if not np.allclose(matrix[2], [0.0, 0.0, 1.0], rtol=0, atol=1e-12):\n        raise ValueError(\"齐次矩阵最后一行必须是[0,0,1]\")\n    rotation = matrix[:2, :2]\n    # 正交旋转需要R.T@R≈I；这保证旋转后长度和直角关系不变。\n    if not np.allclose(rotation.T @ rotation, np.eye(2), rtol=0, atol=1e-9):\n        raise ValueError(\"左上角2×2矩阵不是正交旋转矩阵\")\n    if not np.isclose(np.linalg.det(rotation), 1.0, rtol=0, atol=1e-9):\n        raise ValueError(\"旋转矩阵行列式必须为+1\")\n    return matrix\n\n\ndef _point2(point: np.ndarray) -> np.ndarray:\n    vector = np.asarray(point, dtype=np.float64)\n    if vector.shape != (2,) or not np.isfinite(vector).all():\n        raise ValueError(\"二维点必须含两个有限数[x_m,y_m]\")\n    return vector\n\n\ndef transform_point(transform: np.ndarray, point_vehicle_m: np.ndarray) -> np.ndarray:\n    \"\"\"将车体系中的(x,y)点转成世界系的(x,y)，单位米。\n\n    先确认T和点合法，再把二维点补成(x,y,1)。最后那个1\n    会使T的平移列参与计算；返回时去掉辅助的第三项。\n    \"\"\"\n    matrix = _checked_transform(transform)\n    p = _point2(point_vehicle_m)\n    # p[0]、p[1]分别取车体x、y。最后补的1不是高度1米，\n    # 是为了让旋转和平移能用同一次矩阵乘法完成。\n    p_h = np.array([p[0], p[1], 1.0], dtype=np.float64)\n    result_h = matrix @ p_h  # @做矩阵乘法；不能改成逐元素乘法*。\n    return result_h[:2]      # [:2]只取最前面两个坐标分量。\n\n\ndef transform_direction(transform: np.ndarray, direction_vehicle: np.ndarray) -> np.ndarray:\n    \"\"\"转换一根箭头的方向，不改变它的长度，也不加车辆位置。\n\n    箭头只说明“朝哪儿”，不说明“在哪里”。所以末项写0，\n    与具体位置点(x,y,1)不同；平移列乘0后不会参与计算。\n    \"\"\"\n    matrix = _checked_transform(transform)\n    v = _point2(direction_vehicle)\n    v_h = np.array([v[0], v[1], 0.0], dtype=np.float64)\n    return (matrix @ v_h)[:2]\n\n\ndef transform_points(transform: np.ndarray, points_vehicle_m: np.ndarray) -> np.ndarray:\n    \"\"\"把N个车体系点一次换算成世界系坐标。\n\n    输入是N行2列，每行[x,y]。先补一列1，得到N行3列；\n    转置成3行N列后就可以左乘3×3的T，最后再转置回来。\n    这只是在一次运算里处理所有点，并不会改变坐标变换的数学定义。\n    \"\"\"\n    matrix = _checked_transform(transform)\n    points = np.asarray(points_vehicle_m, dtype=np.float64)\n    if points.ndim != 2 or points.shape[1] != 2 or not np.isfinite(points).all():\n        raise ValueError(\"批量点数组必须是(N,2)有限数矩阵\")\n    # points.shape[0]是点的行数N，np.ones((N,1))会生成N个1。\n    ones = np.ones((points.shape[0], 1), dtype=np.float64)\n    # axis=1指按列拼接：从(N,2)变成(N,3)。\n    points_h = np.concatenate((points, ones), axis=1)\n    # .T把(N,3)换成(3,N)，这样T(3,3)就能乘每一列的点。\n    transformed_h = (matrix @ points_h.T).T\n    return transformed_h[:, :2]  # 全部N行，只保留x和y两列。\n\n\ndef inverse_rigid(transform: np.ndarray) -> np.ndarray:\n    \"\"\"得到从世界系回到车体系的变换矩阵。\n\n    正向是先旋转R再平移t；反过来必须先减t再逆旋转。\n    对纯旋转矩阵，R的逆就是转置R.T，故逆平移应写-R.T@t。\n    \"\"\"\n    matrix = _checked_transform(transform)\n    r = matrix[:2, :2]\n    t = matrix[:2, 2]\n    inverse = np.eye(3, dtype=np.float64)\n    inverse[:2, :2] = r.T\n    # 先把世界位置t换到车体的方向，再取负值。\n    # 只写-t通常是错的，因为还没有撤销原来的旋转。\n    inverse[:2, 2] = -(r.T @ t)\n    return inverse\n\n\ndef roundtrip_error_m(transform: np.ndarray, point: np.ndarray) -> float:\n    \"\"\"先变到世界系，再变回车体系，检查恢复得有多准确。\n\n    对照的是恢复后的两个坐标与原点的距离，单位米。\n    理想情况下为0；浮点运算允许非常小的尾差，本课要求<1e-9m。\n    \"\"\"\n    original = _point2(point)\n    forward = transform_point(transform, original)\n    recovered = transform_point(inverse_rigid(transform), forward)\n    return float(np.linalg.norm(recovered - original))\n"
         },
         {
           "name": "scenarios.py",
           "group": "案例与数据",
-          "text": "\"\"\"D16的7个离线教学场景：输出字段与网页JS模拟逐项对账。\"\"\"\nimport math\n\nimport numpy as np\n\nfrom geometry2d import (inverse_rigid, rigid_transform_deg, rotation_deg,\n                        roundtrip_error_m, transform_direction,\n                        transform_point, transform_points)\n\nLANDMARKS_V = np.array([\n    [0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [2.0, -1.0], [-1.0, 2.0]\n], dtype=float)\n\n\ndef run_scenario(scenario: int) -> dict:\n    \"\"\"返回含status/valid的结果，错误示例不提供合法world_point。\"\"\"\n    if not isinstance(scenario, int) or scenario not in range(7):\n        raise ValueError(\"场景必须是0到6的整数\")\n\n    if scenario == 5:\n        # S06显式拒绝角度NaN。不构造可消费的变换矩阵。\n        try:\n            rigid_transform_deg(float(\"nan\"), 10.0, 5.0)\n        except ValueError as exc:\n            return {\"scenario\": scenario, \"status\": -2, \"valid\": 0,\n                    \"error_kind\": \"nonfinite_angle\", \"diagnostic\": str(exc)}\n        raise AssertionError(\"NaN必须被拒绝\")\n\n    if scenario == 3:\n        # S04 故意漏掉deg2rad，构造错误结果仅用于诊断。\n        wrong_angle = 90.0  # 错将90度传给需要弧度的sin/cos。\n        wrong = np.array([math.cos(wrong_angle), math.sin(wrong_angle)])\n        expected = rotation_deg(90.0) @ np.array([1.0, 0.0])\n        error_m = float(np.linalg.norm(wrong - expected))\n        return {\"scenario\": scenario, \"status\": -3, \"valid\": 0,\n                \"error_kind\": \"degree_as_radian\", \"wrong_point\": wrong.tolist(),\n                \"reference_point\": expected.tolist(), \"error_m\": error_m,\n                \"diagnostic\": \"错误示范：math.cos(90)按90弧度计算；应先转换90度→π/2弧度\"}\n\n    if scenario == 0:\n        transform = rigid_transform_deg(90.0, 0.0, 0.0)\n        point = np.array([1.0, 0.0])\n        world = transform_point(transform, point)\n        return {\"scenario\": scenario, \"status\": 0, \"valid\": 1, \"angle_deg\": 90,\n                \"rotation_shape\": list(rotation_deg(90.0).shape),\n                \"transform_shape\": list(transform.shape),\n                \"vehicle_point\": point.tolist(), \"world_point\": world.tolist(),\n                \"roundtrip_error_m\": roundtrip_error_m(transform, point),\n                \"chart_count\": 1}\n\n    if scenario == 1:\n        transform = rigid_transform_deg(90.0, 10.0, 5.0)\n        point = np.array([1.0, 0.0])\n        return {\"scenario\": scenario, \"status\": 0, \"valid\": 1,\n                \"angle_deg\": 90, \"translation_m\": [10.0, 5.0],\n                \"vehicle_point\": point.tolist(),\n                \"world_point\": transform_point(transform, point).tolist(),\n                \"transform_shape\": list(transform.shape),\n                \"roundtrip_error_m\": roundtrip_error_m(transform, point),\n                \"chart_count\": 1}\n\n    if scenario == 2:\n        # 列向量约定：T=Translation@Rotation表示先旋转，再平移。\n        rotate = rigid_transform_deg(90.0, 0.0, 0.0)\n        translate = rigid_transform_deg(0.0, 2.0, 0.0)\n        point = np.array([1.0, 0.0])\n        correct = translate @ rotate\n        swapped = rotate @ translate\n        return {\"scenario\": scenario, \"status\": 0, \"valid\": 1,\n                \"vehicle_point\": point.tolist(),\n                \"world_point\": transform_point(correct, point).tolist(),\n                \"swapped_point\": transform_point(swapped, point).tolist(),\n                \"composition_gap_m\": float(np.linalg.norm(\n                    transform_point(correct, point) -\n                    transform_point(swapped, point))),\n                \"roundtrip_error_m\": roundtrip_error_m(correct, point),\n                \"chart_count\": 1}\n\n    if scenario == 4:\n        transform = rigid_transform_deg(30.0, 10.0, 5.0)\n        point = np.array([3.0, -2.0])\n        world = transform_point(transform, point)\n        restored = transform_point(inverse_rigid(transform), world)\n        return {\"scenario\": scenario, \"status\": 0, \"valid\": 1, \"angle_deg\": 30,\n                \"translation_m\": [10.0, 5.0],\n                \"vehicle_point\": point.tolist(), \"world_point\": world.tolist(),\n                \"restored_point\": restored.tolist(),\n                \"roundtrip_error_m\": roundtrip_error_m(transform, point),\n                \"chart_count\": 1}\n\n    # S07 一个坐标系转换多组地标点，显示向量(齐次w=0)和点(w=1)差异。\n    transform = rigid_transform_deg(90.0, 10.0, 5.0)\n    points_world = transform_points(transform, LANDMARKS_V)\n    x_axis_world = transform_direction(transform, [1.0, 0.0])\n    return {\"scenario\": scenario, \"status\": 0, \"valid\": 1,\n            \"angle_deg\": 90, \"translation_m\": [10.0, 5.0],\n            \"points_shape\": list(points_world.shape),\n            \"vehicle_points\": LANDMARKS_V.tolist(),\n            \"world_points\": points_world.tolist(),\n            \"vehicle_x_axis_world\": x_axis_world.tolist(),\n            \"chart_count\": 1}\n"
+          "text": "\"\"\"D16七组固定的数学练习：每个案例只改变一个想研究的问题。\n\n先验证最基础的旋转、平移，接着比较顺序和逆变换，再故意输入\n错误角度或NaN。返回status和valid，是为了把可用坐标与错误诊断区分开。\n网页会用JavaScript按同一数学约定演算，但不执行这里的Python。\n\"\"\"\nimport math\n\nimport numpy as np\n\nfrom geometry2d import (inverse_rigid, rigid_transform_deg, rotation_deg,\n                        roundtrip_error_m, transform_direction,\n                        transform_point, transform_points)\n\nLANDMARKS_V = np.array([\n    [0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [2.0, -1.0], [-1.0, 2.0]\n], dtype=float)\n\n\ndef run_scenario(scenario: int) -> dict:\n    \"\"\"按照案例编号计算结果，再把状态和坐标装进字典交回demo.py。\n\n    成功时status=0、valid=1；错误示例不返回可消费的world_point。\n    这样main不需要猜测哪个数字是有效世界坐标。\n    \"\"\"\n    if not isinstance(scenario, int) or scenario not in range(7):\n        raise ValueError(\"场景必须是0到6的整数\")\n\n    if scenario == 5:\n        # S06：NaN不是有效角度。应在构造矩阵前拒绝，\n        # 而不是把一串NaN当作已定位的目标交给后续绘图。\n        try:\n            rigid_transform_deg(float(\"nan\"), 10.0, 5.0)\n        except ValueError as exc:\n            return {\"scenario\": scenario, \"status\": -2, \"valid\": 0,\n                    \"error_kind\": \"nonfinite_angle\", \"diagnostic\": str(exc)}\n        raise AssertionError(\"NaN必须被拒绝\")\n\n    if scenario == 3:\n        # S04故意省去“度→弧度”的转换：代码虽然能算，方向却是错的。\n        # 错误点只在诊断字段里展示，不会冒充有效世界坐标。\n        wrong_angle = 90.0  # 错将90度传给需要弧度的sin/cos。\n        wrong = np.array([math.cos(wrong_angle), math.sin(wrong_angle)])\n        expected = rotation_deg(90.0) @ np.array([1.0, 0.0])\n        error_m = float(np.linalg.norm(wrong - expected))\n        return {\"scenario\": scenario, \"status\": -3, \"valid\": 0,\n                \"error_kind\": \"degree_as_radian\", \"wrong_point\": wrong.tolist(),\n                \"reference_point\": expected.tolist(), \"error_m\": error_m,\n                \"diagnostic\": \"错误示范：math.cos(90)按90弧度计算；应先转换90度→π/2弧度\"}\n\n    if scenario == 0:\n        transform = rigid_transform_deg(90.0, 0.0, 0.0)\n        point = np.array([1.0, 0.0])\n        world = transform_point(transform, point)\n        return {\"scenario\": scenario, \"status\": 0, \"valid\": 1, \"angle_deg\": 90,\n                \"rotation_shape\": list(rotation_deg(90.0).shape),\n                \"transform_shape\": list(transform.shape),\n                \"vehicle_point\": point.tolist(), \"world_point\": world.tolist(),\n                \"roundtrip_error_m\": roundtrip_error_m(transform, point),\n                \"chart_count\": 1}\n\n    if scenario == 1:\n        transform = rigid_transform_deg(90.0, 10.0, 5.0)\n        point = np.array([1.0, 0.0])\n        return {\"scenario\": scenario, \"status\": 0, \"valid\": 1,\n                \"angle_deg\": 90, \"translation_m\": [10.0, 5.0],\n                \"vehicle_point\": point.tolist(),\n                \"world_point\": transform_point(transform, point).tolist(),\n                \"transform_shape\": list(transform.shape),\n                \"roundtrip_error_m\": roundtrip_error_m(transform, point),\n                \"chart_count\": 1}\n\n    if scenario == 2:\n        # S03：列向量从右往左乘。translate@rotate表示先旋转再平移；\n        # 交换顺序后，就变成先平移再围绕世界原点旋转，结果不同。\n        rotate = rigid_transform_deg(90.0, 0.0, 0.0)\n        translate = rigid_transform_deg(0.0, 2.0, 0.0)\n        point = np.array([1.0, 0.0])\n        correct = translate @ rotate\n        swapped = rotate @ translate\n        return {\"scenario\": scenario, \"status\": 0, \"valid\": 1,\n                \"vehicle_point\": point.tolist(),\n                \"world_point\": transform_point(correct, point).tolist(),\n                \"swapped_point\": transform_point(swapped, point).tolist(),\n                \"composition_gap_m\": float(np.linalg.norm(\n                    transform_point(correct, point) -\n                    transform_point(swapped, point))),\n                \"roundtrip_error_m\": roundtrip_error_m(correct, point),\n                \"chart_count\": 1}\n\n    if scenario == 4:\n        transform = rigid_transform_deg(30.0, 10.0, 5.0)\n        point = np.array([3.0, -2.0])\n        world = transform_point(transform, point)\n        restored = transform_point(inverse_rigid(transform), world)\n        return {\"scenario\": scenario, \"status\": 0, \"valid\": 1, \"angle_deg\": 30,\n                \"translation_m\": [10.0, 5.0],\n                \"vehicle_point\": point.tolist(), \"world_point\": world.tolist(),\n                \"restored_point\": restored.tolist(),\n                \"roundtrip_error_m\": roundtrip_error_m(transform, point),\n                \"chart_count\": 1}\n\n    # S07用相同的变换一次计算五个点，不必手写五次transform_point。\n    # 除点之外，再单独转换车头方向(1,0)；方向末项是0，不加平移。\n    transform = rigid_transform_deg(90.0, 10.0, 5.0)\n    points_world = transform_points(transform, LANDMARKS_V)\n    x_axis_world = transform_direction(transform, [1.0, 0.0])\n    return {\"scenario\": scenario, \"status\": 0, \"valid\": 1,\n            \"angle_deg\": 90, \"translation_m\": [10.0, 5.0],\n            \"points_shape\": list(points_world.shape),\n            \"vehicle_points\": LANDMARKS_V.tolist(),\n            \"world_points\": points_world.tolist(),\n            \"vehicle_x_axis_world\": x_axis_world.tolist(),\n            \"chart_count\": 1}\n"
         },
         {
           "name": "plot_frames.py",
           "group": "绘图",
-          "text": "\"\"\"D16绘图：以世界系x/y展示车辆坐标轴方向及离线地标点。\"\"\"\nfrom pathlib import Path\n\nimport matplotlib\nmatplotlib.use(\"Agg\")  # CI/WSL无GUI环境可保存PNG。\nimport matplotlib.pyplot as plt\nfrom matplotlib import font_manager\nimport numpy as np\n\nfrom geometry2d import rigid_transform_deg, transform_points\nfrom scenarios import LANDMARKS_V\n\n\ndef _font():\n    \"\"\"按存在的CJK字体设定中文；缺字体时提醒使用README安装Noto字体。\"\"\"\n    installed = {f.name for f in font_manager.fontManager.ttflist}\n    for name in (\"Noto Sans CJK SC\", \"Microsoft YaHei\", \"SimHei\", \"PingFang SC\",\n                 \"WenQuanYi Micro Hei\"):\n        if name in installed:\n            plt.rcParams[\"font.sans-serif\"] = [name, \"DejaVu Sans\"]\n            plt.rcParams[\"axes.unicode_minus\"] = False\n            return name\n    print(\"提示：未检测到中文字体，图形可保存但中文可能缺字；见README安装Noto Sans CJK。\")\n    return None\n\n\ndef save_frame_plot(angle_deg: float, tx_m: float, ty_m: float,\n                    output_dir: str | Path) -> Path:\n    \"\"\"独立保存一张世界/车体坐标及地标图；所有坐标单位为米。\"\"\"\n    _font()\n    transform = rigid_transform_deg(angle_deg, tx_m, ty_m)\n    points_world = transform_points(transform, LANDMARKS_V)\n    origin_vehicle_world = transform[:2, 2]\n    rotation = transform[:2, :2]\n\n    fig, ax = plt.subplots(figsize=(8.3, 7.0), dpi=140)\n    ax.axhline(0.0, color=\"0.8\", linewidth=0.9)\n    ax.axvline(0.0, color=\"0.8\", linewidth=0.9)\n    ax.quiver(0, 0, 1, 0, angles=\"xy\", scale_units=\"xy\", scale=1,\n              color=\"#42638c\", width=0.006)\n    ax.quiver(0, 0, 0, 1, angles=\"xy\", scale_units=\"xy\", scale=1,\n              color=\"#42638c\", width=0.006)\n    ax.annotate(\"世界系 x_W\", (1.08, 0.03), fontsize=10, color=\"#42638c\")\n    ax.annotate(\"世界系 y_W\", (0.05, 1.06), fontsize=10, color=\"#42638c\")\n    x_axis = rotation @ np.array([1.0, 0.0])\n    y_axis = rotation @ np.array([0.0, 1.0])\n    ax.quiver(*origin_vehicle_world, *x_axis, angles=\"xy\", scale_units=\"xy\",\n              scale=1, color=\"#d07a32\", width=0.007)\n    ax.quiver(*origin_vehicle_world, *y_axis, angles=\"xy\", scale_units=\"xy\",\n              scale=1, color=\"#32877a\", width=0.007)\n    ax.annotate(\"车体 x_V\", origin_vehicle_world + x_axis*1.12, fontsize=11,\n                color=\"#d07a32\")\n    ax.annotate(\"车体 y_V\", origin_vehicle_world + y_axis*1.12, fontsize=11,\n                color=\"#32877a\")\n    ax.scatter(points_world[:, 0], points_world[:, 1],\n               marker=\"o\", s=43, color=\"#893f74\", label=\"地标点（世界坐标）\")\n    for i, point in enumerate(points_world):\n        ax.annotate(f\"P{i}\", (point[0]+0.12, point[1]+0.12), fontsize=9)\n    ax.scatter([origin_vehicle_world[0]], [origin_vehicle_world[1]],\n               marker=\"s\", s=55, color=\"#c46324\", label=\"车体原点 O_V\")\n    ax.scatter([0.0], [0.0], marker=\"+\", s=65, color=\"#345878\", label=\"世界原点 O_W\")\n    ax.set_xlabel(\"世界坐标 x_W（m）\")\n    ax.set_ylabel(\"世界坐标 y_W（m）\")\n    ax.set_title(f\"二维车体—世界坐标变换 | 航向角 {angle_deg:g}°\")\n    ax.axis(\"equal\")  # 等比例坐标，不让90°在画面上看起来像斜角。\n    ax.grid(alpha=0.22)\n    ax.legend(loc=\"best\", fontsize=9)\n    fig.tight_layout()\n    path = Path(output_dir) / \"coordinate_frames.png\"\n    path.parent.mkdir(parents=True, exist_ok=True)\n    fig.savefig(path, dpi=220)\n    plt.close(fig)\n    return path\n"
+          "text": "\"\"\"画一张可核对计算结果的坐标图：世界轴、车体轴和五个地标。\n\n同样的数值既能在表里查看，也能在图上检查方向、距离和单位。\n画图采用离线教学点，不连接车辆或实时传感器。\n\"\"\"\nfrom pathlib import Path\n\nimport matplotlib\nmatplotlib.use(\"Agg\")  # 只需保存PNG，即使运行环境没有图形桌面也能生成文件。\nimport matplotlib.pyplot as plt\nfrom matplotlib import font_manager\nimport numpy as np\n\nfrom geometry2d import rigid_transform_deg, transform_points\nfrom scenarios import LANDMARKS_V\n\n\ndef _font():\n    \"\"\"从本机已安装字体里选择能显示中文的字体。\n\n    不同电脑安装的字体不同，所以依次尝试常见中文字体；\n    找不到时仍保存图，但需要按README补装字体才能正确显示中文。\n    \"\"\"\n    installed = {f.name for f in font_manager.fontManager.ttflist}\n    for name in (\"Noto Sans CJK SC\", \"Microsoft YaHei\", \"SimHei\", \"PingFang SC\",\n                 \"WenQuanYi Micro Hei\"):\n        if name in installed:\n            plt.rcParams[\"font.sans-serif\"] = [name, \"DejaVu Sans\"]\n            plt.rcParams[\"axes.unicode_minus\"] = False\n            return name\n    print(\"提示：未检测到中文字体，图形可保存但中文可能缺字；见README安装Noto Sans CJK。\")\n    return None\n\n\ndef save_frame_plot(angle_deg: float, tx_m: float, ty_m: float,\n                    output_dir: str | Path) -> Path:\n    \"\"\"用统一的世界x/y坐标画车辆朝向和五个地标点。\n\n    输入是车辆航向（度）和车体原点的位置（米）。\n    每个地标先转到世界坐标，再放到同一张图中观察。\n    \"\"\"\n    _font()\n    transform = rigid_transform_deg(angle_deg, tx_m, ty_m)\n    points_world = transform_points(transform, LANDMARKS_V)\n    # 第2列前两行就是车体原点的世界坐标；左上2×2则是旋转R。\n    origin_vehicle_world = transform[:2, 2]\n    rotation = transform[:2, :2]\n\n    fig, ax = plt.subplots(figsize=(8.3, 7.0), dpi=140)\n    ax.axhline(0.0, color=\"0.8\", linewidth=0.9)\n    ax.axvline(0.0, color=\"0.8\", linewidth=0.9)\n    ax.quiver(0, 0, 1, 0, angles=\"xy\", scale_units=\"xy\", scale=1,\n              color=\"#42638c\", width=0.006)\n    ax.quiver(0, 0, 0, 1, angles=\"xy\", scale_units=\"xy\", scale=1,\n              color=\"#42638c\", width=0.006)\n    ax.annotate(\"世界系 x_W\", (1.08, 0.03), fontsize=10, color=\"#42638c\")\n    ax.annotate(\"世界系 y_W\", (0.05, 1.06), fontsize=10, color=\"#42638c\")\n    # 先把车体两根单位坐标轴旋转到世界方向。\n    # 它们是方向，不应加上车体原点的位置；画箭头时才把起点放到车上。\n    x_axis = rotation @ np.array([1.0, 0.0])\n    y_axis = rotation @ np.array([0.0, 1.0])\n    ax.quiver(*origin_vehicle_world, *x_axis, angles=\"xy\", scale_units=\"xy\",\n              scale=1, color=\"#d07a32\", width=0.007)\n    ax.quiver(*origin_vehicle_world, *y_axis, angles=\"xy\", scale_units=\"xy\",\n              scale=1, color=\"#32877a\", width=0.007)\n    ax.annotate(\"车体 x_V\", origin_vehicle_world + x_axis*1.12, fontsize=11,\n                color=\"#d07a32\")\n    ax.annotate(\"车体 y_V\", origin_vehicle_world + y_axis*1.12, fontsize=11,\n                color=\"#32877a\")\n    ax.scatter(points_world[:, 0], points_world[:, 1],\n               marker=\"o\", s=43, color=\"#893f74\", label=\"地标点（世界坐标）\")\n    for i, point in enumerate(points_world):\n        ax.annotate(f\"P{i}\", (point[0]+0.12, point[1]+0.12), fontsize=9)\n    ax.scatter([origin_vehicle_world[0]], [origin_vehicle_world[1]],\n               marker=\"s\", s=55, color=\"#c46324\", label=\"车体原点 O_V\")\n    ax.scatter([0.0], [0.0], marker=\"+\", s=65, color=\"#345878\", label=\"世界原点 O_W\")\n    ax.set_xlabel(\"世界坐标 x_W（m）\")\n    ax.set_ylabel(\"世界坐标 y_W（m）\")\n    ax.set_title(f\"二维车体—世界坐标变换 | 航向角 {angle_deg:g}°\")\n    # x轴1米和y轴1米必须画得一样长，否则直角会被视觉拉歪。\n    ax.axis(\"equal\")\n    ax.grid(alpha=0.22)\n    ax.legend(loc=\"best\", fontsize=9)\n    fig.tight_layout()\n    path = Path(output_dir) / \"coordinate_frames.png\"\n    path.parent.mkdir(parents=True, exist_ok=True)\n    fig.savefig(path, dpi=220)\n    plt.close(fig)\n    return path\n"
         },
         {
           "name": "test_geometry.py",
@@ -9995,10 +10197,10 @@
         {
           "name": "README.md",
           "group": "实作说明",
-          "text": "# D16｜线性代数与二维车体/世界坐标变换（Python + NumPy）\n\n## 为什么学这一课\n\nD15已经能处理离线CSV和二维NumPy矩阵。D16用同样的数组知识解决：雷达目标在车体前方1米，车在世界系里朝什么方向？世界系坐标是多少？实现二维旋转、平移、齐次矩阵、变换顺序、逆变换和可视化。它是一套教学模型，不是实际的整车定位、惯导系统或ROS tf2实时数据。\n\n约定：世界系W和车体系V都采用右手二维平面（x向右、y向上），正角逆时针，从局部向世界列向量变换：\n\n```text\np_W = R_WV @ p_V + t_WV\npW_h = T_WV @ pV_h\nR_WV = [[cosθ,-sinθ],[sinθ,cosθ]]\nT_WV = [[cosθ,-sinθ,tx],\n        [sinθ, cosθ,ty],\n        [0,      0,  1]]\n```\n\n这是一套特定且明确的二维教学约定，不自动代表任何实车传感器的轴方向。输入角度用度数，在`rotation_deg()`内部转换成弧度。Python NumPy的`@`是矩阵乘法，`*`是逐元素乘法（形状匹配时）。\n\n## 文件职责和完整执行顺序\n\n```text\npython demo.py --scenario 1 --out charts\n  └─ demo.py: if __name__ == '__main__' → main()\n       └─ scenarios.run_scenario(1)\n            ├─ geometry2d.rigid_transform_deg(angle,tx,ty)\n            │    └─ rotation_deg → np.deg2rad → np.cos/np.sin\n            ├─ geometry2d.transform_point(T,p)\n            │    └─ 把二维点拼成(x,y,1)再算T @ p_h\n            └─ 返回含status/valid/world_point的dict给main\n       ├─ main输出解释、坐标和误差\n       └─ plot_frames.save_frame_plot(...) → coordinate_frames.png\n```\n\n`test_geometry.py`是独立unittest入口，不是直接执行demo时自动运行。\n\n## 本地真实Python验收（建议 Python 3.11+）\n\n在D16项目目录解压文件后：\n\n```bash\npython3 -m venv .venv\nsource .venv/bin/activate\npython -m pip install -r requirements.txt\npython demo.py --scenario 0 --out charts\npython demo.py --scenario 1 --out charts\npython demo.py --scenario 2 --out charts\npython demo.py --scenario 3 --out charts\npython demo.py --scenario 4 --out charts\npython demo.py --scenario 5 --out charts\npython demo.py --scenario 6 --out charts\npython -m unittest -v test_geometry\n```\n\nWindows PowerShell激活命令通常是`.venv\\Scripts\\Activate.ps1`。WSL缺中文字体时先安装`fonts-noto-cjk`，并重新打开Python终端；工程会在缺字体时打印提示。\n\n## 七组场景及判定\n\n| 案例 | 内容 | 预期 |\n|---|---|---|\n| S01 | R(90°)·(1,0) | world=(0,1)，浮点误差允许1e-12 |\n| S02 | 旋转90°，平移(10,5) | world=(10,6) |\n| S03 | T(2,0)@R(90°) vs R(90°)@T(2,0) | world=(2,1)，交换得(0,3) |\n| S04 | 故意将90度送给sin/cos当弧度 | status=-3、valid=0；有误差诊断，**不能作为有效坐标** |\n| S05 | 30°旋转、平移(10,5)、点(3,-2)逆变换 | 闭环误差<1e-9m |\n| S06 | NaN角度 | status=-2、valid=0；不生成有效世界点和PNG |\n| S07 | 5个地标批量变换 | shape=(5,2)，点分别(10,5),(10,6),(9,5),(11,7),(8,4) |\n\n注意：运行D16脚本和test_geometry是在学员电脑上完成，Pages只是JavaScript教学演算。GitHub CI成功表示参考代码通过自动化检查，不意味着学员已通过本地Python；D01–D14历史C本地真实验收依旧单独进行。\n\n## 故障注入 P1–P4\n\n1. 先运行S01，手算90度旋转得(0,1)，观察为什么x可能显示6.123e-17而不是精确0；使用`np.allclose`测试浮点近似。\n2. 暂时把`np.deg2rad(angle)`改成`angle`，观察测试从PASS变为FAIL，随后恢复。\n3. 把S03的`translate @ rotate`改为`rotate @ translate`，预测(2,1)如何变为(0,3)；恢复后重新测试。\n4. 运行S05确认误差<1e-9m；运行S06确认NaN被拒绝、`valid=0`，错误时没有PNG。\n\n源自官方权威资料的概念：Python math.radians、NumPy matmul/@与逐元素乘法区别。辅助阅读：\n- https://docs.python.org/3/library/math.html\n- https://numpy.org/doc/stable/reference/generated/numpy.matmul.html\n- https://numpy.org/doc/stable/user/quickstart.html\n- https://docs.ros.org/en/rolling/Concepts/Intermediate/About-Tf2.html\n"
+          "text": "# D16｜线性代数与二维车体/世界坐标变换（Python + NumPy）\n\n## 为什么学这一课\n\nD15已经能处理离线CSV和二维NumPy矩阵。D16用同样的数组知识解决：雷达目标在车体前方1米，车在世界系里朝什么方向？世界系坐标是多少？实现二维旋转、平移、齐次矩阵、变换顺序、逆变换和可视化。它是一套教学模型，不是实际的整车定位、惯导系统或ROS tf2实时数据。\n\n约定：世界系W的x轴在图上向右、y轴向上；车辆未旋转时，车体x轴指向车头前方、车体y轴指向车辆左侧。车辆旋转后，车体轴也跟着旋转，所以不能一直说“车体x向右、y向上”。采用二维列向量，正角逆时针；从车体坐标转换到世界坐标：\n\n```text\np_W = R_WV @ p_V + t_WV\npW_h = T_WV @ pV_h\nR_WV = [[cosθ,-sinθ],[sinθ,cosθ]]\nT_WV = [[cosθ,-sinθ,tx],\n        [sinθ, cosθ,ty],\n        [0,      0,  1]]\n```\n\n这是一套特定且明确的二维教学约定，不自动代表任何实车传感器的轴方向。输入角度用度数，在`rotation_deg()`内部转换成弧度。Python NumPy的`@`是矩阵乘法，`*`是逐元素乘法（形状匹配时）。\n\n## 先理解图和数学，再进入代码\n\n浏览器D16学习页现已按照“具体车辆问题→画坐标轴→单位圆→从两根单位箭头推导R→旋转后加t→齐次坐标→交换顺序→逆向恢复→批量点→故障→源码”组织，包含10种原生SVG图（其中单位圆可以选择0°、30°、90°、180°）。\n\n拿一个最简单的例子讲：雷达目标在车头正前方1m，即车体系的`(1,0)`。如果车头向世界y正方向转过90°，车前方1m对应世界相对位移`(0,1)`。车辆若在世界`(10,5)`米处，则目标世界坐标是`(10,6)`，因为：\n\n```text\n第1步：车体点 p_V = (1,0)m\n第2步：正向旋转 R90 @ p_V = (0,1)m\n第3步：加车体原点在世界的位置 t=(10,5)m\n结果：世界点 p_W=(10,6)m\n```\n\n再把两个基准向量的旋转结果放成矩阵的两列。车体x单位向量`(1,0)`转90°后是`(0,1)`，车体y单位向量`(0,1)`转90°后是`(-1,0)`，所以`R90=[[0,-1],[1,0]]`，这就是负号的来源。\n\n**为什么补1？** 点的齐次形式`(x,y,1)`让矩阵右上角的平移值参与计算；只有方向没有具体位置的箭头使用`(x,y,0)`，所以不加平移。反向坐标的恢复则先减去t，再用`R.T`旋转回来：`p_V=R.T@(p_W-t)`。\n\n**为什么要看相乘顺序？** 以`(1,0)`为起点，先旋转90°再向世界x正方向平移2m得到`(2,1)`；先平移后旋转得到`(0,3)`。在列向量约定下，表达式`A@R@p`总是右侧R先作用于点。这个顺序必须先用语言理解，再在源码里用`@`表示。\n\n**从理论衔接Python的顺序：**\n\n1. `rotation_deg`：传入**度**，内部显式`np.deg2rad`后调用`np.cos/sin`，返回shape=(2,2)的`np.ndarray`。\n2. `rigid_transform_deg`：用`np.eye(3)`建3×3单位阵，再用`[:2,:2]`放旋转、`[:2,2]`放车辆位置。\n3. `transform_point`：先检查T和二维点，补末尾1，执行`matrix @ p_h`，最后`[:2]`取前两个坐标。\n4. `transform_direction`：方向向量补末尾0，所以只旋转不平移。\n5. `inverse_rigid`：用`R.T`和`-R.T@t`构造世界→车体的逆向变换。\n6. `transform_points`：从(N,2)拼成(N,3)，转置成(3,N)，一次处理全部点后返回(N,2)。\n\n上面每一个符号、完整演算和对应代码位置都可以在Pages第16课找到。原有的在线7案例与本地Python测试保持不变。**网页图只服务于教学理解；真实PNG仍须运行本地Matplotlib生成。**\n\n## 文件职责和完整执行顺序\n\n```text\npython demo.py --scenario 1 --out charts\n  └─ demo.py: if __name__ == '__main__' → main()\n       └─ scenarios.run_scenario(1)\n            ├─ geometry2d.rigid_transform_deg(angle,tx,ty)\n            │    └─ rotation_deg → np.deg2rad → np.cos/np.sin\n            ├─ geometry2d.transform_point(T,p)\n            │    └─ 把二维点拼成(x,y,1)再算T @ p_h\n            └─ 返回含status/valid/world_point的dict给main\n       ├─ main输出解释、坐标和误差\n       └─ plot_frames.save_frame_plot(...) → coordinate_frames.png\n```\n\n`test_geometry.py`是独立unittest入口，不是直接执行demo时自动运行。\n\n## 本地真实Python验收（建议 Python 3.11+）\n\n在D16项目目录解压文件后：\n\n```bash\npython3 -m venv .venv\nsource .venv/bin/activate\npython -m pip install -r requirements.txt\npython demo.py --scenario 0 --out charts\npython demo.py --scenario 1 --out charts\npython demo.py --scenario 2 --out charts\npython demo.py --scenario 3 --out charts\npython demo.py --scenario 4 --out charts\npython demo.py --scenario 5 --out charts\npython demo.py --scenario 6 --out charts\npython -m unittest -v test_geometry\n```\n\nWindows PowerShell激活命令通常是`.venv\\Scripts\\Activate.ps1`。WSL缺中文字体时先安装`fonts-noto-cjk`，并重新打开Python终端；工程会在缺字体时打印提示。\n\n## 七组场景及判定\n\n| 案例 | 内容 | 预期 |\n|---|---|---|\n| S01 | R(90°)·(1,0) | world=(0,1)，浮点误差允许1e-12 |\n| S02 | 旋转90°，平移(10,5) | world=(10,6) |\n| S03 | T(2,0)@R(90°) vs R(90°)@T(2,0) | world=(2,1)，交换得(0,3) |\n| S04 | 故意将90度送给sin/cos当弧度 | status=-3、valid=0；有误差诊断，**不能作为有效坐标** |\n| S05 | 30°旋转、平移(10,5)、点(3,-2)逆变换 | 闭环误差<1e-9m |\n| S06 | NaN角度 | status=-2、valid=0；不生成有效世界点和PNG |\n| S07 | 5个地标批量变换 | shape=(5,2)，点分别(10,5),(10,6),(9,5),(11,7),(8,4) |\n\n注意：运行D16脚本和test_geometry是在学员电脑上完成，Pages只是JavaScript教学演算。GitHub CI成功表示参考代码通过自动化检查，不意味着学员已通过本地Python；D01–D14历史C本地真实验收依旧单独进行。\n\n## 故障注入 P1–P4\n\n1. 先运行S01，手算90度旋转得(0,1)，观察为什么x可能显示6.123e-17而不是精确0；使用`np.allclose`测试浮点近似。\n2. 暂时把`np.deg2rad(angle)`改成`angle`，观察测试从PASS变为FAIL，随后恢复。\n3. 把S03的`translate @ rotate`改为`rotate @ translate`，预测(2,1)如何变为(0,3)；恢复后重新测试。\n4. 运行S05确认误差<1e-9m；运行S06确认NaN被拒绝、`valid=0`，错误时没有PNG。\n\n源自官方权威资料的概念：Python math.radians、NumPy matmul/@与逐元素乘法区别。辅助阅读：\n- https://docs.python.org/3/library/math.html\n- https://numpy.org/doc/stable/reference/generated/numpy.matmul.html\n- https://numpy.org/doc/stable/user/quickstart.html\n- https://docs.ros.org/en/rolling/Concepts/Intermediate/About-Tf2.html\n\n## 后续页面制作规范\n\n课程按内容选择展示顺序，理论与数学课优先图示、逻辑推导和手算，编程/软件架构课按具体问题决定是否先看调用链。详细规则见仓库 `docs/COURSE_PAGE_AUTHORING_STANDARD.md`。D16在发布前须通过真实NumPy测试、SVG交互、代码下载、笔记保留、手机端布局和旧课程兼容性检查。\n"
         }
       ],
-      "code": "\"\"\"D16可直接运行入口：场景→二维坐标运算→诊断→保存可视化。\n\n运行方式：\n    python demo.py --scenario 0 --out charts\n    python -m unittest -v test_geometry\n网页只用JS展示参考数值；本文件必须由本地Python实际执行。\n\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\n\nfrom plot_frames import save_frame_plot\nfrom scenarios import run_scenario\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description=\"D16 NumPy二维旋转和车体/世界坐标\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(7), default=0,\n                        help=\"0旋转，1平移，2顺序，3角度故障，4逆变换，5NaN，6多点\")\n    parser.add_argument(\"--out\", default=\"charts\", help=\"输出坐标PNG的目录\")\n    args = parser.parse_args()\n\n    result = run_scenario(args.scenario)  # scenarios.py调用geometry2d.py。\n    print(f\"scenario={args.scenario} status={result['status']} valid={result['valid']}\")\n    if not result[\"valid\"]:\n        print(f\"error_kind={result['error_kind']}\")\n        print(result[\"diagnostic\"])\n        # 故障场景仍返回完整诊断，但不提供可消费的世界坐标或PNG。\n        print(\"diagnostic_json=\" + json.dumps(result, ensure_ascii=False))\n        return 2\n\n    print(\"result_json=\" + json.dumps(result, ensure_ascii=False))\n    print(f\"roundtrip_error_m={result.get('roundtrip_error_m', 'n/a')}\")\n    if args.scenario in (0, 1, 2, 4, 6):\n        if args.scenario == 0:\n            angle, tx, ty = 90.0, 0.0, 0.0\n        elif args.scenario == 2:\n            angle, tx, ty = 90.0, 2.0, 0.0\n        elif args.scenario == 4:\n            angle, tx, ty = 30.0, 10.0, 5.0\n        else:\n            angle, tx, ty = 90.0, 10.0, 5.0\n        saved = save_frame_plot(angle, tx, ty, Path(args.out))\n        print(\"chart=\" + str(saved))\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n"
+      "code": "\"\"\"D16运行入口：按场景编号，调用数学模块，再决定是否保存坐标图。\n\n运行方式：\n    python demo.py --scenario 0 --out charts\n    python -m unittest -v test_geometry\n网页只用JS展示参考数值；本文件必须由本地Python实际执行。\n\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\n\nfrom plot_frames import save_frame_plot\nfrom scenarios import run_scenario\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description=\"D16 NumPy二维旋转和车体/世界坐标\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(7), default=0,\n                        help=\"0旋转，1平移，2顺序，3角度故障，4逆变换，5NaN，6多点\")\n    parser.add_argument(\"--out\", default=\"charts\", help=\"输出坐标PNG的目录\")\n    args = parser.parse_args()\n\n    # 这里才真正开始算坐标。main先等待run_scenario返回结果字典；\n    # 场景函数内部再调用geometry2d.py。import本身不会执行这些案例。\n    result = run_scenario(args.scenario)\n    print(f\"scenario={args.scenario} status={result['status']} valid={result['valid']}\")\n    if not result[\"valid\"]:\n        print(f\"error_kind={result['error_kind']}\")\n        print(result[\"diagnostic\"])\n        # status和valid要一起看。角度错误或NaN时不能拿诊断里的错误点绘图；\n        # 返回2是向命令行说明本次案例按正常坐标计算的路径未成功。\n        print(\"diagnostic_json=\" + json.dumps(result, ensure_ascii=False))\n        return 2\n\n    print(\"result_json=\" + json.dumps(result, ensure_ascii=False))\n    print(f\"roundtrip_error_m={result.get('roundtrip_error_m', 'n/a')}\")\n    # 只有成功的五个场景才会走到绘图模块。\n    # 这里的角度和位移与scenarios.py所用的教学数据一一对应。\n    if args.scenario in (0, 1, 2, 4, 6):\n        if args.scenario == 0:\n            angle, tx, ty = 90.0, 0.0, 0.0\n        elif args.scenario == 2:\n            angle, tx, ty = 90.0, 2.0, 0.0\n        elif args.scenario == 4:\n            angle, tx, ty = 30.0, 10.0, 5.0\n        else:\n            angle, tx, ty = 90.0, 10.0, 5.0\n        saved = save_frame_plot(angle, tx, ty, Path(args.out))\n        print(\"chart=\" + str(saved))\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n"
     }
   },
   "rules": {
@@ -12911,5 +13113,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "day16-20261119-coordinate-frames-v1"
+  "release": "day16-20261119-theory-first-v2"
 }

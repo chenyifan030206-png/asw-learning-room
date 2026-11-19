@@ -8,6 +8,8 @@ on:
       - 'app.js'
       - 'index.html'
       - 'day16-project/**'
+      - 'day16-theory.js'
+      - 'style.css'
       - 'tests/day16_browser.py'
       - '.github/workflows/day16-python-tests.yml'
   push:
@@ -18,6 +20,8 @@ on:
       - 'app.js'
       - 'index.html'
       - 'day16-project/**'
+      - 'day16-theory.js'
+      - 'style.css'
       - 'tests/day16_browser.py'
       - '.github/workflows/day16-python-tests.yml'
 
@@ -40,7 +44,7 @@ jobs:
           import json
           from pathlib import Path
           b=json.loads(Path('courses.json').read_text(encoding='utf-8'))
-          assert b['release']=='day16-20261119-coordinate-frames-v1'
+          assert b['release']=='day16-20261119-theory-first-v2'
           assert len(b['lessons'])==16
           assert b['lessons']['15']['runner']=='python_numpy_logs_day15'
           assert b['lessons']['16']['runner']=='coordinate_frames_day16'
@@ -51,6 +55,20 @@ jobs:
           assert len(lesson['practice']['fields'])==7
           assert len(lesson['experiments'])==7
           assert len(lesson['code_sections'])>=12
+          assert len(lesson['reading'])==14
+          assert all(len(x['text'])>=350 for x in lesson['reading'])
+          assert all(len(x['worked'])>=4 and x['check'] for x in lesson['reading'])
+          assert len(set(x['diagram'] for x in lesson['reading']))>=10
+          assert all(len(x['text'])+len(x['trace'])>=320 for x in lesson['code_sections'])
+          js=Path('day16-theory.js').read_text(encoding='utf-8')
+          assert 'window.Day16Theory={render,index}' in js
+          html=Path('index.html').read_text(encoding='utf-8')
+          assert 'day16-theory.js' in html
+          app=Path('app.js').read_text(encoding='utf-8')
+          assert "lesson.runner==='coordinate_frames_day16'" in app
+          assert "window.Day16Theory.render" in app
+          print('PASS D16 theory-first: diagrams, 14 detailed sections, code links')
+  
           assert len(b['rules']['16']['needed'])==7
           for asset in lesson['assets']:
               actual=Path('day16-project',asset['name']).read_text(encoding='utf-8')
@@ -112,6 +130,7 @@ jobs:
         run: |
           node --check pages-runtime.js
           node --check app.js
+          node --check day16-theory.js
           node <<'JS'
           const fs=require('fs'),vm=require('vm');
           const data=JSON.parse(fs.readFileSync('courses.json','utf8'));
