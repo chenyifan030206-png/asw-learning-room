@@ -80,16 +80,16 @@
 @media(max-width:600px){#workspace.day12-mode #day12Primer{padding:12px}#workspace.day12-mode .d12-symbols button{min-width:85px}}
 
 /* D16理论优先：图文一体、可复核的推导，不改变其它课程布局。 */
-#learn.theory-first #reading{margin:22px 0 38px;display:grid;gap:19px}
+#learn.theory-first #reading{margin:22px 0 38px;display:grid;grid-template-columns:minmax(0,1fr);gap:19px;min-width:0;max-width:100%}
 #learn.theory-first #reading .d16-concept{border:1px solid var(--border);border-radius:13px;
-  padding:26px 25px 25px;background:var(--panel);margin:0;scroll-margin-top:18px}
+  padding:26px 25px 25px;background:var(--panel);margin:0;min-width:0;max-width:100%;scroll-margin-top:18px}
 #learn.theory-first #reading .d16-concept h3{margin:8px 0 13px;font-size:20px;line-height:1.48}
 #learn.theory-first .d16-step-number{font-size:13px;color:var(--accent);font-weight:700}
 #learn.theory-first #reading .d16-lead{font-size:16px;font-weight:600;line-height:1.8;margin:12px 0 18px}
 #learn.theory-first #reading .d16-prose{margin:14px 0;line-height:1.95;font-size:15.7px}
 #learn.theory-first #reading .d16-figure{margin:18px 0 22px;border:1px solid var(--border);
-  border-radius:11px;padding:12px;background:var(--panel)}
-#learn.theory-first #reading .d16-figure-canvas{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+  border-radius:11px;padding:12px;background:var(--panel);min-width:0;max-width:100%}
+#learn.theory-first #reading .d16-figure-canvas{overflow-x:auto;width:100%;min-width:0;max-width:100%;-webkit-overflow-scrolling:touch}
 #learn.theory-first #reading .d16-figure svg{display:block;min-width:610px;width:100%;height:auto}
 #learn.theory-first #reading figcaption{padding:10px 7px 1px;font-size:13px;line-height:1.7;color:var(--muted)}
 #learn.theory-first #reading .d16-angle-buttons{display:flex;flex-wrap:wrap;gap:6px;align-items:center;
