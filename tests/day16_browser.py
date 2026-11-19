@@ -59,6 +59,7 @@ def main():
             if scenario == 2:
                 assert "交换矩阵顺序后的坐标" in text
         # 真实资源打包：ZIP应该恰好7个可读取原始Python文件。
+        page.locator("#tab-learn").click()
         with page.expect_download() as transfer:
             page.locator("#downloadProject").click()
         download = transfer.value
