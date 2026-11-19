@@ -397,6 +397,70 @@ $('runFields').addEventListener('input',()=>renderBytePreview());
 $('runFields').addEventListener('change',updateTimingFields);
 function setInputs(values,hint,guide){lesson.run_fields.forEach((f,i)=>$(f.id).value=values[i]);renderBytePreview(values);updateTimingFields();$('timelineLab').hidden=true;$('hint').textContent=hint||'';steps('experimentSteps',guide||['输入已经填好。','先写自己的预测，再点击运行案例。','检查结果后回到做检测继续。']);}
 $('transferRun').onclick=()=>{setInputs(lesson.practice.values,'迁移实验：输入已填好。请先保留你的手算答案，再点击运行案例。');tab('run');$('prediction').focus();};
+function renderDay16Preview(result){
+  // JS只绘制固定教学坐标的SVG示意，真实高分辨率PNG在学员本地Matplotlib生成。
+  if(!result.valid)return;
+  const NS='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(NS,'svg');
+  svg.setAttribute('viewBox','0 0 630 410');
+  svg.setAttribute('role','img');
+  svg.setAttribute('aria-label','世界坐标与车体系的二维坐标示意，全部单位为米');
+  svg.style.maxWidth='100%';svg.style.width='100%';svg.style.height='auto';
+  svg.style.border='1px solid #d9e1ec';svg.style.borderRadius='10px';
+  svg.style.background='#fafcfe';
+  const origin=[75,335],scale=23;
+  const map=(p)=>[origin[0]+p[0]*scale,origin[1]-p[1]*scale];
+  const draw=(tag,attrs,text)=>{
+    const x=document.createElementNS(NS,tag);
+    for(const [k,v] of Object.entries(attrs||{}))x.setAttribute(k,String(v));
+    if(text!==undefined)x.textContent=String(text);
+    svg.appendChild(x);return x;
+  };
+  const line=(p,q,color,width=1.5,dash=null)=>{
+    const [x1,y1]=map(p),[x2,y2]=map(q);
+    const l=draw('line',{x1,y1,x2,y2,stroke:color,'stroke-width':width});
+    if(dash)l.setAttribute('stroke-dasharray',dash);
+    return l;
+  };
+  const label=(p,text,color='#2c3f51')=>{
+    const [x,y]=map(p);draw('text',{x:x+7,y:y-8,fill:color,'font-size':11,
+      'font-family':'sans-serif'},text);
+  };
+  for(let x=0;x<=22;x+=2){line([x,-2],[x,14],'#e8edf5',1);}
+  for(let y=-2;y<=14;y+=2){line([0,y],[22,y],'#e8edf5',1);}
+  line([-1,0],[22,0],'#637d9d',2.3);
+  line([0,-2],[0,14],'#637d9d',2.3);
+  label([20,0],'世界x_W (m)','#42638c');
+  label([0,13],'世界y_W (m)','#42638c');
+  const data={0:{a:90,t:[0,0]},1:{a:90,t:[10,5]},2:{a:90,t:[2,0]},
+    4:{a:30,t:[10,5]},6:{a:90,t:[10,5]}}[result.scenario];
+  if(!data)return;
+  const theta=data.a*Math.PI/180,cs=Math.cos(theta),sn=Math.sin(theta);
+  const vx=[cs,sn],vy=[-sn,cs],t=data.t;
+  line(t,[t[0]+vx[0]*2,t[1]+vx[1]*2],'#e17d38',3.1);
+  line(t,[t[0]+vy[0]*2,t[1]+vy[1]*2],'#2a9784',3.1);
+  label([t[0]+vx[0]*2,t[1]+vx[1]*2],'车体x_V','#c56831');
+  label([t[0]+vy[0]*2,t[1]+vy[1]*2],'车体y_V','#237b72');
+  const [ox,oy]=map(t);draw('rect',{x:ox-4,y:oy-4,width:8,height:8,fill:'#c56831'});
+  label(t,'O_V');
+  const points=result.world_points||[result.world_point];
+  for(const [index,p] of points.entries()){
+    const [x,y]=map(p);
+    draw('circle',{cx:x,cy:y,r:4.2,fill:'#8e4e91'});
+    label(p,result.world_points?'P'+index:'p_W');
+    line(t,p,'#bc9fc0',1,'4 4');
+  }
+  if(result.swapped_point){
+    const [x,y]=map(result.swapped_point);
+    draw('circle',{cx:x,cy:y,r:6,fill:'none',stroke:'#ca4d58','stroke-width':2.2});
+    label(result.swapped_point,'交换矩阵后的错误位置','#be454f');
+  }
+  const h=document.createElement('h4');
+  h.textContent='二维坐标系示意（浏览器SVG；非本地Matplotlib生成的PNG）';
+  const caption=document.createElement('p');
+  caption.textContent='世界与车体系原点、方向和点按本课列向量约定展示。切勿将本图当作真实车辆姿态或定位证据。';
+  $('output').append(h,caption,svg);
+}
 function renderDay15Preview(result){
   if(!result.valid||!result.plot_series)return;
   const source=result.plot_series;
@@ -483,6 +547,39 @@ $('runButton').onclick=async()=>{
           '列出现'+result.error_kind+'；不会悄悄丢弃或填零，也不产生有效图表。';
         summaryText='D15 '+result.source+' status='+result.status+'，第'+result.error_line+
           '行 '+result.error_field+' '+result.error_kind;
+      }
+    }else if(lesson.runner==='coordinate_frames_day16'){
+      grid.append(item('案例编号','S'+String(result.scenario+1).padStart(2,'0')),
+        item('计算状态status',result.status,result.status===0?'good':'bad'),
+        item('输出有效性valid',result.valid,result.valid?'good':'bad'),
+        item('本地应生成PNG',result.chart_count+'张'));
+      if(result.valid){
+        if(result.vehicle_point)grid.append(item('车体系输入点 (m)',
+          '('+result.vehicle_point.map(x=>x.toFixed(3)).join(', ')+')'));
+        if(result.world_point)grid.append(item('世界系有效坐标 (m)',
+          '('+result.world_point.map(x=>Number(x).toFixed(6)).join(', ')+')','good'));
+        if(result.swapped_point)grid.append(item('交换矩阵顺序后的坐标 (m)',
+          '('+result.swapped_point.map(x=>Number(x).toFixed(6)).join(', ')+')','bad'),
+          item('顺序差异距离 (m)',result.composition_gap_m.toFixed(6)));
+        if(result.restored_point)grid.append(item('逆变换恢复的车体系点 (m)',
+          '('+result.restored_point.map(x=>Number(x).toFixed(6)).join(', ')+')'));
+        if(result.roundtrip_error_m!==undefined)grid.append(
+          item('正逆闭环欧氏误差 (m)',result.roundtrip_error_m.toExponential(3),
+            result.roundtrip_error_m<1e-9?'good':'bad'));
+        if(result.points_shape)grid.append(item('地标矩阵shape',
+          '('+result.points_shape.join(', ')+')'));
+        explanation='在本课二维列向量约定下，status=0、valid=1才代表有效坐标。角度先度转弧度，矩阵使用@乘法（JS示例等价公式）。网页SVG只供理解，本地生成的PNG由Matplotlib完成。';
+        summaryText='D16 S'+(result.scenario+1)+' status=0 valid=1 '+JSON.stringify(
+          result.world_point||result.world_points||{});
+      }else{
+        grid.append(item('错误类别',result.error_kind,'bad'));
+        if(result.wrong_point)grid.append(item('错误角度产生的位置（不能消费）',
+          '('+result.wrong_point.map(x=>x.toFixed(6)).join(', ')+')','bad'),
+          item('正确参考坐标','('+result.reference_point.join(', ')+')'),
+          item('错误距离 (m)',result.error_m.toFixed(6),'bad'));
+        explanation=result.diagnostic+'。结果无效，没有发布world_point，且没有本次有效PNG。';
+        summaryText='D16 S'+(result.scenario+1)+' status='+result.status+
+          ' valid=0 error='+result.error_kind;
       }
     }else if(lesson.runner==='vehicle_requirements_day13'){
       // D13原先漏掉自己的显示分支，错误落入D01模式/valid展示逻辑。
@@ -589,6 +686,29 @@ $('runButton').onclick=async()=>{
         msg.textContent='错误定位：'+result.source+' 第'+result.error_line+'行，字段'+
           result.error_field+'，类别'+result.error_kind+'。原始CSV可在完整工程文件标签中查看。';
         $('output').append(msg);
+      }
+    }
+    if(lesson.runner==='coordinate_frames_day16'){
+      if(result.valid){
+        if(result.world_points){
+          $('output').append(makeTable(['地标编号','车辆x_V (m)','车辆y_V (m)',
+            '世界x_W (m)','世界y_W (m)'],
+            result.world_points.map((p,i)=>[i,result.vehicle_points[i][0],
+              result.vehicle_points[i][1],p[0],p[1]])));
+        }else{
+          $('output').append(makeTable(['数据与验证','具体数值'],[
+            ['角度（度）',result.angle_deg===undefined?'本例组合变换':result.angle_deg],
+            ['世界坐标 (m)',result.world_point.join(', ')],
+            ['反向恢复 (m)',result.restored_point?.join(', ')||'本场景不显示'],
+            ['闭环误差 (m)',result.roundtrip_error_m===undefined?'本场景不显示':result.roundtrip_error_m],
+            ['坐标结果有效性',result.valid?'有效':'无效']
+          ]));
+        }
+        renderDay16Preview(result);
+      }else{
+        const warn=document.createElement('p');
+        warn.textContent='故障诊断：'+result.diagnostic+'。没有合法坐标图；请查看scenarios.py并在本地运行对应故障场景。';
+        $('output').append(warn);
       }
     }
     if(lesson.runner==='vehicle_requirements_day13'){
