@@ -75,12 +75,16 @@ def main():
         page.locator("#tab-learn").click()
         page.locator("#notes").fill("D16：我理解了R@p再加t。")
         page.locator("#saveNotes").click()
-        page.wait_for_timeout(900)
+        page.wait_for_function("""() => {
+          const s=localStorage.getItem('asw-pages-v1:/');
+          return s && JSON.parse(s).notes.some(n=>n.day===16 && n.notes.includes('D16：我理解'));
+        }""")
         prev = page.evaluate("""() => JSON.parse(localStorage.getItem('asw-pages-v1:/'))""")
         assert next(x for x in prev["notes"] if x["day"] == 15)["notes"].startswith("D15浏览器通过")
         assert len(prev["progress"]) == 15
         page.reload(wait_until="networkidle")
         page.wait_for_function("document.querySelector('#courseStatus')?.textContent.includes('D16')")
+        page.wait_for_function("document.querySelector('#notes')?.value.includes('D16：我理解')")
         assert "D16：我理解" in page.locator("#notes").input_value()
         page.locator("#fileTabs button[data-file='geometry2d.py']").click()
         page.locator("#editCodeNotes").click()
