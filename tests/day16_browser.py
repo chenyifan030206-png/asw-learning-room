@@ -33,9 +33,11 @@ def main():
         assert page.locator("#codeNotes").count() == 1
 
         # 原架构个人源码副本修改后切文件再回，应仍是个人内容。
+        page.locator("#editCodeNotes").click()
         page.locator("#codeNotes").fill("# 我的D16副本批注：@是矩阵乘法。")
         page.locator("#fileTabs button[data-file='demo.py']").click()
         page.locator("#fileTabs button[data-file='geometry2d.py']").click()
+        page.locator("#editCodeNotes").click()
         assert "我的D16副本批注" in page.locator("#codeNotes").input_value()
 
         page.locator("#tab-run").click()
@@ -80,6 +82,7 @@ def main():
         page.wait_for_function("document.querySelector('#courseStatus')?.textContent.includes('D16')")
         assert "D16：我理解" in page.locator("#notes").input_value()
         page.locator("#fileTabs button[data-file='geometry2d.py']").click()
+        page.locator("#editCodeNotes").click()
         assert "我的D16副本批注" in page.locator("#codeNotes").input_value()
         assert not js_errors, js_errors
         print("PASS D16 real browser: 7 scenarios, statuses, SVG, ZIP, notes, D15 preservation")
