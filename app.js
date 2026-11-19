@@ -363,8 +363,43 @@ async function selectDay(d){
   $('waiting').hidden=true;$('workspace').hidden=false;$('dayTag').textContent=`D${String(day).padStart(2,'0')} · 第${c.week}周 · ${c.stage}`;
   $('title').textContent=lesson.title;$('summary').textContent=lesson.summary;$('time').textContent=lesson.time;
   $('goals').replaceChildren();for(const goal of lesson.goals){const li=document.createElement('li');li.textContent=goal;$('goals').append(li);}
-  renderCode();renderDay11Guide();renderDay12Guide();renderBitLab();$('reading').replaceChildren();
-  for(const [ri,r] of (lesson.code_sections?lesson.reading.slice(1):lesson.reading).entries()){const section=document.createElement('section'),h=document.createElement('h3');section.dataset.annotationScope='reading:'+ri;h.textContent=r.title;section.append(h);for(const text of r.text.split('\n')){const p=document.createElement('p');p.textContent=text;section.append(p);}if(r.table)section.append(makeTable(r.table.headers,r.table.rows));for(const source of r.sources||[]){const p=document.createElement('p'),a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';p.append(a);section.append(p);}$('reading').append(section);}
+  renderCode();renderDay11Guide();renderDay12Guide();renderBitLab();
+  // 理论型课程按“问题→图→推导→代码”阅读；其他课保留原来的页面结构。
+  const theoryFirst=lesson.runner==='coordinate_frames_day16';
+  $('learn').classList.toggle('theory-first',theoryFirst);
+  const theoryHeading=$('readingHeading');
+  if(theoryFirst){
+    theoryHeading.textContent='先用图和手算理解原理 · 读完再进入完整Python工程';
+    $('architecture').before(theoryHeading,$('reading'));
+    $('codeIntro').textContent='上方理论已经解释坐标、角度、R、T和逆变换。这里再沿实际Python函数逐行对照：先理解参数与返回值，接着读运算过程，最后结合案例运行。完整源码保留在下方，个人副本和代码旁注继续自动保存。';
+    $('architectureHeading').textContent='理论与代码怎样对应 · 先对照数据流，再阅读源文件';
+  }else{
+    theoryHeading.textContent='按程序执行顺序理解 · 不懂就停在这一段';
+    $('appendices').before(theoryHeading,$('reading'));
+    $('codeIntro').textContent='先看完整源码，再按执行顺序逐段学。按职责分段注释，关键语句单独解释；下载可独立运行的源码和完整讲义，配色不改变源码。';
+    $('architectureHeading').textContent='先看整体架构 · 谁调用谁，数据往哪里走';
+  }
+  $('reading').replaceChildren();
+  if(theoryFirst&&window.Day16Theory)window.Day16Theory.index($('reading'),lesson.reading);
+  const contentToRead=theoryFirst?lesson.reading:(lesson.code_sections?lesson.reading.slice(1):lesson.reading);
+  for(const [ri,r] of contentToRead.entries()){
+    const section=document.createElement('section');
+    section.dataset.annotationScope='reading:'+ri;
+    if(theoryFirst&&window.Day16Theory){
+      window.Day16Theory.render(section,r,ri,(step)=>{
+        showStep(step);
+        $('walkthrough').scrollIntoView({behavior:'smooth',block:'start'});
+      });
+    }else{
+      const h=document.createElement('h3');h.textContent=r.title;section.append(h);
+      for(const text of r.text.split('\n')){const p=document.createElement('p');p.textContent=text;section.append(p);}
+      if(r.table)section.append(makeTable(r.table.headers,r.table.rows));
+      for(const source of r.sources||[]){const p=document.createElement('p'),a=document.createElement('a');
+        a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';
+        p.append(a);section.append(p);}
+    }
+    $('reading').append(section);
+  }
   if(!lesson.project_name)for(const asset of lesson.assets||[]){const section=document.createElement('section'),h=document.createElement('h3'),pre=document.createElement('pre'),button=document.createElement('button');h.textContent='完整文件 · '+asset.name;pre.textContent=asset.text;pre.style.maxHeight='none';button.textContent='下载 '+asset.name;button.onclick=()=>download(asset.text,asset.name,'text/plain;charset=utf-8');section.append(h,pre,button);$('reading').append(section);}
   if(lesson.project_name){const button=document.createElement('button');button.textContent='下载完整项目ZIP';button.id='downloadProject';button.className='primary';button.onclick=()=>download(projectZip(lesson.assets,lesson.project_name),lesson.project_name+'.zip','application/zip');$('architecture').append(button);}
   if(lesson.reference){const section=document.createElement('section'),h=document.createElement('h3'),p=document.createElement('p');h.textContent='独立工具实测参考 · 不是浏览器现场运行';p.textContent=`工具cantools ${lesson.reference.version}，实际读取DBC；每行同时与手工C和协议向量一致。`;section.append(h,p,makeTable(['输入速度／模式／雷达','factor／offset／width','工具编码字节','工具解码速度'],lesson.reference.vectors.map(v=>[v.values.slice(0,3).join(' / '),`${v.factor} / ${v.offset} / ${v.width}`,v.frame.map(x=>x.toString(16).toUpperCase().padStart(2,'0')).join(' '),v.decoded])));$('reading').append(section);}
@@ -780,10 +815,25 @@ $('copyCode').onclick=()=>copy(sourceFile().text);
 $('downloadCode').onclick=()=>download(sourceFile().text,activeFile,'text/plain;charset=utf-8');
 $('downloadLesson').onclick=()=>{
   const parts=['# '+lesson.title,'\n'+lesson.summary,'\n'+lesson.time,'## 整体架构',lesson.flow_text||$('executionFlow').textContent,JSON.stringify(lesson.architecture||{},null,2)];
-  if(!lesson.project_name)parts.push('## 完整中文源码','```c\n'+lesson.code+'```');
+  if(!lesson.project_name)parts.push('## 完整中文源码','```'+(/\.py$/.test(lesson.source)?'python':'c')+'\n'+lesson.code+'```');
   for(const asset of lesson.assets||[])parts.push('## '+asset.name,'```\n'+asset.text+'\n```');
-  for(const r of lesson.reading){parts.push('## '+r.title,r.text);for(const source of r.sources||[])parts.push(`[${source.title}](${source.url})`);if(r.table)parts.push(JSON.stringify(r.table,null,2));}
-  for(const s of lesson.code_sections||[]){const source=s.file?sourceFile(s.file).text:lesson.code,start=source.indexOf(s.start),end=source.indexOf(s.end,start+s.start.length),finish=end<0?source.length:s.end.startsWith('    return 0;')?end+'    return 0;\n}'.length:end;parts.push('## '+s.title+' · '+(s.file||lesson.source),'```c\n'+source.slice(Math.max(0,start),finish)+'\n```','通用语法：'+s.pattern,s.text,'具体值：'+s.trace);}
+  for(const r of lesson.reading){
+    parts.push('## '+r.title);
+    if(r.lead)parts.push(r.lead);
+    parts.push(r.text);
+    if(r.formula)parts.push('公式与演算：\n'+r.formula);
+    if(r.worked?.length)parts.push('逐步演算：\n'+r.worked.map((x,i)=>(i+1)+'. '+x).join('\n'));
+    if(r.check)parts.push('自测：'+r.check.question+'\n参考解释：'+r.check.answer);
+    for(const source of r.sources||[])parts.push('参考：'+source.title+' '+source.url);
+    if(r.table)parts.push(JSON.stringify(r.table,null,2));
+  }
+  for(const s of lesson.code_sections||[]){
+    const source=s.file?sourceFile(s.file).text:lesson.code,
+      start=source.indexOf(s.start),end=source.indexOf(s.end,start+s.start.length),
+      finish=end<0?source.length:s.end.startsWith('    return 0;')?end+'    return 0;\n}'.length:end;
+    const fence=/\.py$/.test(s.file||lesson.source)?'python':'c';
+    parts.push('## '+s.title+' · '+(s.file||lesson.source),'\x60\x60\x60'+fence+'\n'+source.slice(Math.max(0,start),finish)+'\n\x60\x60\x60','通用语法：'+s.pattern,s.text,'具体值：'+s.trace);
+  }
   if(lesson.project_intro)parts.push('## 项目目的',...lesson.project_intro.paragraphs);for(const a of lesson.appendices||[])parts.push('## '+a.title,...a.paragraphs);
   for(const e of lesson.experiments)parts.push('## 实验：'+e.name,'输入：'+e.values.join(' '),...e.steps);
   parts.push('## 迁移任务',lesson.practice.text,...lesson.practice.steps,'## 自测题（不附答案）',...lesson.questions.map(q=>q.text+'\n'+q.options.map((o,i)=>`${i+1}. ${o}`).join('\n')));
