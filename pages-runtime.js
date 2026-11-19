@@ -304,6 +304,70 @@ function pagesSimulate(day,values){
         plot_series:{time_ms,speed_kmh,distance_m,mode},
         compiler_log:'浏览器只预览与Python源文件相同的教学样例及公式；3张PNG必须由本地Matplotlib生成。'};
     }
+  }else if(day===16){
+    // D16浏览器仅做双精度JavaScript坐标演算，不运行Python或NumPy。
+    const [scenario]=pagesNumbers(values,1);
+    if(!Number.isInteger(scenario)||scenario<0||scenario>6)
+      throw Error('D16场景必须是S01–S07中的整数0到6。');
+    const clean=x=>Math.abs(x)<1e-12?0:Number(x.toFixed(12));
+    const point=p=>p.map(clean);
+    const degToRad=d=>d*Math.PI/180;
+    const makeT=(degrees,tx,ty)=>{
+      if(![degrees,tx,ty].every(Number.isFinite))throw Error('D16角度与平移必须是有限数');
+      const angle=degToRad(degrees),c=Math.cos(angle),sin=Math.sin(angle);
+      return [[c,-sin,tx],[sin,c,ty],[0,0,1]];
+    };
+    const mult=(a,b)=>a.map(row=>b[0].map((_,j)=>
+      row.reduce((sum,x,k)=>sum+x*b[k][j],0)));
+    const apply=(t,p)=>[t[0][0]*p[0]+t[0][1]*p[1]+t[0][2],
+                        t[1][0]*p[0]+t[1][1]*p[1]+t[1][2]];
+    const inverse=t=>{
+      const a=t[0][0],b=t[0][1],c=t[1][0],d=t[1][1],
+            tx=t[0][2],ty=t[1][2];
+      return [[a,c,-a*tx-c*ty],[b,d,-b*tx-d*ty],[0,0,1]];
+    };
+    const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+    const computeError=(t,p)=>dist(p,apply(inverse(t),apply(t,p)));
+    const common={scenario,engine_detail:'D16 JavaScript离线坐标公式演算，非真实Python/NumPy/Matplotlib。'};
+    if(scenario===5){
+      result={...common,status:-2,valid:0,error_kind:'nonfinite_angle',
+        diagnostic:'角度NaN不能转换成有效二维旋转；本轮没有合法world_point或PNG。',
+        chart_count:0};
+    }else if(scenario===3){
+      const wrong=[Math.cos(90),Math.sin(90)],target=[0,1];
+      result={...common,status:-3,valid:0,error_kind:'degree_as_radian',
+        wrong_point:point(wrong),reference_point:target,error_m:dist(wrong,target),
+        chart_count:0,diagnostic:'math.cos(90)使用的是90弧度而不是90°；应先乘π/180。'};
+    }else if(scenario===0){
+      const t=makeT(90,0,0),p=[1,0];
+      result={...common,status:0,valid:1,angle_deg:90,vehicle_point:p,
+        world_point:point(apply(t,p)),transform_shape:[3,3],rotation_shape:[2,2],
+        roundtrip_error_m:computeError(t,p),chart_count:1};
+    }else if(scenario===1){
+      const t=makeT(90,10,5),p=[1,0];
+      result={...common,status:0,valid:1,angle_deg:90,translation_m:[10,5],
+        vehicle_point:p,world_point:point(apply(t,p)),transform_shape:[3,3],
+        roundtrip_error_m:computeError(t,p),chart_count:1};
+    }else if(scenario===2){
+      const r=makeT(90,0,0),shift=makeT(0,2,0),p=[1,0];
+      const right=mult(shift,r),wrong=mult(r,shift);
+      result={...common,status:0,valid:1,vehicle_point:p,
+        world_point:point(apply(right,p)),swapped_point:point(apply(wrong,p)),
+        composition_gap_m:dist(apply(right,p),apply(wrong,p)),
+        roundtrip_error_m:computeError(right,p),chart_count:1};
+    }else if(scenario===4){
+      const t=makeT(30,10,5),p=[3,-2],world=apply(t,p);
+      result={...common,status:0,valid:1,angle_deg:30,translation_m:[10,5],
+        vehicle_point:p,world_point:point(world),restored_point:point(apply(inverse(t),world)),
+        roundtrip_error_m:computeError(t,p),chart_count:1};
+    }else{
+      const t=makeT(90,10,5),landmarks=[[0,0],[1,0],[0,1],[2,-1],[-1,2]];
+      result={...common,status:0,valid:1,angle_deg:90,translation_m:[10,5],
+        points_shape:[5,2],vehicle_points:landmarks,
+        world_points:landmarks.map(p=>point(apply(t,p))),
+        vehicle_x_axis_world:point([t[0][0],t[1][0]]),chart_count:1};
+    }
+    result.compiler_log='浏览器JavaScript模拟：S01–S07仅演算固定数学场景，真实Python与PNG必须在本地执行。';
   }else if(day===11){
     // D11为完全单线程的JS教学演算，不模拟真实共享内存/线程同步。
     const v=pagesNumbers(values,1),scenario=v[0];
@@ -436,6 +500,16 @@ function pagesRegression(day){
     ['T04 超时101ms',[6],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,4,0]}],
     ['T03 未启用',[7],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,5,0]}],
     ['T03 设备故障',[8],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,6,0]}]
+  ];
+  cases[16]=[
+    ['S01 90度单位旋转',[0],{status:0,valid:1,rotation_shape:[2,2],transform_shape:[3,3],world_point:[0,1]}],
+    ['S02 旋转后平移',[1],{status:0,valid:1,world_point:[10,6],chart_count:1}],
+    ['S03 矩阵顺序不交换',[2],{status:0,valid:1,world_point:[2,1],swapped_point:[0,3]}],
+    ['S04 度数当弧度',[3],{status:-3,valid:0,error_kind:'degree_as_radian',chart_count:0}],
+    ['S05 逆变换闭环',[4],{status:0,valid:1,restored_point:[3,-2],roundtrip_error_m:0}],
+    ['S06 非有限角度拒绝',[5],{status:-2,valid:0,error_kind:'nonfinite_angle',chart_count:0}],
+    ['S07 五个地标',[6],{status:0,valid:1,points_shape:[5,2],
+      world_points:[[10,5],[10,6],[9,5],[11,7],[8,4]],chart_count:1}]
   ];
   cases[15]=[
     ['S01 合法CSV的shape与统计',[0],{status:0,valid:1,rows_count:10,columns:4,
