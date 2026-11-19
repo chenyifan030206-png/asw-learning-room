@@ -9857,7 +9857,7 @@
           "title": "11 · S05数值闭环/S07批量点",
           "file": "scenarios.py",
           "start": "    if scenario == 4:",
-          "end": "    # S07 一个坐标系",
+          "end": "    # S07用相同的变换一次计算五个点，不必手写五次transform_point。",
           "pattern": "S05验证逆向，S07一次转换五个地标",
           "text": "S05构造30°旋转、(10,5)平移和点(3,-2)。world=transform_point(transform,point)是正向计算；restored=transform_point(inverse_rigid(transform),world)是逆向计算。结果字典分别存world_point与restored_point，roundtrip_error_m提供能否回到原点的数值证据。你应先手算世界点约(13.5981,4.7679)，再看恢复点为什么接近(3,-2)。",
           "trace": "S07把五个车体系点放在LANDMARKS_V矩阵中，调用transform_points一次得到五个世界点，shape=(5,2)。随后另外调用transform_direction处理车头朝向的单位向量。请注意场景中的points_shape和world_points都是基于计算结果返回的，不是网页硬填的一行状态文字；图像与表格都必须与这一组世界坐标一致。"
