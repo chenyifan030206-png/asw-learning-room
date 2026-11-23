@@ -70,7 +70,7 @@ jobs:
           assert 'day16-theory.js' in html
           app=Path('app.js').read_text(encoding='utf-8')
           assert "lesson.runner==='coordinate_frames_day16'" in app
-          assert "window.Day16Theory.render" in app
+          assert "theoryRenderer.render" in app and "window.Day16Theory" in app
           print('PASS D16 theory-first: diagrams, 14 detailed sections, code links')
   
           assert len(b['rules']['16']['needed'])==7
