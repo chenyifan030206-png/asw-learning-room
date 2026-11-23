@@ -34,11 +34,13 @@
      line(s,p,q,'#e7edf4',1);
      text(s,p[0]-8,y+h+22,String(t),'#64748b',11);
    }
-   for(let v=0;v<=ymax;v+=ymax===16?4:2){
+   const tickStart=ymin===0?0:Math.ceil(ymin/2)*2;
+   for(let v=tickStart;v<=ymax;v+=ymax===16?4:2){
      const p=map(xmin,v),q=map(xmax,v);
      line(s,p,q,'#e7edf4',1);text(s,x-32,p[1]+4,String(v),'#64748b',11);
    }
-   line(s,[x,y+h],[x+w,y+h],C.navy,2);line(s,[x,y+h],[x,y],C.navy,2);
+   line(s,map(xmin,ymin),map(xmax,ymin),C.navy,2);
+   line(s,map(xmin,ymin),map(xmin,ymax),C.navy,2);
    text(s,x+w-26,y+h+40,'时间 t（s）','#64748b',12);
    return map;
  }
