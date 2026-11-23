@@ -365,13 +365,17 @@ async function selectDay(d){
   $('goals').replaceChildren();for(const goal of lesson.goals){const li=document.createElement('li');li.textContent=goal;$('goals').append(li);}
   renderCode();renderDay11Guide();renderDay12Guide();renderBitLab();
   // 理论型课程按“问题→图→推导→代码”阅读；其他课保留原来的页面结构。
-  const theoryFirst=lesson.runner==='coordinate_frames_day16';
+  const theoryFirst=['coordinate_frames_day16','discrete_calculus_day17'].includes(lesson.runner);
+  const theoryRenderer=lesson.runner==='discrete_calculus_day17'?
+    window.Day17Theory:window.Day16Theory;
   $('learn').classList.toggle('theory-first',theoryFirst);
   const theoryHeading=$('readingHeading');
   if(theoryFirst){
     theoryHeading.textContent='先用图和手算理解原理 · 读完再进入完整Python工程';
     $('architecture').before(theoryHeading,$('reading'));
-    $('codeIntro').textContent='上方理论已经解释坐标、角度、R、T和逆变换。这里再沿实际Python函数逐行对照：先理解参数与返回值，接着读运算过程，最后结合案例运行。完整源码保留在下方，个人副本和代码旁注继续自动保存。';
+    $('codeIntro').textContent=lesson.runner==='discrete_calculus_day17'?
+      '你已经在上方用速度—时间图手算面积、斜率、dt和数值误差。现在按入口→时间校验→积分/差分→结果→绘图的顺序对应Python；完整中文源码和个人批注仍可逐文件查看、编辑并自动保存。':
+      '上方理论已经解释坐标、角度、R、T和逆变换。这里再沿实际Python函数逐行对照：先理解参数与返回值，接着读运算过程，最后结合案例运行。完整源码保留在下方，个人副本和代码旁注继续自动保存。';
     $('architectureHeading').textContent='理论与代码怎样对应 · 先对照数据流，再阅读源文件';
   }else{
     theoryHeading.textContent='按程序执行顺序理解 · 不懂就停在这一段';
@@ -380,13 +384,13 @@ async function selectDay(d){
     $('architectureHeading').textContent='先看整体架构 · 谁调用谁，数据往哪里走';
   }
   $('reading').replaceChildren();
-  if(theoryFirst&&window.Day16Theory)window.Day16Theory.index($('reading'),lesson.reading);
+  if(theoryFirst&&theoryRenderer)theoryRenderer.index($('reading'),lesson.reading);
   const contentToRead=theoryFirst?lesson.reading:(lesson.code_sections?lesson.reading.slice(1):lesson.reading);
   for(const [ri,r] of contentToRead.entries()){
     const section=document.createElement('section');
     section.dataset.annotationScope='reading:'+ri;
-    if(theoryFirst&&window.Day16Theory){
-      window.Day16Theory.render(section,r,ri,(step)=>{
+    if(theoryFirst&&theoryRenderer){
+      theoryRenderer.render(section,r,ri,(step)=>{
         showStep(step);
         $('walkthrough').scrollIntoView({behavior:'smooth',block:'start'});
       });
@@ -432,6 +436,54 @@ $('runFields').addEventListener('input',()=>renderBytePreview());
 $('runFields').addEventListener('change',updateTimingFields);
 function setInputs(values,hint,guide){lesson.run_fields.forEach((f,i)=>$(f.id).value=values[i]);renderBytePreview(values);updateTimingFields();$('timelineLab').hidden=true;$('hint').textContent=hint||'';steps('experimentSteps',guide||['输入已经填好。','先写自己的预测，再点击运行案例。','检查结果后回到做检测继续。']);}
 $('transferRun').onclick=()=>{setInputs(lesson.practice.values,'迁移实验：输入已填好。请先保留你的手算答案，再点击运行案例。');tab('run');$('prediction').focus();};
+function renderDay17Preview(result){
+  // 教学图：网页JS从结果数据画SVG，和真实Python/Matplotlib输出严格分开。
+  if(!result.valid)return;
+  const namespace='http://www.w3.org/2000/svg';
+  const metrics=[
+    ['速度—时间图','速度（m/s）',result.time_s,result.speed_mps],
+    ['梯形积分累计位移','位移（m）',result.time_s,result.displacement_series_m],
+    ['区间差分加速度','加速度（m/s²）',
+      result.time_s.slice(1).map((t,i)=>(t+result.time_s[i])/2),result.accel_mps2]
+  ];
+  const add=(svg,tag,attrs={},str)=>{
+    const el=document.createElementNS(namespace,tag);
+    for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));
+    if(str!==undefined)el.textContent=str;svg.append(el);return el;
+  };
+  for(const [heading,ylabel,times,values] of metrics){
+    const svg=document.createElementNS(namespace,'svg');
+    svg.setAttribute('viewBox','0 0 760 270');svg.setAttribute('role','img');
+    svg.setAttribute('aria-label',heading+'，横轴秒，纵轴'+ylabel);
+    svg.dataset.role='day17-chart';svg.style.width='100%';svg.style.height='auto';
+    const xmin=times[0],xmax=times.at(-1),ymin=Math.min(...values),
+      ymax=Math.max(...values),delta=Math.max(ymax-ymin,0.1);
+    const lower=ymin-delta*.1,upper=ymax+delta*.12;
+    const X=x=>76+(x-xmin)/Math.max(xmax-xmin,1e-9)*620,
+      Y=y=>224-(y-lower)/(upper-lower)*158;
+    add(svg,'rect',{x:1,y:1,width:758,height:268,rx:8,fill:'none',stroke:'#c9d7e7'});
+    add(svg,'line',{x1:76,y1:66,x2:76,y2:224,stroke:'#8299af','stroke-width':1.5});
+    add(svg,'line',{x1:76,y1:224,x2:697,y2:224,stroke:'#8299af','stroke-width':1.5});
+    add(svg,'text',{x:24,y:28,fill:'currentColor','font-size':15},heading);
+    add(svg,'text',{x:77,y:53,fill:'currentColor','font-size':12},ylabel);
+    add(svg,'text',{x:602,y:253,fill:'currentColor','font-size':12},'时间（s）');
+    add(svg,'text',{x:32,y:224,fill:'currentColor','font-size':11},lower.toFixed(2));
+    add(svg,'text',{x:31,y:74,fill:'currentColor','font-size':11},upper.toFixed(2));
+    add(svg,'text',{x:70,y:244,fill:'currentColor','font-size':11},xmin.toFixed(2));
+    add(svg,'text',{x:671,y:244,fill:'currentColor','font-size':11},xmax.toFixed(2));
+    const points=times.map((t,i)=>[X(t),Y(values[i])]);
+    add(svg,'polyline',{points:points.map(p=>p.join(',')).join(' '),fill:'none',
+      stroke:'#4677a8','stroke-width':2.2});
+    const step=Math.max(1,Math.floor(points.length/23));
+    for(let i=0;i<points.length;i+=step)add(svg,'circle',
+      {cx:points[i][0],cy:points[i][1],r:2.8,fill:'#4677a8'});
+    const block=document.createElement('div');
+    block.className='d17-run-chart';block.append(svg);
+    const cap=document.createElement('p');cap.className='muted';
+    cap.textContent='浏览器JS按本次结果绘制的坐标图，非本地Python PNG。';
+    block.append(cap);$('output').append(block);
+  }
+}
 function renderDay16Preview(result){
   // JS只绘制固定教学坐标的SVG示意，真实高分辨率PNG在学员本地Matplotlib生成。
   if(!result.valid)return;
@@ -583,6 +635,32 @@ $('runButton').onclick=async()=>{
         summaryText='D15 '+result.source+' status='+result.status+'，第'+result.error_line+
           '行 '+result.error_field+' '+result.error_kind;
       }
+    }else if(lesson.runner==='discrete_calculus_day17'){
+      grid.append(item('案例','S'+String(result.scenario+1).padStart(2,'0')),
+        item('status',result.status,result.status===0?'good':'bad'),
+        item('valid',result.valid,result.valid?'good':'bad'));
+      if(result.valid){
+        const n=x=>Number(x).toFixed(4);
+        grid.append(item('速度样本数',result.sample_count),
+          item('时间区间数',result.interval_count),
+          item('最小dt (s)',n(result.dt_min_s)),
+          item('最大dt (s)',n(result.dt_max_s)),
+          item('真实位移参考 (m)',n(result.true_displacement_m)),
+          item('左矩形累计位移 (m)',n(result.left_m)),
+          item('梯形累计位移 (m)',n(result.trapezoid_m),'good'),
+          item('左矩形误差 (m)',n(result.left_error_m)),
+          item('梯形误差 (m)',n(result.trapezoid_error_m)),
+          item('首区间加速度 (m/s²)',n(result.first_interval_accel_mps2)),
+          item('差分加速度噪声RMS (m/s²)',n(result.accel_noise_rms_mps2)),
+          item('本地应保存PNG',result.chart_count+'张'));
+        explanation='D17按实际时间戳差计算；左矩形和梯形均是离散积分，差分是区间平均速度变化率。误差与真实参考值来自本课固定数学函数。浏览器只执行JS；本地Python需独立运行。';
+        summaryText='D17 S'+(result.scenario+1)+' left='+n(result.left_m)+
+          'm trap='+n(result.trapezoid_m)+'m acc_noise_rms='+n(result.accel_noise_rms_mps2)+'m/s²';
+      }else{
+        grid.append(item('错误类别',result.error_kind,'bad'));
+        explanation='无效时间戳：'+result.diagnostic+'。没有有效位移、加速度或可供使用的图。';
+        summaryText='D17 S'+(result.scenario+1)+' status=-2 valid=0';
+      }
     }else if(lesson.runner==='coordinate_frames_day16'){
       grid.append(item('案例编号','S'+String(result.scenario+1).padStart(2,'0')),
         item('计算状态status',result.status,result.status===0?'good':'bad'),
@@ -721,6 +799,27 @@ $('runButton').onclick=async()=>{
         msg.textContent='错误定位：'+result.source+' 第'+result.error_line+'行，字段'+
           result.error_field+'，类别'+result.error_kind+'。原始CSV可在完整工程文件标签中查看。';
         $('output').append(msg);
+      }
+    }
+    if(lesson.runner==='discrete_calculus_day17'){
+      if(result.valid){
+        if(result.interval_count<=40){
+          const times=result.time_s;
+          const limit=Math.min(7,result.interval_count);
+          $('output').append(makeTable(['区间i','起点t（s）','终点t（s）',
+             '区间dt（s）','左端速度（m/s）','右端速度（m/s）','差分加速度（m/s²）'],
+             Array.from({length:limit},(_,i)=>[i,
+               times[i].toFixed(3),times[i+1].toFixed(3),
+               (times[i+1]-times[i]).toFixed(3),
+               result.speed_mps[i].toFixed(3),
+               result.speed_mps[i+1].toFixed(3),
+               result.accel_mps2[i].toFixed(3)])));
+        }
+        renderDay17Preview(result);
+      }else{
+        const p=document.createElement('p');
+        p.textContent='拒绝本次计算：'+result.diagnostic+'。不生成有效积分、差分或坐标图。';
+        $('output').append(p);
       }
     }
     if(lesson.runner==='coordinate_frames_day16'){
