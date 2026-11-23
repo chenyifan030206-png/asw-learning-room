@@ -128,3 +128,54 @@
  #learn.theory-first #reading .d16-figure svg{min-width:670px}
  #learn.theory-first #reading .d16-formula{font-size:12.5px}
 }
+
+/* D17微积分与离散时间：与D16共享“先理论后代码”布局，但使用速度积分专用图文。 */
+#learn.theory-first #reading .d17-index{padding:20px;border:1px solid var(--border);
+ background:var(--soft);border-radius:13px;min-width:0}
+#learn.theory-first #reading .d17-index h3{margin:0 0 11px;font-size:19px}
+#learn.theory-first #reading .d17-index p{line-height:1.8}
+#learn.theory-first #reading .d17-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#learn.theory-first #reading .d17-links a{padding:9px 11px;border:1px solid var(--border);
+ background:var(--panel);border-radius:7px;line-height:1.5;text-decoration:none;color:var(--fg);
+ overflow-wrap:anywhere;font-size:13px}
+#learn.theory-first #reading .d17-concept{border:1px solid var(--border);border-radius:14px;
+ background:var(--panel);padding:26px;min-width:0;max-width:100%;scroll-margin-top:15px}
+#learn.theory-first #reading .d17-concept h3{font-size:20px;line-height:1.5;margin:8px 0 16px}
+#learn.theory-first #reading .d17-concept h4{font-size:15px;margin:17px 0 9px}
+#learn.theory-first #reading .d17-step{font-size:13px;color:var(--accent);font-weight:700}
+#learn.theory-first #reading .d17-lead{font-size:16px;font-weight:600;line-height:1.9}
+#learn.theory-first #reading .d17-prose{font-size:15.7px;line-height:1.95}
+#learn.theory-first #reading .d17-figure{border:1px solid var(--border);
+ border-radius:12px;padding:11px;margin:20px 0;background:var(--panel);max-width:100%;min-width:0}
+#learn.theory-first #reading .d17-figure-canvas{width:100%;max-width:100%;min-width:0;
+ overflow-x:auto;-webkit-overflow-scrolling:touch}
+#learn.theory-first #reading .d17-figure svg{min-width:640px;width:100%;height:auto;display:block}
+#learn.theory-first #reading .d17-figure figcaption{color:var(--muted);font-size:13px;
+ line-height:1.75;padding:9px 5px}
+#learn.theory-first #reading .d17-dt-buttons{display:flex;gap:9px;align-items:center;
+ flex-wrap:wrap;margin:8px 4px;font-size:13px}
+#learn.theory-first #reading .d17-dt-buttons button[aria-pressed=true]{
+ background:var(--soft);color:var(--accent);border-color:var(--accent);font-weight:700}
+#learn.theory-first #reading .d17-formula{border-left:3px solid var(--accent);
+ background:var(--soft);border-radius:0 10px 10px 0;padding:13px 15px;margin:18px 0}
+#learn.theory-first #reading .d17-formula pre{white-space:pre-wrap;overflow-x:auto;
+ padding:11px;border:0;line-height:1.75;font-size:13.5px}
+#learn.theory-first #reading .d17-worked{padding-left:27px;line-height:1.8}
+#learn.theory-first #reading .d17-worked li{margin:9px 0}
+#learn.theory-first #reading .d17-check{margin:20px 0;padding:13px 6px;
+ border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+#learn.theory-first #reading .d17-check summary{font-weight:700}
+#learn.theory-first #reading .d17-check p{line-height:1.85}
+#learn.theory-first #reading .d17-code-jump{font-size:14px;margin-top:4px}
+#learn.theory-first #reading .d17-concept:target{outline:2px solid var(--accent)}
+.d17-run-chart{padding:12px;border:1px solid var(--border);border-radius:10px;
+ margin:15px 0;max-width:100%;overflow-x:auto}
+.d17-run-chart svg{min-width:460px;display:block}
+@media(max-width:680px){
+ #learn.theory-first #reading .d17-index{padding:14px}
+ #learn.theory-first #reading .d17-links{grid-template-columns:1fr}
+ #learn.theory-first #reading .d17-concept{padding:17px 12px}
+ #learn.theory-first #reading .d17-figure{padding:8px}
+ #learn.theory-first #reading .d17-figure svg{min-width:660px}
+ #learn.theory-first #reading .d17-formula pre{font-size:12.5px}
+}

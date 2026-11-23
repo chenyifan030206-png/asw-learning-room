@@ -8,6 +8,8 @@ on:
       - 'app.js'
       - 'index.html'
       - 'day16-project/**'
+      - 'day17-project/**'
+      - 'day17-theory.js'
       - 'day16-theory.js'
       - 'style.css'
       - 'tests/day16_browser.py'
@@ -20,6 +22,8 @@ on:
       - 'app.js'
       - 'index.html'
       - 'day16-project/**'
+      - 'day17-project/**'
+      - 'day17-theory.js'
       - 'day16-theory.js'
       - 'style.css'
       - 'tests/day16_browser.py'
@@ -44,8 +48,8 @@ jobs:
           import json
           from pathlib import Path
           b=json.loads(Path('courses.json').read_text(encoding='utf-8'))
-          assert b['release']=='day16-20261119-theory-first-v2'
-          assert len(b['lessons'])==16
+          assert b['release']=='day17-20261123-discrete-calculus-v1'
+          assert len(b['lessons'])>=17
           assert b['lessons']['15']['runner']=='python_numpy_logs_day15'
           assert b['lessons']['16']['runner']=='coordinate_frames_day16'
           assert b['curriculum'][15]['主题']=='线性代数与坐标系'
@@ -66,7 +70,7 @@ jobs:
           assert 'day16-theory.js' in html
           app=Path('app.js').read_text(encoding='utf-8')
           assert "lesson.runner==='coordinate_frames_day16'" in app
-          assert "window.Day16Theory.render" in app
+          assert "theoryRenderer.render" in app and "window.Day16Theory" in app
           print('PASS D16 theory-first: diagrams, 14 detailed sections, code links')
   
           assert len(b['rules']['16']['needed'])==7
