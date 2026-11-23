@@ -445,6 +445,50 @@ function pagesSimulate(day,values){
       states:rows.map(x=>x.state),alerts:rows.map(x=>x.alert),statuses:rows.map(x=>x.status),
       valids:rows.map(x=>x.valid),alert_changes:rows.filter((x,i)=>i>0&&x.alert!==rows[i-1].alert).length,
       compiler_log:'浏览器JavaScript模拟同一状态机规则，未编译C文件；用户须在WSL独立执行GCC/CTest。'};
+  }else if(day===17){
+    // 浏览器只按与calculus.py相同的离散数学公式进行JavaScript演算。
+    const [scenario]=pagesNumbers(values,1);
+    if(!Number.isInteger(scenario)||scenario<0||scenario>7)
+      throw Error('D17场景必须是S01–S08对应的0到7整数。');
+    if(scenario===7){
+      result={scenario,status:-2,valid:0,error_kind:'non_increasing_timestamp',
+        diagnostic:'时间戳必须严格递增；本例[0,.1,.1,.2]出现dt=0。',
+        chart_count:0};
+    }else{
+      const irregular=scenario===6,constant=scenario===0||scenario===1,
+        noisy=scenario===4||scenario===5;
+      const step=(scenario===1||scenario===3||scenario===5)?0.05:0.1;
+      const count=irregular?3:Math.round(2/step);
+      const t=irregular?[0,0.1,0.25,0.35]:Array.from({length:count+1},(_,i)=>2*i/count);
+      const v=t.map((tm,i)=>constant?10:10+2*tm+(noisy?(i%2===0?0.1:-0.1):0));
+      const dt=t.slice(1).map((tm,i)=>tm-t[i]);
+      if(dt.some(x=>!Number.isFinite(x)||x<=0))throw Error('D17时间戳非法');
+      const acc=dt.map((delta,i)=>(v[i+1]-v[i])/delta);
+      const leftInc=dt.map((delta,i)=>v[i]*delta);
+      const trapInc=dt.map((delta,i)=>(v[i]+v[i+1])/2*delta);
+      const cumulative=[0];let left=0,trapezoid=0;
+      for(let i=0;i<dt.length;i++){
+        left+=leftInc[i];trapezoid+=trapInc[i];
+        cumulative.push(trapezoid);
+      }
+      const exact=irregular?3.6225:constant?20:24;
+      const trueAcc=constant?0:2;
+      const rms=Math.sqrt(acc.reduce((sum,x)=>sum+(x-trueAcc)**2,0)/acc.length);
+      result={
+        scenario,status:0,valid:1,
+        mode:irregular?'irregular_time':constant?'constant_speed':
+          noisy?'linear_speed_with_alternating_error':'linear_speed',
+        dt_s:dt[0],dt_min_s:Math.min(...dt),dt_max_s:Math.max(...dt),
+        sample_count:t.length,interval_count:dt.length,
+        time_s:t,speed_mps:v,left_m:left,trapezoid_m:trapezoid,
+        true_displacement_m:exact,left_error_m:left-exact,
+        trapezoid_error_m:trapezoid-exact,
+        accel_mps2:acc,accel_noise_rms_mps2:rms,
+        first_interval_accel_mps2:acc[0],
+        displacement_series_m:cumulative,chart_count:3
+      };
+    }
+    result.compiler_log='仅浏览器JavaScript按公式模拟；NumPy/Matplotlib在本地Python独立执行。';
   }else if(day===8){
     const v=pagesNumbers(values,5),[start,count,value,capacity,on]=v;
     if(!v.every(n=>Number.isInteger(n)&&n>=-100000&&n<=100000)||![0,1].includes(on))throw Error('D08需完整范围内整数，开关0或1。');
@@ -500,6 +544,16 @@ function pagesRegression(day){
     ['T04 超时101ms',[6],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,4,0]}],
     ['T03 未启用',[7],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,5,0]}],
     ['T03 设备故障',[8],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,6,0]}]
+  ];
+  cases[17]=[
+    ['S01 恒速dt0.1',[0],{status:0,valid:1,sample_count:21,interval_count:20,left_m:20,trapezoid_m:20}],
+    ['S02 恒速dt0.05',[1],{status:0,valid:1,sample_count:41,interval_count:40,left_m:20}],
+    ['S03 线性dt0.1',[2],{status:0,valid:1,left_m:23.8,trapezoid_m:24,first_interval_accel_mps2:2}],
+    ['S04 线性dt0.05',[3],{status:0,valid:1,left_m:23.9,trapezoid_m:24}],
+    ['S05 人工误差dt0.1',[4],{status:0,valid:1,accel_noise_rms_mps2:2,first_interval_accel_mps2:0}],
+    ['S06 人工误差dt0.05',[5],{status:0,valid:1,accel_noise_rms_mps2:4,first_interval_accel_mps2:-2}],
+    ['S07 不规则时间',[6],{status:0,valid:1,sample_count:4,dt_min_s:0.1,dt_max_s:0.15,left_m:3.58,trapezoid_m:3.6225}],
+    ['S08 重复时间拒绝',[7],{status:-2,valid:0,chart_count:0,error_kind:'non_increasing_timestamp'}]
   ];
   cases[16]=[
     ['S01 90度单位旋转',[0],{status:0,valid:1,rotation_shape:[2,2],transform_shape:[3,3],world_point:[0,1]}],
