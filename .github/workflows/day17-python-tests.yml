@@ -1,0 +1,158 @@
+name: D17 discrete calculus actual Python and browser lesson tests
+
+on:
+  pull_request:
+    paths:
+      - 'courses.json'
+      - 'app.js'
+      - 'pages-runtime.js'
+      - 'index.html'
+      - 'style.css'
+      - 'day17-theory.js'
+      - 'day17-project/**'
+      - 'tests/day17_browser.py'
+      - '.github/workflows/day17-python-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'courses.json'
+      - 'app.js'
+      - 'pages-runtime.js'
+      - 'index.html'
+      - 'style.css'
+      - 'day17-theory.js'
+      - 'day17-project/**'
+      - 'tests/day17_browser.py'
+      - '.github/workflows/day17-python-tests.yml'
+
+jobs:
+  actual-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install NumPy/Matplotlib and Chinese fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-noto-cjk
+          python -m pip install -r day17-project/requirements.txt
+      - name: Audit D17 data, learning order, file excerpts and unchanged D16
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          b=json.loads(Path('courses.json').read_text(encoding='utf-8'))
+          assert b['release']=='day17-20261123-discrete-calculus-v1'
+          assert len(b['lessons'])==17
+          assert b['curriculum'][16]['主题']=='微积分与离散时间'
+          assert b['lessons']['16']['runner']=='coordinate_frames_day16'
+          d=b['lessons']['17']
+          assert d['runner']=='discrete_calculus_day17'
+          assert len(d['reading'])==14
+          assert len(set(x['diagram'] for x in d['reading']))>=10
+          assert all(x['lead'] and x['text'] and x['formula'] and
+                     len(x['worked'])>=4 and x['check'] for x in d['reading'])
+          assert len(d['questions'])==14 and len(d['practice']['fields'])==9
+          assert len(d['experiments'])==8 and len(b['rules']['17']['needed'])==8
+          assert len(d['assets'])==7
+          assert len(d['code_sections'])>=10
+          for item in d['assets']:
+              content=Path('day17-project',item['name']).read_text(encoding='utf-8')
+              assert item['text']==content,item['name']
+          for code in d['code_sections']:
+              src=next(a['text'] for a in d['assets'] if a['name']==code['file'])
+              assert code['start'] in src,code['title']
+              assert code['end'] in src,code['title']
+              assert code['text'] and code['trace']
+          html=Path('index.html').read_text(encoding='utf-8')
+          app=Path('app.js').read_text(encoding='utf-8')
+          assert 'day17-theory.js' in html and 'day16-theory.js' in html
+          assert 'theoryRenderer.render' in app and 'renderDay17Preview' in app
+          assert 'window.Day17Theory' in Path('day17-theory.js').read_text(encoding='utf-8')
+          assert Path('docs/day17/COURSE_DESIGN_AND_VERIFICATION.md').exists()
+          print('PASS D17 math-first schema, embedded sources, Q14/P9, 8 cases and retained D16')
+          PY
+      - name: Run actual Python unit tests, case results and three image files
+        run: |
+          cd day17-project
+          python -m compileall -q .
+          python -m unittest -v test_calculus
+          python - <<'PY'
+          import json,math,subprocess
+          from pathlib import Path
+          path=Path('charts')
+          results=[]
+          for case in range(8):
+              cmd=['python','demo.py','--scenario',str(case),'--out',str(path/str(case))]
+              p=subprocess.run(cmd,capture_output=True,text=True)
+              expected_exit=2 if case==7 else 0
+              assert p.returncode==expected_exit,(case,p.stdout,p.stderr)
+              line=next(x for x in p.stdout.splitlines()
+                        if x.startswith('result_json=') or x.startswith('diagnostic_json='))
+              r=json.loads(line.split('=',1)[1]);results.append(r)
+              assert r['scenario']==case
+              if case==7:
+                  assert r['status']==-2 and r['valid']==0
+                  assert 'left_m' not in r and 'accel_mps2' not in r
+                  assert not (path/str(case)).exists()
+              else:
+                  assert r['status']==0 and r['valid']==1
+                  assert len(list((path/str(case)).glob('*.png')))==3
+          assert math.isclose(results[0]['trapezoid_m'],20,abs_tol=1e-9)
+          assert math.isclose(results[1]['left_m'],20,abs_tol=1e-9)
+          assert math.isclose(results[2]['left_m'],23.8,abs_tol=1e-9)
+          assert math.isclose(results[2]['trapezoid_m'],24,abs_tol=1e-9)
+          assert math.isclose(results[3]['left_m'],23.9,abs_tol=1e-9)
+          assert math.isclose(results[4]['accel_noise_rms_mps2'],2,abs_tol=1e-9)
+          assert math.isclose(results[5]['accel_noise_rms_mps2'],4,abs_tol=1e-9)
+          assert math.isclose(results[6]['trapezoid_m'],3.6225,abs_tol=1e-9)
+          print('PASS actual eight Python cases, 3 PNG each for seven valid scenarios')
+          PY
+      - name: JS syntax and every existing D01-D17 browser regression
+        run: |
+          node --check app.js
+          node --check pages-runtime.js
+          node --check day16-theory.js
+          node --check day17-theory.js
+          node <<'JS'
+          const fs=require('fs'),vm=require('vm');
+          const b=JSON.parse(fs.readFileSync('courses.json','utf8'));
+          const cx=vm.createContext({
+            location:{href:'http://127.0.0.1:8765/index.html'},
+            document:{documentElement:{dataset:{courseVersion:b.release}}},
+            localStorage:{getItem:()=>null,setItem:()=>{}},
+            fetch:async()=>({ok:true,json:async()=>b}),
+            window:{dispatchEvent:()=>{}},crypto:{randomUUID:()=>''},
+            Event:class{},URL,console,Date,Number,Math,JSON
+          });
+          vm.runInContext(fs.readFileSync('pages-runtime.js','utf8'),cx);
+          let n=0;
+          for(let day=1;day<=17;day++){
+            const cases=vm.runInContext('pagesRegression('+day+')',cx);
+            for(const c of cases){
+              if(!c.passed)throw new Error('D'+day+' '+c.name+': '+JSON.stringify(c.actual));
+              n++;
+            }
+          }
+          const r=vm.runInContext('pagesSimulate(17,[7])',cx);
+          if(r.valid!==0||r.status!==-2||'left_m' in r)
+            throw Error('invalid timestamps must have no valid integrals');
+          console.log('PASS '+n+' D01-D17 JS simulation regressions');
+          JS
+
+  chromium:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser testing prerequisites
+        run: |
+          python3 -m pip install --user playwright
+          python3 -m playwright install chromium --with-deps
+      - name: Test real D17 page navigation, illustrations, notes, ZIP, mobile and 8 cases
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/d17-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          python3 tests/day17_browser.py
