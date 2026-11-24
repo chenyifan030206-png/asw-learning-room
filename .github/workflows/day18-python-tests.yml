@@ -1,0 +1,114 @@
+name: D18 real Python statistics lowpass and browser lesson tests
+on:
+  pull_request:
+    paths: ['courses.json','app.js','pages-runtime.js','index.html','style.css','day18-theory.js','day18-project/**','tests/day18_browser.py','.github/workflows/day18-python-tests.yml']
+  push:
+    branches: [main]
+    paths: ['courses.json','app.js','pages-runtime.js','index.html','style.css','day18-theory.js','day18-project/**','tests/day18_browser.py','.github/workflows/day18-python-tests.yml']
+jobs:
+  actual-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install NumPy Matplotlib and fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-noto-cjk
+          python -m pip install -r day18-project/requirements.txt
+      - name: Check actual lesson assets and complete API guide
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          b=json.loads(Path('courses.json').read_text())
+          assert b['curriculum'][17]['主题']=='概率与低通滤波'
+          d=b['lessons']['18']
+          assert d['runner']=='noise_lowpass_day18' and len(d['reading'])==12
+          assert len(d['questions'])==15 and len(d['practice']['fields'])==9
+          assert len(d['experiments'])==7
+          assert len(d['assets'])==7
+          for a in d['assets']:
+              assert a['text']==Path('day18-project',a['name']).read_text(),a['name']
+          for c in d['code_sections']:
+              s=next(a['text'] for a in d['assets'] if a['name']==c['file'])
+              assert c['start'] in s and c['end'] in s,c['title']
+          assert 'np.flatnonzero' in Path('day18-project/FUNCTION_GUIDE.md').read_text()
+          PY
+      - name: Actual NumPy tests and CLI plots
+        run: |
+          cd day18-project
+          python -m unittest -v test_filtering
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          rows=[]
+          for i in range(7):
+              p=subprocess.run(['python','demo.py','--scenario',str(i),'--out','charts/'+str(i)],capture_output=True,text=True)
+              assert p.returncode==(2 if i==6 else 0),(p.stdout,p.stderr)
+              r=json.loads(next(x for x in p.stdout.splitlines() if x.startswith('result_json=')).split('=',1)[1])
+              rows.append(r)
+              if i<6:
+                  assert r['valid']==1
+                  for f in ('noise.png','step.png'):
+                      assert Path('charts',str(i),f).stat().st_size>8000
+              else:
+                  assert r['valid']==0 and 'filtered' not in r and not Path('charts/6').exists()
+          assert rows[0]['raw']==rows[1]['raw']
+          Path('../day18-python-results.json').write_text(json.dumps(rows))
+          PY
+      - name: JS syntax previous regression and Python JS cross-check
+        run: |
+          node --check app.js
+          node --check pages-runtime.js
+          node --check day18-theory.js
+          node <<'JS'
+          const fs=require('fs'),vm=require('vm');
+          const b=JSON.parse(fs.readFileSync('courses.json','utf8'));
+          const cx=vm.createContext({
+            location:{href:'http://127.0.0.1:8765/index.html'},
+            document:{documentElement:{dataset:{courseVersion:b.release}}},
+            localStorage:{getItem:()=>null,setItem:()=>{}},
+            fetch:async()=>({ok:true,json:async()=>b}),
+            window:{dispatchEvent:()=>{}},crypto:{randomUUID:()=>''},
+            Event:class{},URL,console,Date,Number,Math,JSON
+          });
+          vm.runInContext(fs.readFileSync('pages-runtime.js','utf8'),cx);
+          let total=0;
+          for(let day=1;day<=18;day++){
+            for(const c of vm.runInContext('pagesRegression('+day+')',cx)){
+              if(!c.passed)throw Error('D'+day+' '+c.name);
+              total++;
+            }
+          }
+          const expected=JSON.parse(fs.readFileSync('day18-python-results.json','utf8'));
+          function compare(a,b,path){
+            if(Array.isArray(a)){
+              if(!Array.isArray(b)||a.length!==b.length)throw Error(path+' shape');
+              a.forEach((x,i)=>compare(x,b[i],path+'['+i+']'));
+            }else if(typeof a==='number'){
+              if(typeof b!=='number'||Math.abs(a-b)>1e-10)throw Error(path+' '+a+' != '+b);
+            }else if(a!==b)throw Error(path+' '+a+' != '+b);
+          }
+          expected.forEach((r,i)=>{
+            const s=vm.runInContext('pagesSimulate(18,['+i+'])',cx);
+            for(const k of Object.keys(r))if(k!=='diagnostic')compare(r[k],s[k],'S'+i+'.'+k);
+            if(i===6&&('filtered' in s))throw Error('invalid output');
+          });
+          console.log('PASS '+total+' regressions and all 7 Python/JS cases, including complete series');
+          JS
+  chromium:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium
+        run: |
+          python3 -m pip install --user playwright
+          python3 -m playwright install chromium --with-deps
+      - name: Actual lesson page, API guide ZIP, alpha switching, cases and notes
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/d18-http.log 2>&1 &
+          trap 'kill $! || true' EXIT
+          python3 tests/day18_browser.py

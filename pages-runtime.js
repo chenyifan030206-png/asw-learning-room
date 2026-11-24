@@ -1,3 +1,35 @@
+// D18：固定种子、逐帧滤波、独立阶跃，与Python完全相同的教学算法。
+function day18Calculate(scenario){
+  if(!Number.isInteger(scenario)||scenario<0||scenario>6)throw Error('D18场景编号应为0至6');
+  const alpha=[.1,.8,.1,.8,.1,1,0][scenario];
+  if(scenario===6)return {scenario,status:-2,valid:0,error_kind:'invalid_alpha',diagnostic:'alpha必须大于0且不超过1'};
+  const bias=scenario===4?.4:0,dt=.1,seed=18;let state=seed;
+  const raw=Array.from({length:250},()=>{
+    state=(1664525*state+1013904223)%2**32;
+    return 10+bias+(2*state/2**32-1);
+  });
+  const filter=x=>{
+    const y=[x[0]];
+    for(let i=1;i<x.length;i++)y.push(y[i-1]+alpha*(x[i]-y[i-1]));
+    return y;
+  };
+  const stats=x=>{
+    const mean=x.reduce((a,b)=>a+b,0)/x.length;
+    const variance=x.reduce((a,b)=>a+(b-mean)**2,0)/x.length;
+    return {mean,variance,std:Math.sqrt(variance),bias:mean-10,
+      rmse:Math.sqrt(x.reduce((a,b)=>a+(b-10)**2,0)/x.length)};
+  };
+  const filtered=filter(raw),before=stats(raw.slice(50)),after=stats(filtered.slice(50));
+  const step=Array.from({length:100},(_,i)=>i>=20?1:0),response=filter(step);
+  const idx10=response.slice(20).findIndex(y=>y>=.1-1e-12),
+    idx90=response.slice(20).findIndex(y=>y>=.9-1e-12);
+  const t10=idx10<0?null:idx10*dt,t90=idx90<0?null:idx90*dt;
+  return {scenario,status:0,valid:1,seed,alpha,dt_s:dt,bias_injected:bias,
+    raw_variance:before.variance,filtered_variance:after.variance,
+    raw_mean:before.mean,filtered_mean:after.mean,raw_std:before.std,filtered_std:after.std,
+    raw_bias:before.bias,filtered_bias:after.bias,raw_rmse:before.rmse,filtered_rmse:after.rmse,
+    t10_s:t10,t90_s:t90,rise_s:t10===null||t90===null?null:t90-t10,raw,filtered,step,response};
+}
 'use strict';
 // Pages没有服务端：这里的接口全在浏览器执行，绝不声称是C编译结果。
 const pagesBase = new URL('.', location.href);
@@ -445,6 +477,10 @@ function pagesSimulate(day,values){
       states:rows.map(x=>x.state),alerts:rows.map(x=>x.alert),statuses:rows.map(x=>x.status),
       valids:rows.map(x=>x.valid),alert_changes:rows.filter((x,i)=>i>0&&x.alert!==rows[i-1].alert).length,
       compiler_log:'浏览器JavaScript模拟同一状态机规则，未编译C文件；用户须在WSL独立执行GCC/CTest。'};
+  }else if(day===18){
+    const [scenario]=pagesNumbers(values,1);
+    result=day18Calculate(scenario);
+    result.compiler_log='浏览器JavaScript等价演算；真实NumPy/Matplotlib独立在本地运行。';
   }else if(day===17){
     // 浏览器只按与calculus.py相同的离散数学公式进行JavaScript演算。
     const [scenario]=pagesNumbers(values,1);
@@ -545,6 +581,103 @@ function pagesRegression(day){
     ['T03 未启用',[7],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,5,0]}],
     ['T03 设备故障',[8],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,6,0]}]
   ];
+  cases[18]=[
+  [
+    "噪声alpha0.1",
+    [
+      0
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "raw_variance": 0.3264113116587177,
+      "filtered_variance": 0.014745207338574165,
+      "rise_s": 2.1,
+      "filtered_bias": -0.03181967796045271
+    }
+  ],
+  [
+    "噪声alpha0.8",
+    [
+      1
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "raw_variance": 0.3264113116587177,
+      "filtered_variance": 0.2243206582507805,
+      "rise_s": 0.1,
+      "filtered_bias": -0.03369659895464494
+    }
+  ],
+  [
+    "阶跃alpha0.1",
+    [
+      2
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "raw_variance": 0.3264113116587177,
+      "filtered_variance": 0.014745207338574165,
+      "rise_s": 2.1,
+      "filtered_bias": -0.03181967796045271
+    }
+  ],
+  [
+    "阶跃alpha0.8",
+    [
+      3
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "raw_variance": 0.3264113116587177,
+      "filtered_variance": 0.2243206582507805,
+      "rise_s": 0.1,
+      "filtered_bias": -0.03369659895464494
+    }
+  ],
+  [
+    "固定偏差",
+    [
+      4
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "raw_variance": 0.32641131165871784,
+      "filtered_variance": 0.014745207338574104,
+      "rise_s": 2.1,
+      "filtered_bias": 0.3681803220395423
+    }
+  ],
+  [
+    "不滤波",
+    [
+      5
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "raw_variance": 0.3264113116587177,
+      "filtered_variance": 0.3264113116587177,
+      "rise_s": 0,
+      "filtered_bias": -0.03479737100191471
+    }
+  ],
+  [
+    "拒绝非法alpha",
+    [
+      6
+    ],
+    {
+      "status": -2,
+      "valid": 0,
+      "error_kind": "invalid_alpha"
+    }
+  ]
+];
   cases[17]=[
     ['S01 恒速dt0.1',[0],{status:0,valid:1,sample_count:21,interval_count:20,left_m:20,trapezoid_m:20}],
     ['S02 恒速dt0.05',[1],{status:0,valid:1,sample_count:41,interval_count:40,left_m:20}],

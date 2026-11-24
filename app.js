@@ -365,15 +365,15 @@ async function selectDay(d){
   $('goals').replaceChildren();for(const goal of lesson.goals){const li=document.createElement('li');li.textContent=goal;$('goals').append(li);}
   renderCode();renderDay11Guide();renderDay12Guide();renderBitLab();
   // 理论型课程按“问题→图→推导→代码”阅读；其他课保留原来的页面结构。
-  const theoryFirst=['coordinate_frames_day16','discrete_calculus_day17'].includes(lesson.runner);
-  const theoryRenderer=lesson.runner==='discrete_calculus_day17'?
+  const theoryFirst=['coordinate_frames_day16','discrete_calculus_day17','noise_lowpass_day18'].includes(lesson.runner);
+  const theoryRenderer=lesson.runner==='noise_lowpass_day18'?window.Day18Theory:lesson.runner==='discrete_calculus_day17'?
     window.Day17Theory:window.Day16Theory;
   $('learn').classList.toggle('theory-first',theoryFirst);
   const theoryHeading=$('readingHeading');
   if(theoryFirst){
     theoryHeading.textContent='先用图和手算理解原理 · 读完再进入完整Python工程';
     $('architecture').before(theoryHeading,$('reading'));
-    $('codeIntro').textContent=lesson.runner==='discrete_calculus_day17'?
+    $('codeIntro').textContent=lesson.runner==='noise_lowpass_day18'?'先阅读 FUNCTION_GUIDE.md 的新函数定义，再按固定种子→滤波→统计→阶跃→绘图理解完整源码。个人副本与笔记仍独立保存。':lesson.runner==='discrete_calculus_day17'?
       '你已经在上方用速度—时间图手算面积、斜率、dt和数值误差。现在按入口→时间校验→积分/差分→结果→绘图的顺序对应Python；完整中文源码和个人批注仍可逐文件查看、编辑并自动保存。':
       '上方理论已经解释坐标、角度、R、T和逆变换。这里再沿实际Python函数逐行对照：先理解参数与返回值，接着读运算过程，最后结合案例运行。完整源码保留在下方，个人副本和代码旁注继续自动保存。';
     $('architectureHeading').textContent='理论与代码怎样对应 · 先对照数据流，再阅读源文件';
@@ -635,6 +635,26 @@ $('runButton').onclick=async()=>{
         summaryText='D15 '+result.source+' status='+result.status+'，第'+result.error_line+
           '行 '+result.error_field+' '+result.error_kind;
       }
+    }else if(lesson.runner==='noise_lowpass_day18'){
+      grid.append(item('案例','S'+String(result.scenario+1).padStart(2,'0')),
+        item('status',result.status,result.status===0?'good':'bad'),
+        item('valid',result.valid,result.valid?'good':'bad'));
+      if(result.valid){
+        const n=x=>x===null?'观察窗内未达到':Number(x).toFixed(6);
+        grid.append(item('alpha',result.alpha),item('固定种子',result.seed),
+          item('原始方差 (m/s)²',n(result.raw_variance)),item('滤后方差 (m/s)²',n(result.filtered_variance)),
+          item('原始均值 (m/s)',n(result.raw_mean)),item('滤后均值 (m/s)',n(result.filtered_mean)),
+          item('原始标准差 (m/s)',n(result.raw_std)),item('滤后标准差 (m/s)',n(result.filtered_std)),
+          item('原始平均误差 (m/s)',n(result.raw_bias)),item('滤后平均误差 (m/s)',n(result.filtered_bias)),
+          item('原始RMSE (m/s)',n(result.raw_rmse)),item('滤后RMSE (m/s)',n(result.filtered_rmse)),
+          item('t10 (s)',n(result.t10_s)),item('t90 (s)',n(result.t90_s)),item('10%–90%上升时间 (s)',n(result.rise_s)));
+        explanation='固定种子相同，后200个样本采用ddof=0；阶跃为单独无噪声实验，相对第20个索引计时。方差下降不代表固定偏差消除。浏览器只运行JS。';
+        summaryText='D18 S'+(result.scenario+1)+' variance='+n(result.filtered_variance)+' rise='+n(result.rise_s);
+      }else{
+        grid.append(item('错误类别',result.error_kind,'bad'));
+        explanation='非法alpha：'+result.diagnostic+'，不生成有效数值或图。';
+        summaryText='D18 S'+(result.scenario+1)+' status=-2 valid=0';
+      }
     }else if(lesson.runner==='discrete_calculus_day17'){
       grid.append(item('案例','S'+String(result.scenario+1).padStart(2,'0')),
         item('status',result.status,result.status===0?'good':'bad'),
@@ -799,6 +819,18 @@ $('runButton').onclick=async()=>{
         msg.textContent='错误定位：'+result.source+' 第'+result.error_line+'行，字段'+
           result.error_field+'，类别'+result.error_kind+'。原始CSV可在完整工程文件标签中查看。';
         $('output').append(msg);
+      }
+    }
+    if(lesson.runner==='noise_lowpass_day18'&&result.valid){
+      const pairs=[
+        [result.raw,result.filtered,'固定种子噪声与滤波','速度（m/s）'],
+        [result.step,result.response,'无噪声单位阶跃','归一化幅值']
+      ];
+      for(const [a,b,title,label] of pairs){
+        const block=document.createElement('div');block.className='d17-run-chart';
+        const svg=window.Day18Theory.drawPair(a,b,title,label,result.dt_s);
+        svg.dataset.role='day18-chart';block.append(svg);
+        const cap=document.createElement('p');cap.className='muted';cap.textContent='浏览器JS等价演算图；本地运行demo.py独立生成PNG。';block.append(cap);$('output').append(block);
       }
     }
     if(lesson.runner==='discrete_calculus_day17'){

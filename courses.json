@@ -11123,6 +11123,797 @@
         }
       ],
       "code": "\"\"\"D17命令行入口：选择案例、计算结果、保存三张真正的Matplotlib图片。\n\n示例：\n    python demo.py --scenario 0 --out charts\n    python -m unittest -v test_calculus\n\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\n\nfrom plot_motion import save_motion_charts\nfrom scenarios import run_scenario\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description=\"D17微积分与离散时间：积分/差分\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(8), default=0,\n                        help=\"0/1恒速dt，2/3线性速度dt，4/5噪声差分，6不等间隔，7无效时间戳\")\n    parser.add_argument(\"--out\", default=\"charts\", help=\"保存三张中文PNG的目录\")\n    args = parser.parse_args()\n\n    # 根据场景编号构造离线数据，并调用calculus.py进行计算。\n    result = run_scenario(args.scenario)\n    print(f\"scenario={args.scenario} status={result['status']} valid={result['valid']}\")\n    if not result[\"valid\"]:\n        # 时间戳无效时明确返回错误，不制造看起来有效的位移曲线。\n        print(\"diagnostic_json=\" + json.dumps(result, ensure_ascii=False))\n        return 2\n\n    # 把Python浮点数结果打印给操作者，便于逐项核对手算。\n    print(\"result_json=\" + json.dumps(result, ensure_ascii=False))\n    pngs = save_motion_charts(result[\"time_s\"], result[\"speed_mps\"], Path(args.out))\n    for file in pngs:\n        print(\"chart=\" + str(file))\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n"
+    },
+    "18": {
+      "day": 18,
+      "revision": "2026-11-24-day18-v1",
+      "title": "概率与低通滤波：误差、噪声、统计量与一阶递推",
+      "source": "demo.py",
+      "runner": "noise_lowpass_day18",
+      "project_name": "day18_noise_lowpass",
+      "time": "建议分两次学习：先理解误差和概率统计、手算递推，再阅读API手册与工程，完成七组案例及本地实作。",
+      "summary": "承接D17批注，从误差与噪声关系切入，理解概率、均值、方差、标准差、RMSE及低通滤波，比较相同种子下alpha=0.1/0.8的波动和阶跃响应。新增完整非自定义函数手册并随ZIP下载。",
+      "goals": [
+        "区分误差、偏差、噪声与数值近似误差",
+        "理解概率、均匀分布、种子及控制变量",
+        "手算均值、两种方差口径、标准差、偏差及RMSE",
+        "由权重推导一阶递推与阶跃响应",
+        "测量原始/滤后方差和10%–90%上升时间",
+        "读懂新API、运行真实Python和测试"
+      ],
+      "flow_text": "demo.main→scenarios.run_scenario→seeded_noise→lowpass→statistics及step_metrics→返回状态与结果→save_charts→两张PNG。",
+      "remediation_title": "从误差与噪声开始，先推导统计与递推，再学API",
+      "project_intro": {
+        "title": "为什么传感器数据需要滤波？",
+        "paragraphs": [
+          "D17批注提出误差和噪声的关系。本课先回答这个问题，再学习统计和滤波。",
+          "两种alpha用相同数据；独立无噪声阶跃测响应，不能用平滑代替准确性。",
+          "FUNCTION_GUIDE.md与源码一起下载，每个新库API有定义、参数、返回值和例子。"
+        ]
+      },
+      "architecture": {
+        "headers": [
+          "文件",
+          "职责",
+          "输入与返回"
+        ],
+        "rows": [
+          [
+            "filtering.py",
+            "生成固定种子序列、滤波、统计和阶跃",
+            "数组与alpha→数组、指标"
+          ],
+          [
+            "scenarios.py",
+            "组织七个场景",
+            "编号→结果字典"
+          ],
+          [
+            "demo.py",
+            "命令行与绘图",
+            "参数→JSON、PNG"
+          ],
+          [
+            "test_filtering.py",
+            "独立手算验收",
+            "测试→成功或失败"
+          ],
+          [
+            "FUNCTION_GUIDE.md",
+            "非自定义API定义与最小例子",
+            "阅读参考"
+          ],
+          [
+            "README.md / requirements.txt",
+            "本地运行及依赖",
+            "可复现工程"
+          ]
+        ]
+      },
+      "symbols": [
+        {
+          "name": "x",
+          "file": "filtering.py",
+          "match": "x = np.asarray",
+          "what": "当前测量数组",
+          "lifetime": "输入"
+        },
+        {
+          "name": "y",
+          "file": "filtering.py",
+          "match": "y = np.empty_like",
+          "what": "滤波结果",
+          "lifetime": "递推"
+        },
+        {
+          "name": "alpha",
+          "file": "filtering.py",
+          "match": "alpha *",
+          "what": "当前输入权重",
+          "lifetime": "递推"
+        },
+        {
+          "name": "variance",
+          "file": "filtering.py",
+          "match": "np.var",
+          "what": "围绕均值平方偏差平均",
+          "lifetime": "统计"
+        },
+        {
+          "name": "bias",
+          "file": "filtering.py",
+          "match": "mean - truth",
+          "what": "平均误差",
+          "lifetime": "统计"
+        },
+        {
+          "name": "rise",
+          "file": "filtering.py",
+          "match": "rise =",
+          "what": "10%到90%采样时差",
+          "lifetime": "阶跃"
+        }
+      ],
+      "run_fields": [
+        {
+          "id": "scenario",
+          "label": "S01–S07 · 选择滤波案例",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "S01 · alpha=.1 固定种子噪声"
+            ],
+            [
+              "1",
+              "S02 · alpha=.8 同一噪声"
+            ],
+            [
+              "2",
+              "S03 · alpha=.1 无噪声阶跃"
+            ],
+            [
+              "3",
+              "S04 · alpha=.8 无噪声阶跃"
+            ],
+            [
+              "4",
+              "S05 · 加入0.4m/s固定偏差"
+            ],
+            [
+              "5",
+              "S06 · alpha=1 不滤波对照"
+            ],
+            [
+              "6",
+              "S07 · alpha=0 非法输入"
+            ]
+          ]
+        }
+      ],
+      "reading": [
+        {
+          "title": "01｜误差和噪声：为什么车速10m/s，仪器却显示10.3？",
+          "lead": "误差是测量值减真值，噪声是使读数随机或不规则波动的成分。",
+          "text": "假设车始终以10m/s前进，三次仪器读数是9.8、10.3、10.1。分别减10得到−0.2、+0.3、+0.1m/s，这些是有符号测量误差。实际车辆的真值通常未知，本课用已知真值的模拟数据才可以直接计算误差。若仪器始终高报0.4m/s，那是固定系统偏差；若围绕某平均水平上下波动，则可用随机噪声模型描述。在简单加性模型中，测量值z=x+b+e，x是真实物理量，b为固定偏差，e为零均值随机噪声。一次误差等于b+e，并不是每个误差都叫噪声。D17还出现过左矩形积分的离散误差：即使输入没有噪声，近似面积仍可能不准确。三类问题需采用不同解决办法：校准偏差、滤波抑制波动、改进数值积分。",
+          "diagram": "error",
+          "formula": "z_k = x_k + b + e_k；测量误差=z_k−x_k=b+e_k",
+          "worked": [
+            "真值10，读数10.3，误差+0.3。",
+            "若偏差+0.4、噪声−0.1，则误差仍为+0.3。",
+            "固定偏差使整组读数整体偏移。",
+            "D17离散误差即使无噪声也可能存在。"
+          ],
+          "check": {
+            "question": "误差是否都来自噪声？",
+            "answer": "不，误差还可能来自偏差、离散近似、单位错误等。"
+          },
+          "code_step": 0
+        },
+        {
+          "title": "02｜为什么要用概率？从一次读数到很多次读数",
+          "lead": "对于不规则波动，单次结果无法说明整个仪器的行为，需要描述一组可能出现的值。",
+          "text": "随机变量是把随机结果写成数字。例如每次测量产生一个误差e，它可能是正也可能是负。概率描述事件出现的可能性，介于0与1之间；例如理想均匀分布U(−1,1)中，等长小区间有相同概率，P(|e|≤0.5)=1/2。概率分布描述所有可能误差及其概率，而不是保证某一帧的误差值。连续分布中概率用区间面积表示，单个精确值的概率为0。D18用固定种子的简单伪随机生成器产生范围[-1,1)的近似均匀教学序列，不把它当作实车分布；实际传感器可能有漂移、相关噪声、异常值或非高斯分布。下一节先认识均值，再学习波动大小。",
+          "diagram": "uniform",
+          "formula": "理想均匀噪声：e~U(-1,1)，E[e]=0，Var(e)=1/3 (m/s)^2",
+          "worked": [
+            "范围宽度2，[-0.5,0.5]宽度1。",
+            "概率为1/2。",
+            "对称性使理论平均值为0。",
+            "有限样本均值不必恰好为0。"
+          ],
+          "check": {
+            "question": "随机噪声一定是高斯分布吗？",
+            "answer": "不一定，本课采用均匀范围教学数据。"
+          },
+          "code_step": 0
+        },
+        {
+          "title": "03｜固定随机种子：为什么两次实验必须用同一组噪声？",
+          "lead": "如果alpha=0.1与0.8分别面对不同噪声，就难以区分结果差别来自滤波还是输入本身。",
+          "text": "伪随机生成器用确定的算法从一个整数状态产生下一状态，种子决定起点。本课选seed=18，采用state=(1664525*state+1013904223) % 2**32。%是取余，让整数状态保持在0至2**32−1。再除以2**32得到[0,1)范围，乘2减1得到[-1,1)。Python与JS都使用同一递推，因此两端逐样本一致。这只是用于复现和跨语言对账的简易算法，不是安全随机数，也不是高质量噪声模型。np.empty先分配250个未初始化位置，for循环逐个填写，不能在填充前读取。实验分别使用alpha=.1和.8，却保持同一批输入、采样周期和统计窗口。",
+          "diagram": "seed",
+          "formula": "state_next=(1664525*state+1013904223) mod 2^32；e=2*state_next/2^32−1",
+          "worked": [
+            "设整数种子18。",
+            "递推一次并取余。",
+            "缩放到[-1,1)。",
+            "重设种子18，序列完全复现。"
+          ],
+          "check": {
+            "question": "为什么不为两组alpha各选随机种子？",
+            "answer": "控制变量：使用同一输入，才能把差别归因于滤波系数。"
+          },
+          "code_step": 0
+        },
+        {
+          "title": "04｜均值：先找到波动围绕的中心",
+          "lead": "如果三次测量是9、10、11m/s，均值10能够描述中心，却不能描述波动程度。",
+          "text": "均值就是所有数字相加除以数量N。数学上常用横线x̄表示样本平均，E[X]表示随机变量的理论期望，二者不是一个概念。对有限记录，np.mean(x)默认对所有元素求平均。若真值为10，样本均值10.4，则这段记录的平均误差为0.4；不能仅凭一个有限样本均值认定仪器有精确0.4的永久偏差，因为随机波动也会让均值偏离真值。相同均值的两组序列仍可能有完全不同的波动。例如[9,10,11]与[7,10,13]均值都是10，但后者更不稳定。因此需要新的指标：方差。",
+          "diagram": "variance",
+          "formula": "x̄=(x₁+…+x_N)/N；平均误差=x̄−真值",
+          "worked": [
+            "(9+10+11)/3=10。",
+            "(7+10+13)/3=10。",
+            "两组均值相同。",
+            "第二组偏离中心更远，需要方差区分。"
+          ],
+          "check": {
+            "question": "均值相同是否表示两组读数同样稳定？",
+            "answer": "不是，还需要衡量围绕均值的波动。"
+          },
+          "code_step": 2
+        },
+        {
+          "title": "05｜方差和标准差：为什么要先减均值再平方？",
+          "lead": "如果直接把正负偏差相加，往往相互抵消，无法描述波动大小。",
+          "text": "以[9,10,11]为例，均值10，偏差[-1,0,1]。偏差相加为0，但这并不表示没有噪声。先平方使偏差非负，得到[1,0,1]，再平均得到2/3。这是当前记录的描述性方差，单位(m/s)^2。开平方得到标准差约0.8165m/s，单位恢复为速度。np.var(x,ddof=0)分母为N；np.std(x,ddof=0)是它的平方根。若要从独立同分布样本估计总体方差，常采用ddof=1即分母N−1：此例为1。因为样本均值由同一组数据估计，偏差存在一个和为0的约束；N−1校正用于总体方差的无偏估计。本课评价一段既定记录的波动，统一用ddof=0；不能把两种口径混用。",
+          "diagram": "variance",
+          "formula": "Var_N = Σ(x_i−x̄)^2/N；std=√Var_N；ddof=1分母N−1",
+          "worked": [
+            "均值10。",
+            "偏差−1、0、1，平方1、0、1。",
+            "方差(1+0+1)/3=2/3。",
+            "标准差√(2/3)≈0.8165。"
+          ],
+          "check": {
+            "question": "方差单位与速度单位相同吗？",
+            "answer": "不同，方差单位是速度单位的平方，标准差才与速度同单位。"
+          },
+          "code_step": 2
+        },
+        {
+          "title": "06｜偏差、方差与RMSE：平滑不等于准确",
+          "lead": "如果所有读数都增加1m/s，方差不会改变，但相对真值的误差会增大。",
+          "text": "比较两组[9,10,11]和[10,11,12]，真值均为10。前者均值10，后者均值11；围绕各自均值的偏差均为[-1,0,1]，方差同为2/3。第二组固定偏离真值，均方误差MSE=平均((测量−真值)^2)=(0+1+4)/3=5/3，RMSE=√(5/3)≈1.291。数学上令x_i−truth=(x_i−x̄)+(x̄−truth)，平方后求平均；交叉项为0，因为Σ(x_i−x̄)=0。因此在本课固定真值、ddof=0下，MSE=方差+平均误差的平方。低通可以减小快速波动，却未必能消除固定偏差；只看曲线平滑程度会漏掉这个问题。D18 S05会把所有读数提高0.4m/s并检查这一现象。",
+          "diagram": "bias",
+          "formula": "MSE=Var_N+(x̄−truth)^2；RMSE=√MSE",
+          "worked": [
+            "[9,10,11]的方差2/3，平均误差0。",
+            "[10,11,12]方差仍2/3，平均误差1。",
+            "第二组MSE=5/3。",
+            "第二组RMSE≈1.291m/s。"
+          ],
+          "check": {
+            "question": "方差变小是否必然意味着测量更接近真值？",
+            "answer": "不一定，还要检查偏差和RMSE。"
+          },
+          "code_step": 2
+        },
+        {
+          "title": "07｜低通滤波为什么能抑制快速波动？",
+          "lead": "面对当前读数11、上一时刻滤波输出10，直接相信11可能把一帧噪声当成真实加速。",
+          "text": "把当前读数记作x[k]，上一时刻输出记作y[k−1]。如果只向当前读数移动一部分，就有y[k]=y[k−1]+alpha*(x[k]−y[k−1])。展开得(1−alpha)y[k−1]+alpha*x[k]。两个权重之和等于1：alpha是新信息的权重，1−alpha是历史输出的权重。alpha=.1时，从10向11只走差值的10%，得到10.1；alpha=.8时得到10.8。因为历史输出已经包含更早的数据，逐帧递推相当于对历史进行指数衰减加权。这里的低通指相对衰减快速变化、保留慢变化；如果真实速度突然变化，滤波器也会将变化延缓。这就是为什么不能只追求平滑。",
+          "diagram": "recursion",
+          "formula": "y[k]=y[k−1]+α(x[k]−y[k−1])=(1−α)y[k−1]+αx[k]",
+          "worked": [
+            "上一输出10，新测量11。",
+            "alpha=.1，差值1乘.1，输出10.1。",
+            "alpha=.8，输出10.8。",
+            "下一帧必须用新输出继续递推。"
+          ],
+          "check": {
+            "question": "公式里的历史值是上一个原始测量吗？",
+            "answer": "不是，是上一个滤波输出y[k−1]。"
+          },
+          "code_step": 1
+        },
+        {
+          "title": "08｜逐帧手算：为什么这种算法称为一阶递推？",
+          "lead": "先让输入从0变为1并保持，观察每次计算如何依赖上次结果。",
+          "text": "规定初始输出y[0]=x[0]=0，后续输入连续为1。alpha=.1时，第一帧输出0.1；第二帧0.1+0.1*(1−0.1)=0.19；第三帧0.19+0.1*(1−0.19)=0.271。alpha=.8时依次为0.8、0.96、0.992。每次只需上一输出与当前输入，故称一阶递推。定义剩余误差r=1−y，则r_new=(1−alpha)*r_old。若已经完成n次更新，r=(1−alpha)^n，因此y=1−(1−alpha)^n。这解释了响应为何越来越接近1但一般不会在有限次数内精确等于1。实际实现必须保存上一输出，不能把每帧都重新初始化为x[k]，否则滤波失效。",
+          "diagram": "step",
+          "formula": "单位阶跃从0开始，第n次更新：y_n=1−(1−α)^n",
+          "worked": [
+            "alpha=.1第一步.1。",
+            "第二步.19，第三步.271。",
+            "alpha=.8第一步.8，第二步.96。",
+            "alpha=1时每次直接等于输入。"
+          ],
+          "check": {
+            "question": "alpha=.1时第二次更新是否为0.2？",
+            "answer": "不是，是0.19，因为这次差值是0.9。"
+          },
+          "code_step": 1
+        },
+        {
+          "title": "09｜上升时间：怎样量化响应变慢？",
+          "lead": "同一滤波器面对随机噪声和真实变化时都有响应，因此我们单独用无噪声阶跃测量延迟。",
+          "text": "本课阶跃输入前20点为0，从索引20起恒为1，dt=0.1秒。把第20号样本当作相对时间0；此时已经执行第一次更新。首次达到输出0.1的相对时刻叫t10，首次达到0.9叫t90，上升时间rise=t90−t10。alpha=.1第一次输出0.1，第22次输出1−0.9^22≈0.9015，所以t10=0、t90=(22−1)*.1=2.1s。alpha=.8第一次输出.8，第二次.96，所以t10=0、t90=.1s。本课仅报告采样时刻，不插值；这些是离散上升时间，不等于整条链路的通信延迟，也不能把alpha=.8的结果当成绝对安全的控制参数。",
+          "diagram": "step",
+          "formula": "t_r=t90−t10；相对阶跃首样本计时，dt=.1s",
+          "worked": [
+            "alpha=.1，第1次更新达到.1。",
+            "第22次更新首次≥.9。",
+            "相对时间2.1s。",
+            "alpha=.8，第2次更新达到.96，rise=.1s。"
+          ],
+          "check": {
+            "question": "为什么alpha=.1的t90是2.1而不是2.2s？",
+            "answer": "第1次更新所在的阶跃首个采样时刻定义为0s。"
+          },
+          "code_step": 3
+        },
+        {
+          "title": "10｜从方差推导alpha的影响：为什么更平滑通常更慢？",
+          "lead": "这一节把前面的概率与递推连接起来，而不只是观察曲线。",
+          "text": "理想化假设：真值恒定，输入噪声e_k独立、零均值、方差σ²，滤波器已经达到统计稳态。令输出误差η_k=(1−α)η_{k−1}+αe_k。独立性使两项的协方差为0，因此Var(η)= (1−α)^2 Var(η)+α²σ²。移项得到Var(η)/σ²=α/(2−α)。alpha=.1比例约0.0526，alpha=.8约0.6667，较小alpha在这些假设下留下更少噪声方差。但阶跃剩余量(1−α)^n也衰减更慢，所以响应慢。有限教学序列不保证恰好满足理论比例；噪声存在相关性、偏差或真值变化时，也不能直接套用。实验报告真实计算的原始/滤后方差，理论值只用于理解趋势。",
+          "diagram": "compare",
+          "formula": "稳态白噪声假设：Var(y)/Var(x)=α/(2−α)",
+          "worked": [
+            "alpha=.1：.1/1.9≈.0526。",
+            "alpha=.8：.8/1.2≈.6667。",
+            "小alpha记忆更长，噪声波动更小。",
+            "同时阶跃更慢，必须比较实际方差与上升时间。"
+          ],
+          "check": {
+            "question": "理论比例是否要求噪声独立且达到稳态？",
+            "answer": "是；有限或相关噪声不能保证精确比例。"
+          },
+          "code_step": 2
+        },
+        {
+          "title": "11｜Python新函数：从np.empty_like到np.flatnonzero",
+          "lead": "先用最小输入验证API，再阅读完整项目。",
+          "text": "np.empty_like(x)创建和x形状及类型相同的未初始化数组，不是复制x，也不是全部置零；滤波函数先填y[0]再逐项填充，才可以安全返回。np.zeros(100)创建100个0，通过x[20:]=1使索引20到末尾变成1。np.flatnonzero(y[20:]>=0.9)先得到布尔数组，再返回为真的索引；取第一个索引就是首次过阈值，如果为空应返回None。np.mean/var/std/sqrt分别计算均值、方差、标准差、平方根；float(...)将NumPy标量转换为Python浮点数。np.arange(N)*dt生成均匀教学时间轴；.tolist()将数组变为普通列表以便JSON输出。每个函数的参数、返回类型、独立例子与误用均收录FUNCTION_GUIDE.md，在网页文件栏和ZIP中都可查阅。",
+          "diagram": "api",
+          "formula": "np.flatnonzero([False,True,True]) → [1,2]；np.empty_like(x)未初始化",
+          "worked": [
+            "np.zeros(4)→[0,0,0,0]。",
+            "x[2:]=1→[0,0,1,1]。",
+            "np.flatnonzero(x>=.9)→[2,3]。",
+            "第一个索引2是首次过阈值；空数组先检查len。"
+          ],
+          "check": {
+            "question": "np.empty_like是否保证内容为0？",
+            "answer": "不保证，必须先填值。"
+          },
+          "code_step": 3
+        },
+        {
+          "title": "12｜完整实验：用可量化证据选择系数",
+          "lead": "不要把降低方差当成唯一目标；同一输入比较统计量，同时单独测量阶跃上升时间。",
+          "text": "程序固定真实速度10m/s、种子18、250个噪声样本，滤波初值取第一测量值。两组结果统一用索引50以后的200个样本统计，减少初始化过渡影响，并保留原始/滤后均值、方差、标准差、偏差和RMSE。无噪声阶跃另外生成100点，使用同一alpha、dt，报告t10、t90和rise。S05加0.4固定偏差验证低通不能校准；S06 alpha=1作为不滤波对照；S07 alpha=0违反本课定义域，返回status=-2、valid=0。先手算四帧，再在网页运行案例，下载ZIP并本地执行unittest与demo.py；查看noise.png、step.png两图，记录指标表，用自己的话解释为什么平滑程度与响应速度存在取舍。浏览器只运行JS，真实Python/C本地通关仍独立。",
+          "diagram": "compare",
+          "formula": "评价=原始/滤后方差 + 10%→90%上升时间 + 偏差/RMSE",
+          "worked": [
+            "S01/S02相同种子与统计窗口。",
+            "记录两种alpha的方差和rise。",
+            "S05验证偏差；S06验证无滤波。",
+            "S07拒绝非法alpha，再运行真实Python测试。"
+          ],
+          "check": {
+            "question": "能只凭图形平滑选择alpha吗？",
+            "answer": "不能，还需要响应时间、偏差、实际系统需求和采样周期。"
+          },
+          "code_step": 4
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "01 · 固定种子和数组分配",
+          "file": "filtering.py",
+          "start": "def seeded_noise",
+          "end": "def lowpass",
+          "pattern": "np.empty(count,dtype=np.float64)只分配位置，不初始化；range(count)产生0至count−1。%保留整数余数，**表示乘方。伪随机状态用确定公式逐次生成，初始seed=18，因此重复运行可得到相同输入。",
+          "text": "np.empty(count,dtype=np.float64)只分配位置，不初始化；range(count)产生0至count−1。%保留整数余数，**表示乘方。伪随机状态用确定公式逐次生成，初始seed=18，因此重复运行可得到相同输入。\n\n先阅读FUNCTION_GUIDE.md对应条目，再对照当前代码的参数、返回值、数组shape和物理单位。",
+          "trace": "每轮state先递推再缩放，values[i]保存一个[-1,1)的速度误差；250轮后返回shape=(250,)数组。"
+        },
+        {
+          "title": "02 · 一阶滤波的每次更新",
+          "file": "filtering.py",
+          "start": "def lowpass",
+          "end": "def statistics",
+          "pattern": "np.asarray统一列表和数组；ndim检查维度；len检查非空；np.isfinite逐元素判断是否有限，.all要求全部为真。np.empty_like(x)创建同形状同类型的未初始化数组。y[0]=x[0]后，range(1,len(x))从第二项开始循环，保证读取y[k−1]之前该值已写入。",
+          "text": "np.asarray统一列表和数组；ndim检查维度；len检查非空；np.isfinite逐元素判断是否有限，.all要求全部为真。np.empty_like(x)创建同形状同类型的未初始化数组。y[0]=x[0]后，range(1,len(x))从第二项开始循环，保证读取y[k−1]之前该值已写入。\n\n先阅读FUNCTION_GUIDE.md对应条目，再对照当前代码的参数、返回值、数组shape和物理单位。",
+          "trace": "输入[0,1,1,1]、alpha=.1：y0=0、y1=.1、y2=.19、y3=.271。每轮用上一输出不是上一原始值。"
+        },
+        {
+          "title": "03 · 统计量及单位",
+          "file": "filtering.py",
+          "start": "def statistics",
+          "end": "def step_metrics",
+          "pattern": "np.mean返回均值；np.var(ddof=0)分母N，np.std取同口径平方根；np.sqrt求平方根。float将数值转换成Python浮点；(x-truth)**2是逐元素平方，不能误当矩阵乘法。字典分别保存mean、variance、std、bias、rmse。",
+          "text": "np.mean返回均值；np.var(ddof=0)分母N，np.std取同口径平方根；np.sqrt求平方根。float将数值转换成Python浮点；(x-truth)**2是逐元素平方，不能误当矩阵乘法。字典分别保存mean、variance、std、bias、rmse。\n\n先阅读FUNCTION_GUIDE.md对应条目，再对照当前代码的参数、返回值、数组shape和物理单位。",
+          "trace": "[10,11,12]对真值10：mean=11、var=2/3、bias=1、RMSE=√(5/3)。"
+        },
+        {
+          "title": "04 · 阶跃阈值与时间",
+          "file": "filtering.py",
+          "start": "def step_metrics",
+          "end": "    return x, y, t10, t90, rise",
+          "pattern": "np.zeros(100)生成全零；x[20:]选择后80项。np.flatnonzero对布尔数组返回真值索引；if len(i10)判断是否存在；不存在返回None，不把未达到阈值误报为0秒。",
+          "text": "np.zeros(100)生成全零；x[20:]选择后80项。np.flatnonzero对布尔数组返回真值索引；if len(i10)判断是否存在；不存在返回None，不把未达到阈值误报为0秒。\n\n先阅读FUNCTION_GUIDE.md对应条目，再对照当前代码的参数、返回值、数组shape和物理单位。",
+          "trace": "alpha=.1时y[20]=.1、y[41]≈.9015，i10[0]=0、i90[0]=21，因此rise=2.1秒。"
+        },
+        {
+          "title": "05 · 场景入口与结果字典",
+          "file": "scenarios.py",
+          "start": "def run_scenario",
+          "end": "    return {\"scenario\": scenario, \"status\": 0",
+          "pattern": "固定相同seed、dt、统计窗口；raw[50:]切除初始化过渡段。str将异常转为文本，.tolist将ndarray转换为普通列表；字典键明确各项物理含义。",
+          "text": "固定相同seed、dt、统计窗口；raw[50:]切除初始化过渡段。str将异常转为文本，.tolist将ndarray转换为普通列表；字典键明确各项物理含义。\n\n先阅读FUNCTION_GUIDE.md对应条目，再对照当前代码的参数、返回值、数组shape和物理单位。",
+          "trace": "S01与S02的raw完全一样；S05在同样输入上加0.4；S07返回非法alpha诊断。"
+        },
+        {
+          "title": "06 · 绘图中的外部API",
+          "file": "demo.py",
+          "start": "def save_charts",
+          "end": "def main",
+          "pattern": "Path构造路径，mkdir(parents=True,exist_ok=True)创建目录；np.arange(len(...))*dt建立时间轴；plt.subplots返回图与坐标轴；ax.plot画线，label给legend，set_xlabel/ylabel/title明确单位；savefig写PNG，close关闭图对象。",
+          "text": "Path构造路径，mkdir(parents=True,exist_ok=True)创建目录；np.arange(len(...))*dt建立时间轴；plt.subplots返回图与坐标轴；ax.plot画线，label给legend，set_xlabel/ylabel/title明确单位；savefig写PNG，close关闭图对象。\n\n先阅读FUNCTION_GUIDE.md对应条目，再对照当前代码的参数、返回值、数组shape和物理单位。",
+          "trace": "两张图独立展示噪声速度与无噪声阶跃，不能用含噪阶跃测量纯算法上升时间。"
+        },
+        {
+          "title": "07 · 命令行、JSON和退出码",
+          "file": "demo.py",
+          "start": "def main():",
+          "end": "if __name__ == \"__main__\":",
+          "pattern": "argparse.ArgumentParser创建解析器，add_argument声明参数，parse_args返回Namespace，args.scenario是解析后的整数。json.dumps将字典转换成JSON字符串，ensure_ascii=False保留中文。print写到终端；SystemExit将main返回整数交给系统。",
+          "text": "argparse.ArgumentParser创建解析器，add_argument声明参数，parse_args返回Namespace，args.scenario是解析后的整数。json.dumps将字典转换成JSON字符串，ensure_ascii=False保留中文。print写到终端；SystemExit将main返回整数交给系统。\n\n先阅读FUNCTION_GUIDE.md对应条目，再对照当前代码的参数、返回值、数组shape和物理单位。",
+          "trace": "python demo.py --scenario 1→run_scenario(1)→输出JSON→valid=1时保存图；非法时返回2。"
+        },
+        {
+          "title": "08 · 独立测试与容差",
+          "file": "test_filtering.py",
+          "start": "class TestFilter",
+          "end": "if __name__ == \"__main__\":",
+          "pattern": "unittest.TestCase是测试基类，test_方法自动发现。assert_allclose比较数值容差；assertAlmostEqual比较近似；assertRaises检查指定异常，assertLess验证方差大小，assertNotIn检查无效结果字段。",
+          "text": "unittest.TestCase是测试基类，test_方法自动发现。assert_allclose比较数值容差；assertAlmostEqual比较近似；assertRaises检查指定异常，assertLess验证方差大小，assertNotIn检查无效结果字段。\n\n先阅读FUNCTION_GUIDE.md对应条目，再对照当前代码的参数、返回值、数组shape和物理单位。",
+          "trace": "手算[0,.1,.19,.271]、方差2/3、rise2.1与.1秒，独立于实现验证。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "S01 · alpha=.1 固定种子噪声",
+          "values": [
+            0
+          ],
+          "optional": false,
+          "hint": "比较方差与上升时间2.1s",
+          "steps": [
+            "先按理论手算相应指标。",
+            "运行浏览器核对数值、状态与两图。",
+            "在本地运行相同案例并记录原始/滤后方差、RMSE和上升时间。"
+          ]
+        },
+        {
+          "name": "S02 · alpha=.8 同一噪声",
+          "values": [
+            1
+          ],
+          "optional": false,
+          "hint": "同一噪声与上升时间0.1s",
+          "steps": [
+            "先按理论手算相应指标。",
+            "运行浏览器核对数值、状态与两图。",
+            "在本地运行相同案例并记录原始/滤后方差、RMSE和上升时间。"
+          ]
+        },
+        {
+          "name": "S03 · alpha=.1 无噪声阶跃",
+          "values": [
+            2
+          ],
+          "optional": false,
+          "hint": "22次更新达到90%",
+          "steps": [
+            "先按理论手算相应指标。",
+            "运行浏览器核对数值、状态与两图。",
+            "在本地运行相同案例并记录原始/滤后方差、RMSE和上升时间。"
+          ]
+        },
+        {
+          "name": "S04 · alpha=.8 无噪声阶跃",
+          "values": [
+            3
+          ],
+          "optional": false,
+          "hint": "2次更新达到90%",
+          "steps": [
+            "先按理论手算相应指标。",
+            "运行浏览器核对数值、状态与两图。",
+            "在本地运行相同案例并记录原始/滤后方差、RMSE和上升时间。"
+          ]
+        },
+        {
+          "name": "S05 · 加入0.4m/s固定偏差",
+          "values": [
+            4
+          ],
+          "optional": false,
+          "hint": "检查偏差不能消除",
+          "steps": [
+            "先按理论手算相应指标。",
+            "运行浏览器核对数值、状态与两图。",
+            "在本地运行相同案例并记录原始/滤后方差、RMSE和上升时间。"
+          ]
+        },
+        {
+          "name": "S06 · alpha=1 不滤波对照",
+          "values": [
+            5
+          ],
+          "optional": false,
+          "hint": "输出与原始一致",
+          "steps": [
+            "先按理论手算相应指标。",
+            "运行浏览器核对数值、状态与两图。",
+            "在本地运行相同案例并记录原始/滤后方差、RMSE和上升时间。"
+          ]
+        },
+        {
+          "name": "S07 · alpha=0 非法输入",
+          "values": [
+            6
+          ],
+          "optional": false,
+          "hint": "status=-2、valid=0",
+          "steps": [
+            "先按理论手算相应指标。",
+            "运行浏览器核对数值、状态与两图。",
+            "在本地运行相同案例并记录原始/滤后方差、RMSE和上升时间。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "L01：手算误差、偏差、噪声和离散误差的区别。",
+        "L02：手算两组均值、ddof=0/1方差、标准差和RMSE。",
+        "L03：固定种子重复运行，确认输入完全一致。",
+        "L04：手算alpha=.1/.8阶跃前3次输出。",
+        "L05：运行S01/S02，比较后200点的原始与滤后方差及rise。",
+        "L06：运行S03/S04核对t10、t90。",
+        "L07：S05比较偏差，S06比较原始和输出，S07验证非法alpha。",
+        "L08：阅读FUNCTION_GUIDE.md并运行最小API示例。",
+        "L09：本地安装依赖、运行python -m unittest -v test_filtering及demo.py，查看两张PNG。",
+        "L10：修改alpha并复测，写下方差、上升时间和误差来源。"
+      ],
+      "test_steps": [
+        "完成S01–S07、Q01–Q15、P1–P9。",
+        "真实Python运行unittest和两个alpha的PNG，记录指标。",
+        "非法输入不得返回有效数据。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "测量误差定义是什么？",
+          "options": [
+            "测量值−真值",
+            "相邻测量值之差",
+            "标准差"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "固定偏差与随机噪声的区别？",
+          "options": [
+            "完全相同",
+            "偏差是平均水平的偏离，噪声是波动成分",
+            "偏差必为0"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "D17左矩形无噪声也低估面积属于？",
+          "options": [
+            "离散近似误差",
+            "随机噪声",
+            "固定仪器偏差"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "为什么使用相同种子？",
+          "options": [
+            "保证噪声为0",
+            "控制两组输入相同",
+            "增加真实速度"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "方差为何平方偏差？",
+          "options": [
+            "避免正负抵消",
+            "去掉均值",
+            "改变速度单位"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "np.var(ddof=0)分母是什么？",
+          "options": [
+            "N−1",
+            "N",
+            "2N"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "标准差单位是什么？",
+          "options": [
+            "与速度相同",
+            "速度平方",
+            "秒"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "所有样本加同一常数，方差怎样？",
+          "options": [
+            "增加常数",
+            "不变",
+            "必为0"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "滤波递推中的上一值是什么？",
+          "options": [
+            "上一原始值",
+            "上一滤波输出",
+            "真实速度"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "较小alpha对阶跃通常怎样？",
+          "options": [
+            "更快",
+            "更慢",
+            "一定不变"
+          ]
+        },
+        {
+          "id": "q11",
+          "text": "alpha=1的输出是什么？",
+          "options": [
+            "输入本身",
+            "恒为0",
+            "均值"
+          ]
+        },
+        {
+          "id": "q12",
+          "text": "np.empty_like是否初始化为0？",
+          "options": [
+            "是",
+            "不保证",
+            "一定为1"
+          ]
+        },
+        {
+          "id": "q13",
+          "text": "np.flatnonzero返回什么？",
+          "options": [
+            "真值对应索引",
+            "均值",
+            "方差"
+          ]
+        },
+        {
+          "id": "q14",
+          "text": "方差降低是否就能断定更准确？",
+          "options": [
+            "能",
+            "不能，还要查偏差和RMSE",
+            "只看图"
+          ]
+        },
+        {
+          "id": "q15",
+          "text": "在线JS通过是否等于本地Python通关？",
+          "options": [
+            "是",
+            "否",
+            "等于实车通过"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "手算统计与递推，输入小数（分数题可用足够位数）。",
+        "values": [
+          0
+        ],
+        "fields": [
+          {
+            "id": "mean",
+            "label": "P1 · [9,10,11]的均值",
+            "kind": "number"
+          },
+          {
+            "id": "variance",
+            "label": "P2 · [9,10,11]的ddof=0方差",
+            "kind": "number"
+          },
+          {
+            "id": "sample_var",
+            "label": "P3 · [9,10,11]的ddof=1方差",
+            "kind": "number"
+          },
+          {
+            "id": "bias",
+            "label": "P4 · [10,11,12]对真值10的平均误差",
+            "kind": "number"
+          },
+          {
+            "id": "mse",
+            "label": "P5 · [10,11,12]对真值10的MSE",
+            "kind": "number"
+          },
+          {
+            "id": "step1",
+            "label": "P6 · alpha=.1，上一输出10，当前输入11的结果",
+            "kind": "number"
+          },
+          {
+            "id": "step2",
+            "label": "P7 · alpha=.1，单位阶跃第二次更新",
+            "kind": "number"
+          },
+          {
+            "id": "rise01",
+            "label": "P8 · alpha=.1本课阶跃上升时间(s)",
+            "kind": "number"
+          },
+          {
+            "id": "rise08",
+            "label": "P9 · alpha=.8本课阶跃上升时间(s)",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "P1 · [9,10,11]的均值：30/3",
+          "P2 · [9,10,11]的ddof=0方差：2/3",
+          "P3 · [9,10,11]的ddof=1方差：2/(3−1)",
+          "P4 · [10,11,12]对真值10的平均误差：11−10",
+          "P5 · [10,11,12]对真值10的MSE：(0+1+4)/3",
+          "P6 · alpha=.1，上一输出10，当前输入11的结果：10+.1*(11−10)",
+          "P7 · alpha=.1，单位阶跃第二次更新：.1+.1*(1−.1)",
+          "P8 · alpha=.1本课阶跃上升时间(s)：(22−1)*.1",
+          "P9 · alpha=.8本课阶跃上升时间(s)：(2−1)*.1"
+        ]
+      },
+      "pass_rule": "在线JS通过只记录浏览器练习；本地真实Python及历史C独立验收。",
+      "assets": [
+        {
+          "name": "filtering.py",
+          "group": "统计与滤波",
+          "text": "\"\"\"D18：统计量与一阶低通滤波。输入为一维离线速度序列（m/s）。\"\"\"\nimport numpy as np\n\n\ndef seeded_noise(seed=18, count=250):\n    \"\"\"固定种子的教学伪随机序列，范围[-1,1)，不是实车噪声模型。\n    使用简单的线性同余生成器，便于Python与浏览器逐样本对账。\n    不将它用于密码、严肃随机模拟或实际传感器噪声辨识。\n    \"\"\"\n    # np.empty(count, dtype=...) 分配count个尚未初始化的浮点位置；\n    # 必须逐个填好才能读取。range(count)依次产生0至count-1。\n    values = np.empty(count, dtype=np.float64)\n    state = seed\n    for i in range(count):\n        # % 求余；将整数状态约束到0..2**32-1，再缩放到[-1,1)。\n        state = (1664525 * state + 1013904223) % (2 ** 32)\n        values[i] = 2.0 * state / (2 ** 32) - 1.0\n    return values\n\n\ndef lowpass(samples, alpha):\n    \"\"\"y[0]=x[0]；y[k]=y[k-1]+alpha*(x[k]-y[k-1])，0<alpha<=1。\"\"\"\n    # np.asarray把列表统一为数组；float64是64位浮点类型。\n    x = np.asarray(samples, dtype=np.float64)\n    if x.ndim != 1 or len(x) == 0 or not np.isfinite(x).all():\n        raise ValueError(\"输入必须是非空、有限的一维序列\")\n    if not np.isfinite(alpha) or not 0 < alpha <= 1:\n        raise ValueError(\"alpha必须大于0且不超过1\")\n    # np.empty_like(x)创建与x形状、类型相同的未初始化数组。\n    y = np.empty_like(x)\n    y[0] = x[0]\n    for k in range(1, len(x)):\n        # 当前输出需要上一时刻的滤波结果，而不是上一时刻原始读数。\n        y[k] = y[k-1] + alpha * (x[k] - y[k-1])\n    return y\n\n\ndef statistics(samples, truth):\n    \"\"\"计算均值、总体形式的描述性方差、标准差、偏差及均方根误差。\"\"\"\n    x = np.asarray(samples, dtype=np.float64)\n    # mean求和后除以元素数；var(ddof=0)除以N，描述当前记录的波动。\n    mean = float(np.mean(x))\n    variance = float(np.var(x, ddof=0))\n    # std是方差的平方根；单位回到m/s，而不是(m/s)^2。\n    std = float(np.std(x, ddof=0))\n    # sqrt为开平方；**2表示逐元素平方。RMSE以真值为基准。\n    rmse = float(np.sqrt(np.mean((x - truth) ** 2)))\n    return {\"mean\": mean, \"variance\": variance, \"std\": std,\n            \"bias\": mean - truth, \"rmse\": rmse}\n\n\ndef step_metrics(alpha, dt=0.1):\n    \"\"\"无噪声单位阶跃：第20号样本起输入从0变1，输出初值0。\n    t10、t90从阶跃首个样本计时，取首次达到阈值的采样时刻；\n    rise=t90-t10，不做采样点之间的插值。\n    \"\"\"\n    # np.zeros(100)创建100个0；[20:]选第20号及以后。\n    x = np.zeros(100, dtype=np.float64)\n    x[20:] = 1.0\n    y = lowpass(x, alpha)\n    # np.flatnonzero返回条件为真的一维索引；1e-12只处理阈值浮点尾差。\n    i10 = np.flatnonzero(y[20:] >= 0.1 - 1e-12)\n    i90 = np.flatnonzero(y[20:] >= 0.9 - 1e-12)\n    # 未在观察窗达到阈值时返回None，而不是捏造一个时间。\n    t10 = float(i10[0] * dt) if len(i10) else None\n    t90 = float(i90[0] * dt) if len(i90) else None\n    rise = t90 - t10 if t10 is not None and t90 is not None else None\n    return x, y, t10, t90, rise\n"
+        },
+        {
+          "name": "scenarios.py",
+          "group": "场景",
+          "text": "\"\"\"固定种子噪声与独立的无噪声阶跃；二者不能混作同一个统计实验。\"\"\"\nimport numpy as np\nfrom filtering import seeded_noise, lowpass, statistics, step_metrics\n\n\ndef run_scenario(scenario):\n    if scenario not in range(7):\n        raise ValueError(\"场景编号必须为0至6\")\n    alpha = [0.1, 0.8, 0.1, 0.8, 0.1, 1.0, 0.0][scenario]\n    if scenario == 6:\n        try:\n            lowpass([10.0, 11.0], alpha)\n        except ValueError as exc:\n            # str把异常对象变成可显示的字符串；不返回有效滤波数值。\n            return {\"scenario\": scenario, \"status\": -2, \"valid\": 0,\n                    \"error_kind\": \"invalid_alpha\", \"diagnostic\": str(exc)}\n        raise AssertionError(\"非法alpha应被拒绝\")\n    bias = 0.4 if scenario == 4 else 0.0\n    seed = 18\n    dt = 0.1\n    raw = 10.0 + bias + seeded_noise(seed, 250)\n    filtered = lowpass(raw, alpha)\n    # 两组alpha使用相同种子、相同样本；舍弃前50项，减小初始化影响。\n    before = statistics(raw[50:], 10.0)\n    after = statistics(filtered[50:], 10.0)\n    step, response, t10, t90, rise = step_metrics(alpha, dt)\n    return {\"scenario\": scenario, \"status\": 0, \"valid\": 1, \"seed\": seed,\n            \"alpha\": alpha, \"dt_s\": dt, \"bias_injected\": bias,\n            \"raw_variance\": before[\"variance\"], \"filtered_variance\": after[\"variance\"],\n            \"raw_mean\": before[\"mean\"], \"filtered_mean\": after[\"mean\"],\n            \"raw_std\": before[\"std\"], \"filtered_std\": after[\"std\"],\n            \"raw_bias\": before[\"bias\"], \"filtered_bias\": after[\"bias\"],\n            \"raw_rmse\": before[\"rmse\"], \"filtered_rmse\": after[\"rmse\"],\n            \"t10_s\": t10, \"t90_s\": t90, \"rise_s\": rise,\n            # ndarray.tolist()把数组转为普通列表，供JSON序列化。\n            \"raw\": raw.tolist(), \"filtered\": filtered.tolist(),\n            \"step\": step.tolist(), \"response\": response.tolist()}\n"
+        },
+        {
+          "name": "demo.py",
+          "group": "入口与绘图",
+          "text": "\"\"\"运行：python demo.py --scenario 0 --out charts\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\nimport matplotlib\n# use(\"Agg\")选择无需桌面窗口、能保存图片的后端，须在导入pyplot前设置。\nmatplotlib.use(\"Agg\")\nimport matplotlib.pyplot as plt\nfrom matplotlib import font_manager\nimport numpy as np\nfrom scenarios import run_scenario\n\n\ndef save_charts(result, out):\n    # fontManager.ttflist是已知字体对象列表；集合推导式取每个字体的名称。\n    fonts = {f.name for f in font_manager.fontManager.ttflist}\n    for name in (\"Noto Sans CJK SC\", \"Microsoft YaHei\", \"SimHei\", \"PingFang SC\"):\n        if name in fonts:\n            # rcParams是Matplotlib全局绘图设置字典。\n            plt.rcParams[\"font.sans-serif\"] = [name, \"DejaVu Sans\"]\n            plt.rcParams[\"axes.unicode_minus\"] = False\n            break\n    # Path代表文件路径；mkdir(parents=True, exist_ok=True)创建目录并允许已存在。\n    root = Path(out)\n    root.mkdir(parents=True, exist_ok=True)\n    for a, b, title, ylabel, filename in [\n        (\"raw\", \"filtered\", \"固定种子速度测量与滤波\", \"速度 (m/s)\", \"noise.png\"),\n        (\"step\", \"response\", \"无噪声单位阶跃响应\", \"归一化幅值\", \"step.png\"),\n    ]:\n        # arange(N)生成0..N-1；乘dt得到实际时间轴。\n        t = np.arange(len(result[a])) * result[\"dt_s\"]\n        # subplots返回Figure和Axes；plot按(x,y)画曲线，label供图例使用。\n        fig, ax = plt.subplots(figsize=(8, 4.5))\n        ax.plot(t, result[a], label=\"输入\")\n        ax.plot(t, result[b], label=\"滤波输出\")\n        # set_xlabel/ylabel/title设置文字；legend显示图例；grid绘制网格。\n        ax.set_xlabel(\"时间 (s)\")\n        ax.set_ylabel(ylabel)\n        ax.set_title(title)\n        ax.legend()\n        ax.grid(alpha=0.25)\n        # tight_layout调整留白；savefig写PNG；close释放此图。\n        fig.tight_layout()\n        fig.savefig(root / filename, dpi=180)\n        plt.close(fig)\n\n\ndef main():\n    # ArgumentParser创建命令行解析器；add_argument声明参数及默认值。\n    parser = argparse.ArgumentParser(description=\"D18概率与低通滤波\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(7), default=0)\n    parser.add_argument(\"--out\", default=\"charts\")\n    # parse_args解析命令行，返回Namespace，可用args.scenario访问。\n    args = parser.parse_args()\n    result = run_scenario(args.scenario)\n    # json.dumps把字典转换为JSON文本；ensure_ascii=False保留中文。\n    print(\"result_json=\" + json.dumps(result, ensure_ascii=False))\n    if not result[\"valid\"]:\n        return 2\n    save_charts(result, args.out)\n    return 0\n\n\nif __name__ == \"__main__\":\n    # SystemExit是退出异常；把main返回值作为进程退出码。\n    raise SystemExit(main())\n"
+        },
+        {
+          "name": "test_filtering.py",
+          "group": "测试",
+          "text": "\"\"\"用独立手算值检查滤波、方差、阶跃、偏差与异常路径。\"\"\"\nimport unittest\nimport numpy as np\nfrom filtering import seeded_noise, lowpass, statistics, step_metrics\nfrom scenarios import run_scenario\n\n\nclass TestFilter(unittest.TestCase):\n    def test_manual_recursion(self):\n        # assert_allclose比较数组数值，atol为绝对误差容限，rtol为相对容限。\n        np.testing.assert_allclose(lowpass([0, 1, 1, 1], .1),\n                                   [0, .1, .19, .271], atol=1e-12, rtol=0)\n\n    def test_stats(self):\n        a = statistics([9, 10, 11], 10)\n        # assertAlmostEqual检查近似相等；这里的精确方差是2/3。\n        self.assertAlmostEqual(a[\"variance\"], 2/3)\n        self.assertAlmostEqual(a[\"std\"], np.sqrt(2/3))\n        self.assertAlmostEqual(a[\"bias\"], 0)\n        b = statistics([10, 11, 12], 10)\n        self.assertAlmostEqual(b[\"variance\"], 2/3)\n        self.assertAlmostEqual(b[\"rmse\"] ** 2, b[\"variance\"] + b[\"bias\"] ** 2)\n\n    def test_seed(self):\n        # assert_array_equal要求元素严格相等，验证相同种子可复现。\n        np.testing.assert_array_equal(seeded_noise(18), seeded_noise(18))\n        self.assertTrue(np.all(seeded_noise(18) >= -1))\n        self.assertTrue(np.all(seeded_noise(18) < 1))\n\n    def test_tradeoff(self):\n        a, b = run_scenario(0), run_scenario(1)\n        self.assertEqual(a[\"raw\"], b[\"raw\"])\n        self.assertLess(a[\"filtered_variance\"], b[\"filtered_variance\"])\n        self.assertLess(b[\"filtered_variance\"], b[\"raw_variance\"])\n        self.assertAlmostEqual(a[\"rise_s\"], 2.1)\n        self.assertAlmostEqual(b[\"rise_s\"], .1)\n\n    def test_bypass_and_bias(self):\n        a = run_scenario(5)\n        np.testing.assert_allclose(a[\"raw\"], a[\"filtered\"], atol=1e-12)\n        b = run_scenario(4)\n        c = run_scenario(0)\n        self.assertAlmostEqual(b[\"filtered_bias\"] - c[\"filtered_bias\"], .4)\n        self.assertAlmostEqual(b[\"filtered_variance\"], c[\"filtered_variance\"])\n\n    def test_reject(self):\n        # with assertRaises(...)要求代码块抛指定异常，否则测试失败。\n        with self.assertRaises(ValueError):\n            lowpass([1, 2], 0)\n        with self.assertRaises(ValueError):\n            lowpass([1, np.nan], .1)\n        with self.assertRaises(ValueError):\n            lowpass([1, 2], 1.1)\n        self.assertEqual(run_scenario(6)[\"valid\"], 0)\n        self.assertNotIn(\"filtered\", run_scenario(6))\n\n\nif __name__ == \"__main__\":\n    # unittest.main查找并执行test_开头的方法。\n    unittest.main()\n"
+        },
+        {
+          "name": "requirements.txt",
+          "group": "依赖",
+          "text": "numpy>=1.26,<3\nmatplotlib>=3.8,<4\n"
+        },
+        {
+          "name": "README.md",
+          "group": "本地实作",
+          "text": "# D18 概率与低通滤波\n\n先学FUNCTION_GUIDE.md中未见过的API，再读filtering.py。真实速度固定10m/s，固定种子18生成250个[-1,1)均匀范围的教学伪随机误差；用后200个样本统计均值、方差(ddof=0)、标准差、偏差和RMSE。另做100点无噪声阶跃（第20号样本起0→1），dt=0.1s；滤波输出初值取第一个输入。两组alpha使用相同数据。上升时间采用首次达到10%和90%的采样时刻之差，不插值。\n\n## 本地实作\n安装Python 3.11及依赖：`python -m pip install -r requirements.txt`。\n运行 `python -m unittest -v test_filtering`。\n分别运行 `python demo.py --scenario 0 --out charts/a01` 和 `python demo.py --scenario 1 --out charts/a08`，记录raw_variance、filtered_variance、t10_s、t90_s、rise_s。S03/S04复用相同条件，重点核对阶跃。S05加入0.4m/s固定偏差；S06 alpha=1不滤波；S07 alpha=0被拒绝，退出2。正常案例保存noise.png和step.png。图缺中文可安装Noto Sans CJK SC。\n\n理论核对：alpha=0.1的无噪声阶跃首次达到10%、90%分别是0、2.1秒（相对阶跃首个采样）；alpha=0.8为0、0.1秒。固定偏差不能通过此低通滤波消除。所有信号为离线教学数据，浏览器JS不执行真实Python。D17的真实C/Python历史验收不改变。\n"
+        },
+        {
+          "name": "FUNCTION_GUIDE.md",
+          "group": "非自定义函数参考",
+          "text": "# D18 非自定义函数与语法参考（随工程ZIP）\n\n阅读顺序：先看最小例子，再回到源码。下列均为库API、语言语法或属性；seeded_noise、lowpass、statistics、step_metrics、run_scenario、save_charts、main为本课自定义函数。\n\n## 数组、统计、索引\n\n| API与类型 | 定义、参数 | 最小示例与返回 | 本课用途、容易犯的错 |\n|---|---|---|---|\n| np.asarray(a,dtype=...) | 将数组样对象转换为ndarray；dtype指定类型 | np.asarray([1,2],dtype=np.float64) → array([1.,2.])，shape=(2,) | 统一输入；符合条件可复用，不保证复制 |\n| np.float64 / .ndim / .shape | 类型 / 属性 / 属性 | array([1.,2.]).ndim=1，shape=(2,) | 小数及一维检查；属性不加() |\n| np.empty(n,dtype=...) | 创建未初始化数组 | np.empty(3) → shape=(3,)，内容未定义 | 生成噪声前分配；未填充绝不能读 |\n| np.empty_like(a) | 按原数组形状和类型创建未初始化数组 | np.empty_like(np.array([1.,2.])) → 2个浮点位置 | 滤波输出逐个填入 |\n| np.zeros(n,dtype=...) | 创建全0数组 | np.zeros(3) → [0.,0.,0.] | 阶跃的初始输入 |\n| np.mean(a) | 所有元素和除以数量（默认axis=None） | np.mean([9,10,11])=10 | 平均水平 |\n| np.var(a,ddof=0) | 围绕均值的平方偏差之和/(N-ddof) | np.var([9,10,11])=2/3；ddof=1则=1 | 当前记录的描述性方差，单位(m/s)^2；ddof=1常用于独立同分布样本估计总体方差，N必须>1 |\n| np.std(a,ddof=0) | 同分母方差的平方根 | np.std([9,10,11])≈0.8165 | 波动尺度，单位m/s |\n| np.sqrt(x) | 逐元素求非负平方根 | np.sqrt([4,9]) → [2.,3.] | RMSE；负实数不产生正常实根 |\n| np.isfinite(a) / .all() / np.all(a) | 有限数逐项判断 / 全部为真 | np.isfinite([1,np.nan]) → [True,False]；.all()→False | 拒绝NaN/Inf；不是检查数值是否合理 |\n| np.flatnonzero(a) | 返回展平后非零元素索引 | np.flatnonzero([False,True,True]) → [1,2] | 找阶跃首次过阈值；空结果不可取[0] |\n| np.arange(stop) | 生成从0到stop前的等间隔数组 | np.arange(3) → [0,1,2] | 乘dt得时间；不是实际车载时间戳 |\n| ndarray.tolist() | 转成Python列表 | np.array([1.,2.]).tolist() → [1.0,2.0] | JSON不能直接序列化普通ndarray |\n| len(x), range(start,stop), float(x), str(x), int(x) | 内置函数/类型 | len([1,2])=2；list(range(1,3))=[1,2]；float(\"1.2\")=1.2；str(12)=\"12\"；int(\"2\")=2 | 数量、循环、类型转换、错误消息、CLI整数 |\n| 切片、% 、**、比较 | 语言语法 | x[50:]从索引50开始；7%3=1；2**3=8；0<alpha<=1为链式比较 | 统计窗口、伪随机状态、平方、系数检查 |\n| if/else、for、try/except、raise、return、None | 语言语法与空值 | if条件真执行块；except捕获指定异常；None表示没有结果 | 不把未达到阈值写成0秒 |\n| ValueError / AssertionError / SystemExit | 内置异常类 | raise ValueError(\"原因\")；raise SystemExit(2) | 输入错误、内部不变量、进程退出状态 |\n\n## 入口、文件与绘图\n\n| API | 定义和参数 | 例子及返回 |\n|---|---|---|\n| argparse.ArgumentParser(description=...) | 创建命令行参数解析器 | parser=argparse.ArgumentParser()，返回解析器 |\n| parser.add_argument(name,type=...,choices=...,default=...) | 注册选项，type转换输入，choices限定范围 | parser.add_argument(\"--scenario\",type=int,default=0)，返回Action对象 |\n| parser.parse_args() | 解析命令行 | python demo.py --scenario 1 → args.scenario=1，Namespace |\n| json.dumps(obj,ensure_ascii=False) | 将可序列化对象转换成JSON字符串 | json.dumps({\"a\":1}) → '{\"a\": 1}' |\n| print(*objects) | 向标准输出写文本 | print(\"a\",1)输出a 1，返回None |\n| Path(out) / .mkdir(parents=True,exist_ok=True) / 路径 / 运算符 | Path构造路径对象；mkdir创建目录，parents允许补齐父目录，exist_ok允许已存在；/拼接路径 | Path(\"charts\")/\"a.png\"为charts/a.png；mkdir成功返回None |\n| matplotlib.use(\"Agg\") | 指定非交互图形后端 | 在import pyplot前调用，返回None |\n| font_manager.fontManager.ttflist、字体.name、plt.rcParams | 字体列表属性、字体名称属性、全局配置映射 | {f.name for f in ...}为集合推导式；rcParams[\"font.sans-serif\"]设置字体候选 |\n| plt.subplots(figsize=(宽,高)) | 创建画布和坐标轴，英寸 | fig,ax=plt.subplots(figsize=(8,4.5)) |\n| ax.plot(x,y,label=...) | 根据同长度数据画线 | ax.plot([0,1],[0,2],label=\"线\")返回Line2D列表 |\n| ax.set_xlabel / set_ylabel / set_title | 设置轴标签和标题 | ax.set_xlabel(\"时间(s)\")返回Text对象 |\n| ax.legend() / ax.grid(alpha=.25) | 图例 / 网格透明度 | legend返回Legend；grid调整网格，无数值返回 |\n| fig.tight_layout() / fig.savefig(path,dpi=180) / plt.close(fig) | 调整布局 / 保存图片 / 关闭图对象 | 保存后查看PNG，均非滤波计算，通常返回None |\n\n## 测试\n\nunittest.TestCase为测试基类；test_方法由unittest.main()发现并执行。self.assertEqual(a,b)检查相等；assertAlmostEqual检查近似相等；assertTrue检查真值；assertLess(a,b)检查a<b；assertNotIn(key,dict)检查不存在；with self.assertRaises(ValueError)要求块内抛出指定异常。np.testing.assert_allclose(a,b,atol=...,rtol=...)检查容差，np.testing.assert_array_equal(a,b)要求逐项相等；不满足时抛AssertionError，成功返回None。例：np.testing.assert_allclose([0.1+0.2],[0.3],atol=1e-12)。\n\n官方参考：https://numpy.org/doc/stable/reference/generated/numpy.var.html 、https://numpy.org/doc/stable/reference/generated/numpy.flatnonzero.html 、https://docs.python.org/3/library/argparse.html 、https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.subplots.html\n"
+        }
+      ],
+      "code": "\"\"\"运行：python demo.py --scenario 0 --out charts\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\nimport matplotlib\n# use(\"Agg\")选择无需桌面窗口、能保存图片的后端，须在导入pyplot前设置。\nmatplotlib.use(\"Agg\")\nimport matplotlib.pyplot as plt\nfrom matplotlib import font_manager\nimport numpy as np\nfrom scenarios import run_scenario\n\n\ndef save_charts(result, out):\n    # fontManager.ttflist是已知字体对象列表；集合推导式取每个字体的名称。\n    fonts = {f.name for f in font_manager.fontManager.ttflist}\n    for name in (\"Noto Sans CJK SC\", \"Microsoft YaHei\", \"SimHei\", \"PingFang SC\"):\n        if name in fonts:\n            # rcParams是Matplotlib全局绘图设置字典。\n            plt.rcParams[\"font.sans-serif\"] = [name, \"DejaVu Sans\"]\n            plt.rcParams[\"axes.unicode_minus\"] = False\n            break\n    # Path代表文件路径；mkdir(parents=True, exist_ok=True)创建目录并允许已存在。\n    root = Path(out)\n    root.mkdir(parents=True, exist_ok=True)\n    for a, b, title, ylabel, filename in [\n        (\"raw\", \"filtered\", \"固定种子速度测量与滤波\", \"速度 (m/s)\", \"noise.png\"),\n        (\"step\", \"response\", \"无噪声单位阶跃响应\", \"归一化幅值\", \"step.png\"),\n    ]:\n        # arange(N)生成0..N-1；乘dt得到实际时间轴。\n        t = np.arange(len(result[a])) * result[\"dt_s\"]\n        # subplots返回Figure和Axes；plot按(x,y)画曲线，label供图例使用。\n        fig, ax = plt.subplots(figsize=(8, 4.5))\n        ax.plot(t, result[a], label=\"输入\")\n        ax.plot(t, result[b], label=\"滤波输出\")\n        # set_xlabel/ylabel/title设置文字；legend显示图例；grid绘制网格。\n        ax.set_xlabel(\"时间 (s)\")\n        ax.set_ylabel(ylabel)\n        ax.set_title(title)\n        ax.legend()\n        ax.grid(alpha=0.25)\n        # tight_layout调整留白；savefig写PNG；close释放此图。\n        fig.tight_layout()\n        fig.savefig(root / filename, dpi=180)\n        plt.close(fig)\n\n\ndef main():\n    # ArgumentParser创建命令行解析器；add_argument声明参数及默认值。\n    parser = argparse.ArgumentParser(description=\"D18概率与低通滤波\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(7), default=0)\n    parser.add_argument(\"--out\", default=\"charts\")\n    # parse_args解析命令行，返回Namespace，可用args.scenario访问。\n    args = parser.parse_args()\n    result = run_scenario(args.scenario)\n    # json.dumps把字典转换为JSON文本；ensure_ascii=False保留中文。\n    print(\"result_json=\" + json.dumps(result, ensure_ascii=False))\n    if not result[\"valid\"]:\n        return 2\n    save_charts(result, args.out)\n    return 0\n\n\nif __name__ == \"__main__\":\n    # SystemExit是退出异常；把main返回值作为进程退出码。\n    raise SystemExit(main())\n"
     }
   },
   "rules": {
@@ -13346,6 +14137,157 @@
           "S08 · 重复时间戳拒绝"
         ]
       ]
+    },
+    "18": {
+      "correct": {
+        "q1": 0,
+        "q2": 1,
+        "q3": 0,
+        "q4": 1,
+        "q5": 0,
+        "q6": 1,
+        "q7": 0,
+        "q8": 1,
+        "q9": 1,
+        "q10": 1,
+        "q11": 0,
+        "q12": 1,
+        "q13": 0,
+        "q14": 1,
+        "q15": 1
+      },
+      "explanations": {
+        "q1": "误差以真值为基准。",
+        "q2": "加性模型z=x+b+e。",
+        "q3": "近似算法本身产生误差。",
+        "q4": "控制变量。",
+        "q5": "平方使偏差贡献非负。",
+        "q6": "当前记录的描述性方差。",
+        "q7": "方差开平方。",
+        "q8": "相对均值的偏差不变。",
+        "q9": "历史输出参与递推。",
+        "q10": "每次只向新输入靠近少量。",
+        "q11": "历史权重为0。",
+        "q12": "未初始化数组需填满。",
+        "q13": "找首次过阈值。",
+        "q14": "波动与准确性不同。",
+        "q15": "真实Python/C验收独立。"
+      },
+      "numeric": {
+        "mean": [
+          10,
+          "30/3"
+        ],
+        "variance": [
+          0.6666666666666666,
+          "2/3"
+        ],
+        "sample_var": [
+          1,
+          "2/(3−1)"
+        ],
+        "bias": [
+          1,
+          "11−10"
+        ],
+        "mse": [
+          1.6666666666666667,
+          "(0+1+4)/3"
+        ],
+        "step1": [
+          10.1,
+          "10+.1*(11−10)"
+        ],
+        "step2": [
+          0.19,
+          ".1+.1*(1−.1)"
+        ],
+        "rise01": [
+          2.1,
+          "(22−1)*.1"
+        ],
+        "rise08": [
+          0.1,
+          "(2−1)*.1"
+        ]
+      },
+      "labels": {
+        "q1": "Q01",
+        "q2": "Q02",
+        "q3": "Q03",
+        "q4": "Q04",
+        "q5": "Q05",
+        "q6": "Q06",
+        "q7": "Q07",
+        "q8": "Q08",
+        "q9": "Q09",
+        "q10": "Q10",
+        "q11": "Q11",
+        "q12": "Q12",
+        "q13": "Q13",
+        "q14": "Q14",
+        "q15": "Q15",
+        "mean": "P1 · [9,10,11]的均值",
+        "variance": "P2 · [9,10,11]的ddof=0方差",
+        "sample_var": "P3 · [9,10,11]的ddof=1方差",
+        "bias": "P4 · [10,11,12]对真值10的平均误差",
+        "mse": "P5 · [10,11,12]对真值10的MSE",
+        "step1": "P6 · alpha=.1，上一输出10，当前输入11的结果",
+        "step2": "P7 · alpha=.1，单位阶跃第二次更新",
+        "rise01": "P8 · alpha=.1本课阶跃上升时间(s)",
+        "rise08": "P9 · alpha=.8本课阶跃上升时间(s)"
+      },
+      "needed": [
+        [
+          [
+            0
+          ],
+          "lab0",
+          "S01 · alpha=.1 固定种子噪声"
+        ],
+        [
+          [
+            1
+          ],
+          "lab1",
+          "S02 · alpha=.8 同一噪声"
+        ],
+        [
+          [
+            2
+          ],
+          "lab2",
+          "S03 · alpha=.1 无噪声阶跃"
+        ],
+        [
+          [
+            3
+          ],
+          "lab3",
+          "S04 · alpha=.8 无噪声阶跃"
+        ],
+        [
+          [
+            4
+          ],
+          "lab4",
+          "S05 · 加入0.4m/s固定偏差"
+        ],
+        [
+          [
+            5
+          ],
+          "lab5",
+          "S06 · alpha=1 不滤波对照"
+        ],
+        [
+          [
+            6
+          ],
+          "lab6",
+          "S07 · alpha=0 非法输入"
+        ]
+      ]
     }
   },
   "curriculum": [
@@ -14190,5 +15132,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "day17-20261123-discrete-calculus-v1"
+  "release": "day18-20261124-noise-lowpass-v1"
 }
