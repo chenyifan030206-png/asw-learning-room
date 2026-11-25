@@ -11914,6 +11914,663 @@
         }
       ],
       "code": "\"\"\"运行：python demo.py --scenario 0 --out charts\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\nimport matplotlib\n# use(\"Agg\")选择无需桌面窗口、能保存图片的后端，须在导入pyplot前设置。\nmatplotlib.use(\"Agg\")\nimport matplotlib.pyplot as plt\nfrom matplotlib import font_manager\nimport numpy as np\nfrom scenarios import run_scenario\n\n\ndef save_charts(result, out):\n    # fontManager.ttflist是已知字体对象列表；集合推导式取每个字体的名称。\n    fonts = {f.name for f in font_manager.fontManager.ttflist}\n    for name in (\"Noto Sans CJK SC\", \"Microsoft YaHei\", \"SimHei\", \"PingFang SC\"):\n        if name in fonts:\n            # rcParams是Matplotlib全局绘图设置字典。\n            plt.rcParams[\"font.sans-serif\"] = [name, \"DejaVu Sans\"]\n            plt.rcParams[\"axes.unicode_minus\"] = False\n            break\n    # Path代表文件路径；mkdir(parents=True, exist_ok=True)创建目录并允许已存在。\n    root = Path(out)\n    root.mkdir(parents=True, exist_ok=True)\n    for a, b, title, ylabel, filename in [\n        (\"raw\", \"filtered\", \"固定种子速度测量与滤波\", \"速度 (m/s)\", \"noise.png\"),\n        (\"step\", \"response\", \"无噪声单位阶跃响应\", \"归一化幅值\", \"step.png\"),\n    ]:\n        # arange(N)生成0..N-1；乘dt得到实际时间轴。\n        t = np.arange(len(result[a])) * result[\"dt_s\"]\n        # subplots返回Figure和Axes；plot按(x,y)画曲线，label供图例使用。\n        fig, ax = plt.subplots(figsize=(8, 4.5))\n        ax.plot(t, result[a], label=\"输入\")\n        ax.plot(t, result[b], label=\"滤波输出\")\n        # set_xlabel/ylabel/title设置文字；legend显示图例；grid绘制网格。\n        ax.set_xlabel(\"时间 (s)\")\n        ax.set_ylabel(ylabel)\n        ax.set_title(title)\n        ax.legend()\n        ax.grid(alpha=0.25)\n        # tight_layout调整留白；savefig写PNG；close释放此图。\n        fig.tight_layout()\n        fig.savefig(root / filename, dpi=180)\n        plt.close(fig)\n\n\ndef main():\n    # ArgumentParser创建命令行解析器；add_argument声明参数及默认值。\n    parser = argparse.ArgumentParser(description=\"D18概率与低通滤波\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(7), default=0)\n    parser.add_argument(\"--out\", default=\"charts\")\n    # parse_args解析命令行，返回Namespace，可用args.scenario访问。\n    args = parser.parse_args()\n    result = run_scenario(args.scenario)\n    # json.dumps把字典转换为JSON文本；ensure_ascii=False保留中文。\n    print(\"result_json=\" + json.dumps(result, ensure_ascii=False))\n    if not result[\"valid\"]:\n        return 2\n    save_charts(result, args.out)\n    return 0\n\n\nif __name__ == \"__main__\":\n    # SystemExit是退出异常；把main返回值作为进程退出码。\n    raise SystemExit(main())\n"
+    },
+    "19": {
+      "day": 19,
+      "revision": "2026-11-25-day19-v1",
+      "title": "卡尔曼滤波入门：一维位置速度估计与架构设计",
+      "source": "demo.py",
+      "runner": "kalman_cv_day19",
+      "project_name": "day19_kalman_cv",
+      "time": "对话先学理论与架构推导；Pages完成源码阅读、7组实验、15道概念题、9道数值题及本地Python测试。",
+      "summary": "一维位置和速度的联合估计：将模拟器、估计器、实验评价、入口绘图与测试分离；处理5帧缺测，比较Q/R/P与RMSE。理论推导在对话中讲授，网页只做工程实作。",
+      "goals": [
+        "从需求确定状态、配置、输入输出、模块边界和状态生命周期",
+        "用类封装预测与更新、缺测分支、协方差传播",
+        "区分真值生成与估计器接口",
+        "掌握矩阵shape、API与中文注释",
+        "运行7个案例，比较RMSE与协方差，完成本地测试"
+      ],
+      "flow_text": "demo.main → scenarios.run_scenario → simulation.generate → estimate(z,dt,q,r) → KalmanCV初始化 → 每帧step：predict→有测量才update → 记录x/P → 真值仅用于事后RMSE → JSON和PNG。",
+      "remediation_title": "从需求、状态、接口推导模块，而非背文件名",
+      "project_intro": {
+        "title": "D19 工程工作台｜理论在对话，代码与测试在这里",
+        "paragraphs": [
+          "先读对话中的卡尔曼滤波理论与架构推导，再来这里阅读真实实现。旧课程内容和记录不变。",
+          "工程只需位置测量、dt、q、r；真值只存在于模拟与评价端。估计器内部持有x、P，缺测None时只预测。",
+          "先看模块边界与执行链，再按12段代码讲解读源码；FUNCTION_GUIDE.md在文件栏和ZIP内。"
+        ]
+      },
+      "architecture": {
+        "headers": [
+          "模块 / 入口",
+          "职责与拆分理由",
+          "输入 → 输出 / 状态"
+        ],
+        "rows": [
+          [
+            "simulation.py / generate",
+            "模拟数据与真值独立于估计器",
+            "场景开关→时间、真值、位置测量"
+          ],
+          [
+            "kalman.py / KalmanCV",
+            "跨帧状态封装；不知道真值和画图",
+            "dt、q、r、首测量；持有x/P"
+          ],
+          [
+            "kalman.py / predict, update, step",
+            "区分数学操作与每帧调度",
+            "测量/None→创新、增益；更新x/P"
+          ],
+          [
+            "scenarios.py / estimate",
+            "单一循环调度估计器，记录历史",
+            "z、dt、q、r→六组日志"
+          ],
+          [
+            "scenarios.py / rmse, run_scenario",
+            "控制变量与独立评价",
+            "场景编号→结果字典"
+          ],
+          [
+            "demo.py / main, save_charts",
+            "命令行、展示，与算法解耦",
+            "结果字典→JSON、PNG"
+          ],
+          [
+            "test_kalman.py",
+            "独立手算和故障检查",
+            "断言→通过/失败"
+          ],
+          [
+            "FUNCTION_GUIDE.md、README.md、requirements.txt",
+            "API参考与复现",
+            "完整ZIP"
+          ]
+        ]
+      },
+      "symbols": [
+        {
+          "name": "self.x",
+          "file": "kalman.py",
+          "match": "self.x =",
+          "what": "位置/速度估计，shape=(2,)",
+          "lifetime": "对象内跨帧"
+        },
+        {
+          "name": "self.P",
+          "file": "kalman.py",
+          "match": "self.P =",
+          "what": "2×2估计误差协方差",
+          "lifetime": "对象内跨帧"
+        },
+        {
+          "name": "F",
+          "file": "kalman.py",
+          "match": "self.F =",
+          "what": "状态转移(2,2)",
+          "lifetime": "固定配置"
+        },
+        {
+          "name": "H",
+          "file": "kalman.py",
+          "match": "self.H =",
+          "what": "观测(1,2)，只测位置",
+          "lifetime": "固定配置"
+        },
+        {
+          "name": "Q",
+          "file": "kalman.py",
+          "match": "self.Q =",
+          "what": "过程噪声协方差(2,2)",
+          "lifetime": "固定配置"
+        },
+        {
+          "name": "r",
+          "file": "kalman.py",
+          "match": "self.r",
+          "what": "位置测量方差(m²)",
+          "lifetime": "固定配置"
+        },
+        {
+          "name": "innovation",
+          "file": "kalman.py",
+          "match": "innovation =",
+          "what": "测量减预测观测(m)",
+          "lifetime": "当前更新"
+        },
+        {
+          "name": "k",
+          "file": "kalman.py",
+          "match": "k = (self.P",
+          "what": "增益(2,1)",
+          "lifetime": "当前更新"
+        },
+        {
+          "name": "z",
+          "file": "scenarios.py",
+          "match": "def estimate",
+          "what": "测量列表，None为缺测",
+          "lifetime": "输入"
+        },
+        {
+          "name": "pp/pv",
+          "file": "scenarios.py",
+          "match": "positions, speeds, pp",
+          "what": "位置/速度方差日志",
+          "lifetime": "输出"
+        }
+      ],
+      "run_fields": [
+        {
+          "id": "scenario",
+          "label": "S01–S07 · 选择估计案例",
+          "kind": "select",
+          "value": 0,
+          "options": [
+            [
+              "0",
+              "S01 · 恒速位置速度联合估计"
+            ],
+            [
+              "1",
+              "S02 · 连续5帧缺测后恢复"
+            ],
+            [
+              "2",
+              "S03 · 相同观测，增大R"
+            ],
+            [
+              "3",
+              "S04 · 加速段，q=.25"
+            ],
+            [
+              "4",
+              "S05 · 相同加速段，q=4"
+            ],
+            [
+              "5",
+              "S06 · 相同加速段，q=0"
+            ],
+            [
+              "6",
+              "S07 · 非法R=0拒绝"
+            ]
+          ]
+        }
+      ],
+      "reading": [
+        {
+          "title": "工程设计约束",
+          "text": "对话负责理论与设计推导。本页先确定输入输出与模块边界：估计器只接收位置测量与配置，跨帧保存x、P；模拟器和评价模块才有真值。独立测试验证每个接口，而不是把所有逻辑写进main。按下方架构表和12段执行链阅读源码，遇到陌生库函数查FUNCTION_GUIDE.md。"
+        }
+      ],
+      "code_sections": [
+        {
+          "title": "01 · 程序入口：从需求找到调用者",
+          "file": "demo.py",
+          "start": "def main():",
+          "end": "if __name__ == \"__main__\":",
+          "pattern": "入口只处理命令行、输出和退出码，不应该持有滤波状态或生成真值。argparse将--scenario转换成整数；run_scenario返回字典；valid决定能否画图。",
+          "text": "入口只处理命令行、输出和退出码，不应该持有滤波状态或生成真值。argparse将--scenario转换成整数；run_scenario返回字典；valid决定能否画图。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "python demo.py --scenario 1 → main解析args.scenario=1 → run_scenario(1) → JSON → save_charts；S07无效时return 2，SystemExit将其作为退出码。"
+        },
+        {
+          "title": "02 · 模拟器：为什么真值必须隔离",
+          "file": "simulation.py",
+          "start": "def generate(",
+          "end": "    return t, p, v, z",
+          "pattern": "模拟器负责构造可复现的教学输入与事后评价参考。先分配时间、位置、速度数组，再按运动公式填入真值，最后叠加固定种子噪声。列表z允许None，而普通float数组不能直接保存这种缺测标记。",
+          "text": "模拟器负责构造可复现的教学输入与事后评价参考。先分配时间、位置、速度数组，再按运动公式填入真值，最后叠加固定种子噪声。列表z允许None，而普通float数组不能直接保存这种缺测标记。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "k=20–24时只令z[k]=None，真值仍正常演化；不能删除这些时间帧，否则0.5秒缺测被错误压缩。generate返回t,p,v,z，只有z传入estimate。"
+        },
+        {
+          "title": "03 · 对象初始化：谁拥有状态和协方差",
+          "file": "kalman.py",
+          "start": "class KalmanCV:",
+          "end": "    def predict(self):",
+          "pattern": "滤波是跨帧递推，x和P必须同时保留。class将每个估计器的独立状态与配置封装为一个对象；__init__只执行一次。self.F/self.H/self.Q/self.I是固定配置；self.x/self.P是每帧变化的内部状态。np.diag构造P0；G@G.T构造Q。",
+          "text": "滤波是跨帧递推，x和P必须同时保留。class将每个估计器的独立状态与配置封装为一个对象；__init__只执行一次。self.F/self.H/self.Q/self.I是固定配置；self.x/self.P是每帧变化的内部状态。np.diag构造P0；G@G.T构造Q。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "dt=.1、q=.25、r=1/3时F为2×2，H为1×2，G为2×1，Q为2×2。初始x=[z[0],0]，P=diag(r,4)；速度0为先验，不是真值。"
+        },
+        {
+          "title": "04 · predict：纯预测接口",
+          "file": "kalman.py",
+          "start": "    def predict(self):",
+          "end": "    def update(self, z):",
+          "pattern": "预测只读取并更新对象内的x和P，无需位置测量。使用@进行矩阵乘法；F@P@F.T按右侧先作用的线性变换传播误差，Q补入过程不确定性。没有返回值，是因为self.x/self.P就是持续保存的结果。",
+          "text": "预测只读取并更新对象内的x和P，无需位置测量。使用@进行矩阵乘法；F@P@F.T按右侧先作用的线性变换传播误差，Q补入过程不确定性。没有返回值，是因为self.x/self.P就是持续保存的结果。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "手算测试dt=1、q=0、r=1、first_z=0，x=[0,0]、P=diag(1,4)→预测x=[0,0]、P=[[5,4],[4,4]]。"
+        },
+        {
+          "title": "05 · update：从测量得到创新和增益",
+          "file": "kalman.py",
+          "start": "    def update(self, z):",
+          "end": "        self.x = self.x +",
+          "pattern": "测量z为标量，H@x得到shape=(1,)的预测观测，[0]提取数值。innovation=z−预测观测；H@P@H.T是1×1矩阵，加r后取标量S。K=(P@H.T)/S是2×1数组。不要将位置测量误当作速度测量。",
+          "text": "测量z为标量，H@x得到shape=(1,)的预测观测，[0]提取数值。innovation=z−预测观测；H@P@H.T是1×1矩阵，加r后取标量S。K=(P@H.T)/S是2×1数组。不要将位置测量误当作速度测量。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "手算预测P=[[5,4],[4,4]]、R=1、z=6：innovation=6、S=6、K=[[5/6],[4/6]]。"
+        },
+        {
+          "title": "06 · update：状态修正和Joseph协方差更新",
+          "file": "kalman.py",
+          "start": "        self.x = self.x +",
+          "end": "    def step(self, z):",
+          "pattern": "self.x为(2,)；k[:,0]为(2,)，乘标量innovation再加x。若直接将(2,1)与(2,)相加会广播成(2,2)，导致维度错误。Joseph形式A=I−KH，P=A P A.T+R K K.T；最后取对称平均，降低浮点不对称。",
+          "text": "self.x为(2,)；k[:,0]为(2,)，乘标量innovation再加x。若直接将(2,1)与(2,)相加会广播成(2,2)，导致维度错误。Joseph形式A=I−KH，P=A P A.T+R K K.T；最后取对称平均，降低浮点不对称。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "K=[5/6,4/6]、创新6→x=[5,4]；P更新为[[5/6,2/3],[2/3,4/3]]。返回创新与增益列表，便于上层记录，不返回真值。"
+        },
+        {
+          "title": "07 · step：将一次采样组织成完整事务",
+          "file": "kalman.py",
+          "start": "    def step(self, z):",
+          "end": "        return self.update(z)",
+          "pattern": "首先检查输入是否合法，避免NaN到来时先改变状态。之后每帧均predict；None表示此帧缺测，直接返回(None,None)，保留预测状态；否则update。0是有效位置，不能写if z判断。",
+          "text": "首先检查输入是否合法，避免NaN到来时先改变状态。之后每帧均predict；None表示此帧缺测，直接返回(None,None)，保留预测状态；否则update。0是有效位置，不能写if z判断。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "k=20–24调用step(None)共5次；k=25调用step(z[25])，先预测再更新。缺测时没有创新与增益，不用0伪造测量。"
+        },
+        {
+          "title": "08 · estimate：谁控制循环、谁持有算法状态",
+          "file": "scenarios.py",
+          "start": "def estimate(",
+          "end": "def rmse(",
+          "pattern": "estimate是流水线，不是滤波公式本身。校验首帧后创建一个KalmanCV对象；enumerate同时给出索引和测量；k=0只初始化，后续调用step。每次把x/P的标量复制到日志，避免存储同一可变对象引用。",
+          "text": "estimate是流水线，不是滤波公式本身。校验首帧后创建一个KalmanCV对象；enumerate同时给出索引和测量；k=0只初始化，后续调用step。每次把x/P的标量复制到日志，避免存储同一可变对象引用。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "81帧有80次预测。正常情况80次更新；缺测案例75次更新、5次仅预测。positions、speeds、pp、pv等均为81项。"
+        },
+        {
+          "title": "09 · RMSE：独立评价模块",
+          "file": "scenarios.py",
+          "start": "def rmse(",
+          "end": "def run_scenario(",
+          "pattern": "评价不应写进KalmanCV。np.asarray将两组输入转换为数组，相减得到逐帧误差；**2平方，np.mean平均，np.sqrt开平方，float返回Python数值。",
+          "text": "评价不应写进KalmanCV。np.asarray将两组输入转换为数组，相减得到逐帧误差；**2平方，np.mean平均，np.sqrt开平方，float返回Python数值。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "prediction=[3,4]、truth=[0,0]→平方误差[9,16]→平均12.5→RMSE≈3.5355。位置单位m，速度单位m/s。"
+        },
+        {
+          "title": "10 · 场景编排：控制变量、接口和输出字段",
+          "file": "scenarios.py",
+          "start": "def run_scenario(",
+          "end": "    return {\"scenario\": scenario, \"status\": 0",
+          "pattern": "run_scenario决定dt、q、r及是否加速/缺测；非法R单独验证。generate提供真值和测量；estimate只接收z、dt、q、r。available是有效帧索引，原始与滤后位置RMSE在同一窗口比较；全帧RMSE单独报告。",
+          "text": "run_scenario决定dt、q、r及是否加速/缺测；非法R单独验证。generate提供真值和测量；estimate只接收z、dt、q、r。available是有效帧索引，原始与滤后位置RMSE在同一窗口比较；全帧RMSE单独报告。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "S04/S05/S06使用完全相同的加速轨迹与噪声，只改q。S02保留81个时间点而75次更新，评价可观测帧与全帧分开。"
+        },
+        {
+          "title": "11 · 输出图：记录与可视化不修改算法",
+          "file": "demo.py",
+          "start": "def save_charts(",
+          "end": "def main():",
+          "pattern": "绘图只读取结果字典，不改变x/P。位置图标记缺测，不连接不存在的测量；速度图展示真值与估计。协方差图分两个纵轴单位独立的子图。Path、mkdir、subplots、plot、savefig等API在手册中定义。",
+          "text": "绘图只读取结果字典，不改变x/P。位置图标记缺测，不连接不存在的测量；速度图展示真值与估计。协方差图分两个纵轴单位独立的子图。Path、mkdir、subplots、plot、savefig等API在手册中定义。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "正常输出position.png、velocity.png、covariance.png；非法R退出2，不调用save_charts。"
+        },
+        {
+          "title": "12 · 独立测试：如何证明实现符合设计",
+          "file": "test_kalman.py",
+          "start": "class TestKalman",
+          "end": "if __name__ == \"__main__\":",
+          "pattern": "测试不要只用另一遍相同公式。先用独立手算预期检查P、K和x，再验证缺测数量、恢复更新、P对称半正定、控制变量和无效输入不修改状态。eigvalsh检查实对称矩阵特征值；assert_allclose使用容差。",
+          "text": "测试不要只用另一遍相同公式。先用独立手算预期检查P、K和x，再验证缺测数量、恢复更新、P对称半正定、控制变量和无效输入不修改状态。eigvalsh检查实对称矩阵特征值；assert_allclose使用容差。\n\n对照FUNCTION_GUIDE.md中的API定义，核对形参、返回值、shape、单位及调用者。",
+          "trace": "本地python -m unittest -v test_kalman；故意交换predict/update顺序、把None写成0或将Q写错形状，测试应捕获，再恢复源码。"
+        }
+      ],
+      "experiments": [
+        {
+          "name": "S01 · 恒速位置速度联合估计",
+          "values": [
+            0
+          ],
+          "optional": false,
+          "hint": "比较位置RMSE与原始测量；检查速度估计",
+          "steps": [
+            "先确认场景输入与控制变量。",
+            "运行并核对状态、RMSE、协方差和曲线。",
+            "在本地运行对应编号，记录结果，与网页核对。"
+          ]
+        },
+        {
+          "name": "S02 · 连续5帧缺测后恢复",
+          "values": [
+            1
+          ],
+          "optional": false,
+          "hint": "5帧仅预测，P位置方差增大，恢复后降低",
+          "steps": [
+            "先确认场景输入与控制变量。",
+            "运行并核对状态、RMSE、协方差和曲线。",
+            "在本地运行对应编号，记录结果，与网页核对。"
+          ]
+        },
+        {
+          "name": "S03 · 相同观测，增大R",
+          "values": [
+            2
+          ],
+          "optional": false,
+          "hint": "相同输入，比较R变化",
+          "steps": [
+            "先确认场景输入与控制变量。",
+            "运行并核对状态、RMSE、协方差和曲线。",
+            "在本地运行对应编号，记录结果，与网页核对。"
+          ]
+        },
+        {
+          "name": "S04 · 加速段，q=.25",
+          "values": [
+            3
+          ],
+          "optional": false,
+          "hint": "加速时模型出现偏差",
+          "steps": [
+            "先确认场景输入与控制变量。",
+            "运行并核对状态、RMSE、协方差和曲线。",
+            "在本地运行对应编号，记录结果，与网页核对。"
+          ]
+        },
+        {
+          "name": "S05 · 相同加速段，q=4",
+          "values": [
+            4
+          ],
+          "optional": false,
+          "hint": "相同观测，过程方差增大",
+          "steps": [
+            "先确认场景输入与控制变量。",
+            "运行并核对状态、RMSE、协方差和曲线。",
+            "在本地运行对应编号，记录结果，与网页核对。"
+          ]
+        },
+        {
+          "name": "S06 · 相同加速段，q=0",
+          "values": [
+            5
+          ],
+          "optional": false,
+          "hint": "q=0的模型失配对照",
+          "steps": [
+            "先确认场景输入与控制变量。",
+            "运行并核对状态、RMSE、协方差和曲线。",
+            "在本地运行对应编号，记录结果，与网页核对。"
+          ]
+        },
+        {
+          "name": "S07 · 非法R=0拒绝",
+          "values": [
+            6
+          ],
+          "optional": false,
+          "hint": "status=-2、valid=0，无有效数值",
+          "steps": [
+            "先确认场景输入与控制变量。",
+            "运行并核对状态、RMSE、协方差和曲线。",
+            "在本地运行对应编号，记录结果，与网页核对。"
+          ]
+        }
+      ],
+      "lab_steps": [
+        "L01：不看源码，写出输入、输出、跨帧状态与5个模块职责。",
+        "L02：在纸上推导F/H/Q的shape及单位。",
+        "L03：独立手算dt=1、Q=0、R=1、P0=diag(1,4)、z=6的一轮预测和更新。",
+        "L04：读kalman.py，追踪__init__→step→predict/update；说明为什么不能每帧重建对象。",
+        "L05：读simulation与estimate，确认真值未作为估计输入。",
+        "L06：S01核对位置和速度RMSE；S02检查缺测索引20–24及P变化。",
+        "L07：S03仅改R；S04–S06保持观测一致仅改q，记录误差变化。",
+        "L08：S07非法R拒绝；将本地测量改为NaN观察异常。",
+        "L09：运行本地unittest和demo.py，查看三张PNG，逐条记录指标。",
+        "L10：将step的缺测分支改错进行故障测试，恢复后重新运行；说明哪个测试捕获。"
+      ],
+      "test_steps": [
+        "完成S01–S07、Q01–Q15、P1–P9。",
+        "下载项目，本地安装NumPy/Matplotlib，运行python -m unittest -v test_kalman和七场景。",
+        "核对81帧、5帧缺测、75次更新，真值只在模拟/评价。"
+      ],
+      "questions": [
+        {
+          "id": "q1",
+          "text": "状态向量包含什么？",
+          "options": [
+            "一维位置与速度",
+            "二维坐标x/y",
+            "仅测量值"
+          ]
+        },
+        {
+          "id": "q2",
+          "text": "为什么KalmanCV要持有self.x和self.P？",
+          "options": [
+            "每帧都重新随机生成",
+            "跨帧递推需要保留估计与不确定性",
+            "为了绘图"
+          ]
+        },
+        {
+          "id": "q3",
+          "text": "F的作用？",
+          "options": [
+            "将上一状态预测到当前",
+            "把噪声改为0",
+            "直接读取真值"
+          ]
+        },
+        {
+          "id": "q4",
+          "text": "H=[1,0]意味着什么？",
+          "options": [
+            "直接测速度",
+            "同时测位置速度",
+            "仅测位置"
+          ]
+        },
+        {
+          "id": "q5",
+          "text": "Q代表什么？",
+          "options": [
+            "过程噪声协方差",
+            "传感器读数",
+            "状态向量"
+          ]
+        },
+        {
+          "id": "q6",
+          "text": "R单位是什么？",
+          "options": [
+            "m",
+            "m²",
+            "m/s"
+          ]
+        },
+        {
+          "id": "q7",
+          "text": "P对角元素分别是什么？",
+          "options": [
+            "两种噪声的均值",
+            "位置和速度估计误差方差",
+            "位置坐标"
+          ]
+        },
+        {
+          "id": "q8",
+          "text": "为什么位置测量也能修正速度？",
+          "options": [
+            "读取了真值",
+            "位置速度误差协方差进入速度增益",
+            "速度总等于位置"
+          ]
+        },
+        {
+          "id": "q9",
+          "text": "缺测None时如何处理？",
+          "options": [
+            "只预测",
+            "把位置更新成0",
+            "删除时间帧"
+          ]
+        },
+        {
+          "id": "q10",
+          "text": "首帧用z[0]初始化后怎样处理？",
+          "options": [
+            "重复用同一观测更新",
+            "只初始化，不重复使用",
+            "直接用真值速度"
+          ]
+        },
+        {
+          "id": "q11",
+          "text": "K为(2,1)、x为(2,)，为何取K[:,0]？",
+          "options": [
+            "使两个长度2的一维数组形状一致",
+            "求转置",
+            "将K变成标量"
+          ]
+        },
+        {
+          "id": "q12",
+          "text": "RMSE评价模块能使用真值吗？",
+          "options": [
+            "能，事后评价；估计器不能",
+            "估计器也可以直接读",
+            "不能计算评价"
+          ]
+        },
+        {
+          "id": "q13",
+          "text": "同一观测只增大R通常意味着？",
+          "options": [
+            "模型预测权重相对提高",
+            "观测变成真值",
+            "保证误差降低"
+          ]
+        },
+        {
+          "id": "q14",
+          "text": "代码中遇到NaN应该怎样处理？",
+          "options": [
+            "等同于有效0",
+            "明确拒绝；None才代表缺测",
+            "无条件更新"
+          ]
+        },
+        {
+          "id": "q15",
+          "text": "在线案例通过意味着？",
+          "options": [
+            "真实车辆已验证",
+            "本人本地C/Python都已通关",
+            "仅浏览器JS练习通过"
+          ]
+        }
+      ],
+      "practice": {
+        "text": "根据对话中的手算例子填写，分数填写足够精度的小数。",
+        "values": [
+          0
+        ],
+        "fields": [
+          {
+            "id": "f_pos",
+            "label": "P1 · 位置10m、速度2m/s、dt=.1s的预测位置(m)",
+            "kind": "number"
+          },
+          {
+            "id": "p_pred",
+            "label": "P2 · dt=1、Q=0、P0=diag(1,4)时预测位置方差(m²)",
+            "kind": "number"
+          },
+          {
+            "id": "cross",
+            "label": "P3 · 同例预测位置速度协方差(m²/s)",
+            "kind": "number"
+          },
+          {
+            "id": "s",
+            "label": "P4 · 预测位置方差5、R=1时创新方差",
+            "kind": "number"
+          },
+          {
+            "id": "kp",
+            "label": "P5 · 同例位置增益Kp（小数）",
+            "kind": "number"
+          },
+          {
+            "id": "kv",
+            "label": "P6 · 同例速度增益Kv（小数）",
+            "kind": "number"
+          },
+          {
+            "id": "p_update",
+            "label": "P7 · 预测位置0、创新6、Kp=5/6时修正位置(m)",
+            "kind": "number"
+          },
+          {
+            "id": "v_update",
+            "label": "P8 · 预测速度0、创新6、Kv=4/6时修正速度(m/s)",
+            "kind": "number"
+          },
+          {
+            "id": "updates",
+            "label": "P9 · 81帧、首帧初始化、缺测5帧，更新次数",
+            "kind": "number"
+          }
+        ],
+        "steps": [
+          "P1 · 位置10m、速度2m/s、dt=.1s的预测位置(m)：10+2*.1",
+          "P2 · dt=1、Q=0、P0=diag(1,4)时预测位置方差(m²)：1+4",
+          "P3 · 同例预测位置速度协方差(m²/s)：1*4",
+          "P4 · 预测位置方差5、R=1时创新方差：5+1",
+          "P5 · 同例位置增益Kp（小数）：5/6",
+          "P6 · 同例速度增益Kv（小数）：4/6",
+          "P7 · 预测位置0、创新6、Kp=5/6时修正位置(m)：0+5/6*6",
+          "P8 · 预测速度0、创新6、Kv=4/6时修正速度(m/s)：0+4/6*6",
+          "P9 · 81帧、首帧初始化、缺测5帧，更新次数：81−1−5"
+        ]
+      },
+      "pass_rule": "仅浏览器JS练习通过；真实Python与历史C本地验收独立。",
+      "assets": [
+        {
+          "name": "kalman.py",
+          "group": "估计器",
+          "text": "\"\"\"一维位置/速度卡尔曼滤波器：只接收配置与位置测量，不接触真值。\"\"\"\nimport numpy as np\n\n\nclass KalmanCV:\n    \"\"\"恒速度预测模型。x=[位置(m),速度(m/s)]；P为2×2估计误差协方差。\"\"\"\n\n    def __init__(self, dt, q, r, first_z):\n        # np.isfinite逐元素判断是否有限；.all()要求所有判断为True。\n        if not np.isfinite([dt, q, r, first_z]).all() or dt <= 0 or q < 0 or r <= 0:\n            raise ValueError(\"要求有限数值、dt>0、q>=0、r>0\")\n        self.dt, self.r = dt, r\n        # np.array把嵌套列表转换为二维数组；dtype指定浮点类型。\n        self.F = np.array([[1., dt], [0., 1.]], dtype=np.float64)\n        self.H = np.array([[1., 0.]])\n        g = np.array([[dt**2 / 2], [dt]])\n        # @是矩阵乘法；.T交换行列。G(2,1)@G.T(1,2)得到(2,2)。\n        self.Q = q * (g @ g.T)\n        # 初始位置只来自首帧测量，初始速度0是先验，不是真实速度。\n        self.x = np.array([first_z, 0.], dtype=np.float64)\n        # np.diag(一维数组)构造对角矩阵；初始速度方差4 (m/s)^2。\n        self.P = np.diag([r, 4.])\n        # np.eye(n)构造n×n单位矩阵；Joseph协方差更新要用。\n        self.I = np.eye(2)\n\n    def predict(self):\n        \"\"\"根据上一帧后验推算当前帧先验，不需要测量。\"\"\"\n        self.x = self.F @ self.x\n        self.P = self.F @ self.P @ self.F.T + self.Q\n\n    def update(self, z):\n        \"\"\"只在有效位置测量存在时进行更新；返回创新与两个增益。\"\"\"\n        if not np.isfinite(z):\n            raise ValueError(\"测量必须为有限数字\")\n        # H(1,2)@x(2,)得到长度1的数组，[0]取标量。\n        innovation = float(z - (self.H @ self.x)[0])\n        # H P H.T 为1×1矩阵，[0,0]取元素。R>0确保S为正（有效P下）。\n        s = float((self.H @ self.P @ self.H.T)[0, 0] + self.r)\n        k = (self.P @ self.H.T) / s\n        self.x = self.x + k[:, 0] * innovation\n        # Joseph形式：两个矩阵项相加，避免仅做减法时的数值抵消。\n        a = self.I - k @ self.H\n        self.P = a @ self.P @ a.T + self.r * (k @ k.T)\n        self.P = 0.5 * (self.P + self.P.T)\n        # .tolist()将NumPy数组变为普通列表，便于结果JSON序列化。\n        return innovation, k[:, 0].tolist()\n\n    def step(self, z):\n        \"\"\"一帧事务：先验证，再预测；None表示缺测，只预测不更新。\"\"\"\n        if z is not None and not np.isfinite(z):\n            raise ValueError(\"无效测量不是缺测；请使用None明确表示缺测\")\n        self.predict()\n        if z is None:\n            return None, None\n        return self.update(z)\n"
+        },
+        {
+          "name": "simulation.py",
+          "group": "教学数据",
+          "text": "\"\"\"只在教学场景中生成真值和位置传感器观测。估计器不得读取真值。\"\"\"\nimport numpy as np\n\n\ndef generate(maneuver=False, dropout=False):\n    \"\"\"81帧，dt=0.1秒。可选加速度段和连续5帧位置缺测。\"\"\"\n    dt, count, seed = 0.1, 81, 19\n    # np.arange(count)生成0..count-1；乘dt构造等间隔教学时间轴。\n    t = np.arange(count) * dt\n    # np.zeros(n)返回n个0组成的数组；随后逐帧填入真值。\n    p, v = np.zeros(count), np.zeros(count)\n    v[0] = 2.0\n    for k in range(1, count):\n        a = 0.8 if maneuver and 30 <= k < 50 else 0.0\n        p[k] = p[k-1] + dt * v[k-1] + 0.5 * a * dt**2\n        v[k] = v[k-1] + a * dt\n    # D18同款确定性教学伪随机递推；不代表实际传感器噪声模型。\n    z = []\n    state = seed\n    for k in range(count):\n        state = (1664525 * state + 1013904223) % (2**32)\n        noise = 2.0 * state / (2**32) - 1.0\n        # .append(value)在列表末尾添加一个元素，返回None。\n        z.append(None if dropout and 20 <= k < 25 else float(p[k] + noise))\n    return t, p, v, z\n"
+        },
+        {
+          "name": "scenarios.py",
+          "group": "实验与评价",
+          "text": "\"\"\"控制实验条件、调用估计器、最后用真值评价。真值不参与状态更新。\"\"\"\nimport numpy as np\nfrom kalman import KalmanCV\nfrom simulation import generate\n\n\ndef estimate(z, dt, q, r):\n    \"\"\"估计流水线只接收测量序列和配置；不允许传入真值。\"\"\"\n    if len(z) == 0 or z[0] is None:\n        raise ValueError(\"需要有效首帧位置进行初始化\")\n    kf = KalmanCV(dt, q, r, z[0])\n    positions, speeds, pp, pv = [], [], [], []\n    innovations, gains = [], []\n    # enumerate(iterable)逐项产生(索引,元素)；k=0只初始化。\n    for k, measurement in enumerate(z):\n        innovation, gain = (None, None) if k == 0 else kf.step(measurement)\n        positions.append(float(kf.x[0]))\n        speeds.append(float(kf.x[1]))\n        pp.append(float(kf.P[0, 0]))\n        pv.append(float(kf.P[1, 1]))\n        innovations.append(innovation)\n        gains.append(gain)\n    return positions, speeds, pp, pv, innovations, gains\n\n\ndef rmse(prediction, truth):\n    \"\"\"np.asarray转换数组；**2逐元素平方；mean求均值；sqrt开平方。\"\"\"\n    e = np.asarray(prediction) - np.asarray(truth)\n    return float(np.sqrt(np.mean(e**2)))\n\n\ndef run_scenario(scenario):\n    if scenario not in range(7):\n        raise ValueError(\"场景编号必须在0至6之间\")\n    dt = 0.1\n    q = [0.25, 0.25, 0.25, 0.25, 4., 0., 0.25][scenario]\n    r = 3.0 if scenario == 2 else 0.0 if scenario == 6 else 1/3\n    if scenario == 6:\n        try:\n            KalmanCV(dt, q, r, 0.)\n        except ValueError as exc:\n            return {\"scenario\": scenario, \"status\": -2, \"valid\": 0,\n                    \"error_kind\": \"invalid_r\", \"diagnostic\": str(exc)}\n        raise AssertionError(\"非法R应被拒绝\")\n    t, truth_p, truth_v, z = generate(scenario in (3, 4, 5), scenario == 1)\n    # 关键边界：estimate的参数不包含truth_p、truth_v。\n    p, v, pp, pv, innovations, gains = estimate(z, dt, q, r)\n    available = [k for k, value in enumerate(z) if value is not None]\n    # 列表推导式选择相同有效观测帧，避免不同统计窗口的不公平比较。\n    measured = [z[k] for k in available]\n    reference = truth_p[available]\n    return {\"scenario\": scenario, \"status\": 0, \"valid\": 1, \"dt_s\": dt,\n            \"q\": q, \"r\": r, \"sample_count\": len(z),\n            \"predict_only_count\": len(z) - len(available),\n            \"update_count\": len(available) - 1,\n            \"raw_position_rmse_m\": rmse(measured, reference),\n            \"estimated_position_rmse_available_m\": rmse([p[k] for k in available], reference),\n            \"position_rmse_m\": rmse(p, truth_p), \"speed_rmse_mps\": rmse(v, truth_v),\n            \"p_position_before_gap\": pp[19], \"p_position_end_gap\": pp[24],\n            \"p_position_after_gap\": pp[25],\n            \"t\": t.tolist(), \"truth_p\": truth_p.tolist(), \"truth_v\": truth_v.tolist(),\n            \"z\": z, \"p\": p, \"v\": v, \"pp\": pp, \"pv\": pv,\n            \"innovations\": innovations, \"gains\": gains}\n"
+        },
+        {
+          "name": "demo.py",
+          "group": "入口与绘图",
+          "text": "\"\"\"命令行入口和图像输出，不负责估计器内部数学。\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\nimport matplotlib\nmatplotlib.use(\"Agg\")  # 指定可在无图形界面的环境中保存PNG的后端。\nimport matplotlib.pyplot as plt\nfrom matplotlib import font_manager\nfrom scenarios import run_scenario\n\n\ndef save_charts(r, out):\n    fonts = {f.name for f in font_manager.fontManager.ttflist}\n    for name in (\"Noto Sans CJK SC\", \"Microsoft YaHei\", \"SimHei\", \"PingFang SC\"):\n        if name in fonts:\n            plt.rcParams[\"font.sans-serif\"] = [name, \"DejaVu Sans\"]\n            plt.rcParams[\"axes.unicode_minus\"] = False\n            break\n    root = Path(out)\n    root.mkdir(parents=True, exist_ok=True)\n    # subplots创建Figure和Axes；plot(x,y)画线；None在测量曲线中形成断点。\n    for truth, estimate, title, unit, filename in [\n        (\"truth_p\", \"p\", \"位置估计\", \"位置 (m)\", \"position.png\"),\n        (\"truth_v\", \"v\", \"速度估计\", \"速度 (m/s)\", \"velocity.png\"),\n    ]:\n        fig, ax = plt.subplots(figsize=(8, 4.5))\n        ax.plot(r[\"t\"], r[truth], label=\"教学真值\")\n        if estimate == \"p\":\n            ax.plot(r[\"t\"], r[\"z\"], \".\", label=\"位置测量\", alpha=.45)\n        ax.plot(r[\"t\"], r[estimate], label=\"估计值\")\n        ax.set_xlabel(\"时间 (s)\")\n        ax.set_ylabel(unit)\n        ax.set_title(title)\n        ax.legend()\n        ax.grid(alpha=.25)\n        fig.tight_layout()\n        fig.savefig(root / filename, dpi=180)\n        plt.close(fig)\n    # 两个P对角量单位不同，分两个子图，不将其直接求和或共用纵轴。\n    fig, axes = plt.subplots(2, 1, figsize=(8, 6))\n    for ax, key, unit in [(axes[0], \"pp\", \"位置方差 (m²)\"),\n                          (axes[1], \"pv\", \"速度方差 ((m/s)²)\")]:\n        ax.plot(r[\"t\"], r[key])\n        ax.set_xlabel(\"时间 (s)\")\n        ax.set_ylabel(unit)\n        ax.grid(alpha=.25)\n    fig.tight_layout()\n    fig.savefig(root / \"covariance.png\", dpi=180)\n    plt.close(fig)\n\n\ndef main():\n    # argparse创建命令行解析器；parse_args返回带命名属性的Namespace。\n    parser = argparse.ArgumentParser(description=\"D19一维卡尔曼滤波\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(7), default=0)\n    parser.add_argument(\"--out\", default=\"charts\")\n    args = parser.parse_args()\n    r = run_scenario(args.scenario)\n    # json.dumps将字典转为JSON文本，None转为null。\n    print(\"result_json=\" + json.dumps(r, ensure_ascii=False, allow_nan=False))\n    if not r[\"valid\"]:\n        return 2\n    save_charts(r, args.out)\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n"
+        },
+        {
+          "name": "test_kalman.py",
+          "group": "测试",
+          "text": "\"\"\"独立手算、缺测、接口边界及协方差数值测试。\"\"\"\nimport unittest\nimport numpy as np\nfrom kalman import KalmanCV\nfrom scenarios import estimate, run_scenario\n\n\nclass TestKalman(unittest.TestCase):\n    def test_manual(self):\n        # 独立例子：dt=1,Q=0,R=1，初始x=[0,0]、P=diag(1,4)。\n        kf = KalmanCV(1., 0., 1., 0.)\n        kf.predict()\n        # np.testing.assert_allclose比较每个元素，允许小浮点误差。\n        np.testing.assert_allclose(kf.P, [[5,4],[4,4]], atol=1e-12)\n        innovation, gain = kf.update(6.)\n        self.assertAlmostEqual(innovation, 6.)\n        np.testing.assert_allclose(gain, [5/6, 4/6], atol=1e-12)\n        np.testing.assert_allclose(kf.x, [5,4], atol=1e-12)\n        np.testing.assert_allclose(kf.P, [[5/6,2/3],[2/3,4/3]], atol=1e-12)\n\n    def test_q(self):\n        kf = KalmanCV(1., 2., 1., 0.)\n        np.testing.assert_allclose(kf.Q, [[.5,1],[1,2]])\n\n    def test_dropout(self):\n        r = run_scenario(1)\n        self.assertEqual(r[\"predict_only_count\"], 5)\n        self.assertEqual(r[\"update_count\"], 75)\n        self.assertEqual(r[\"z\"][20:25], [None]*5)\n        self.assertEqual(r[\"gains\"][20:25], [None]*5)\n        self.assertGreater(r[\"pp\"][24], r[\"pp\"][19])\n        self.assertLess(r[\"pp\"][25], r[\"pp\"][24])\n\n    def test_covariance(self):\n        kf = KalmanCV(.1, .25, 1/3, 0.)\n        for k in range(80):\n            kf.step(None if 20 <= k < 25 else .2*k)\n            np.testing.assert_allclose(kf.P, kf.P.T, atol=1e-12)\n            # eigvalsh返回实对称矩阵的特征值；非负是半正定检查。\n            self.assertGreaterEqual(float(np.linalg.eigvalsh(kf.P).min()), -1e-12)\n\n    def test_comparison(self):\n        a, b = run_scenario(0), run_scenario(2)\n        self.assertEqual(a[\"z\"], b[\"z\"])\n        self.assertLess(a[\"estimated_position_rmse_available_m\"], a[\"raw_position_rmse_m\"])\n        c, d, e = [run_scenario(k) for k in (3,4,5)]\n        self.assertEqual(c[\"z\"], d[\"z\"])\n        self.assertEqual(c[\"z\"], e[\"z\"])\n        self.assertLess(d[\"speed_rmse_mps\"], e[\"speed_rmse_mps\"])\n\n    def test_invalid(self):\n        with self.assertRaises(ValueError):\n            KalmanCV(.1, .25, 0., 0.)\n        kf = KalmanCV(.1, .25, 1., 0.)\n        old = kf.x.copy()  # copy创建独立数组副本，以便比较异常前后。\n        with self.assertRaises(ValueError):\n            kf.step(float(\"nan\"))\n        np.testing.assert_array_equal(kf.x, old)\n        with self.assertRaises(ValueError):\n            estimate([None, 1.], .1, .25, 1.)\n        self.assertEqual(run_scenario(6)[\"valid\"], 0)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        },
+        {
+          "name": "requirements.txt",
+          "group": "依赖",
+          "text": "numpy>=1.26,<3\nmatplotlib>=3.8,<4\n"
+        },
+        {
+          "name": "README.md",
+          "group": "实作步骤",
+          "text": "# D19 一维卡尔曼滤波：工程实作\n理论与架构设计推导由对话讲授；本项目用于源码学习与本地真实测试。\n执行链：demo.main → scenarios.run_scenario → simulation.generate → estimate → KalmanCV初始化 → 每帧step → predict → 有测量才update → 估计结果 → RMSE评价 → save_charts。\n真值只用于生成教学测量与计算误差，不作为估计器输入。单位：位置m，速度m/s，dt秒，q为每步加速度方差(m/s²)²，r为测量位置方差m²。P的对角分量分别为位置和速度方差，不能直接相加比较。首帧用位置测量初始化、速度先验0，首帧不重复更新。None是缺测，不是0。缺测5帧索引20–24，25恢复。\n安装：python -m pip install -r requirements.txt\n测试：python -m unittest -v test_kalman\n案例：python demo.py --scenario 0 --out charts/normal；编号0–6分别为正常、缺测、增大R、加速Q=.25、加速Q=4、加速Q=0、非法R=0。\n正常输出position.png、velocity.png、covariance.png；非法R退出2、不输出有效图。查看FUNCTION_GUIDE.md了解外部函数。网页仅JS等价计算，本地Python和历史C验收仍独立。\n"
+        },
+        {
+          "name": "FUNCTION_GUIDE.md",
+          "group": "非自定义API手册",
+          "text": "# D19 非自定义函数、方法与语法\n先在Python交互环境运行最小例子；KalmanCV、predict、update、step、generate、estimate、rmse、run_scenario、save_charts、main均为本课自定义。\n| API或语法 | 定义、参数、返回值 | 最小例子与用途 |\n|---|---|---|\n| class / __init__ / self | class定义对象类型；__init__(self,...)在构造实例时初始化；self指当前实例 | a=KalmanCV(.1,.25,1/3,0.)；a.x、a.P保存该对象自己的状态；不要每帧重建 |\n| np.array(a,dtype=...) / np.asarray(a) | 构造或转换ndarray；dtype指定元素类型；asarray可复用内存 | np.array([[1.,2.]])的shape=(1,2)；np.asarray([1,2])的shape=(2,) |\n| np.float64 / .shape / .T | 浮点类型、形状属性、转置属性 | np.array([[1,2]]).T形状(2,1)；一维数组.T仍是一维 |\n| @ / * / ** | 矩阵乘法、逐元素乘法/标量乘法、乘方 | np.array([[1,2]])@np.array([3,4])→[11]；np.array([1,2])*2→[2,4] |\n| np.diag(v) | 一维输入构造对角矩阵；二维输入提取对角线 | np.diag([1.,4.])→[[1,0],[0,4]]，P0 |\n| np.eye(n) | 创建n×n单位矩阵 | np.eye(2)→[[1,0],[0,1]]，Joseph更新 |\n| np.isfinite(a).all() | 逐元素有限性判断，再检查全部为真 | np.isfinite([1,np.nan]).all()→False |\n| [0,0] / [:,0] | 二维索引/切片，分别取单元素与第一列 | K.shape=(2,1)，K[:,0].shape=(2,)；避免(2,2)意外广播 |\n| np.arange(n) / np.zeros(n) | 生成0到n−1的数组 / 全零数组 | np.arange(3)→[0,1,2]；np.zeros(3)→[0.,0.,0.] |\n| enumerate(iterable) | 迭代产生索引与元素元组，从0开始 | list(enumerate([10,11]))→[(0,10),(1,11)]；逐帧循环 |\n| list.append(value) | 原地向末尾增加元素，返回None | a=[]; a.append(3)后a=[3]；不能写a=a.append(3) |\n| 列表推导式 / 整数列表索引 | [表达式 for 元素 in 序列 if 条件]；NumPy可按整数列表取值 | [k for k,z in enumerate([1,None,3]) if z is not None]→[0,2]；np.array([1,2,3])[[0,2]]→[1,3] |\n| None / is None / is not None | 空值及身份判断 | 缺测None而0是有效测量；不可用if z判断是否缺测 |\n| np.mean(a) / np.sqrt(a) | 平均值与逐元素平方根 | np.sqrt(np.mean(np.array([3.,4.])**2))≈3.5355，RMSE |\n| float(x) / len(x) / range(n) / str(x) | 类型转换、长度、整数迭代、字符串转换 | float(\"1.2\")=1.2；len([1,2])=2；list(range(3))=[0,1,2] |\n| .tolist() / .copy() | 转普通列表 / 独立数组副本 | np.array([1.,2.]).tolist()→[1.,2.]；copy避免修改源数组 |\n| np.linalg.eigvalsh(a) / .min() | 实对称矩阵特征值（升序）；最小元素 | np.linalg.eigvalsh(np.diag([1.,4.])).min()=1；检查P半正定 |\n| ValueError / AssertionError / SystemExit | 输入值错误、断言错误、进程退出异常 | raise ValueError(\"错误\")；raise SystemExit(2) |\n| argparse.ArgumentParser / add_argument / parse_args | 创建解析器、注册参数、返回Namespace | --scenario 1→args.scenario=1；type=int做转换，choices限制范围 |\n| json.dumps(obj,ensure_ascii=False,allow_nan=False) | 字典序列化为字符串；保留中文，拒绝NaN/Inf | json.dumps({\"z\":None})→'{\"z\": null}' |\n| print(*objects) | 输出到终端，返回None | print(\"a\",1)输出a 1 |\n| Path(out) / mkdir(parents=True,exist_ok=True) / 路径除号 | 构造路径、创建目录、拼路径 | Path(\"charts\")/\"a.png\"→charts/a.png |\n| matplotlib.use(\"Agg\") | 非交互后端，导入pyplot之前调用 | 允许无桌面环境生成PNG |\n| font_manager.fontManager.ttflist / .name / plt.rcParams | 已知字体列表、名称属性、全局绘图配置映射 | {f.name for f in ...}取字体名集合；rcParams设置字体 |\n| plt.subplots(nrows,ncols,figsize=...) | 返回Figure和Axes，figsize单位英寸 | fig,axes=plt.subplots(2,1)；axes[0]为第一个轴 |\n| ax.plot(x,y,...) / set_xlabel / set_ylabel / set_title / legend / grid | 画曲线、轴名称、标题、图例和网格 | ax.plot([0,1],[0,2],label=\"线\")；返回Line2D列表 |\n| fig.tight_layout / savefig(path,dpi=180) / plt.close(fig) | 调整布局、保存图、释放图对象 | fig.savefig(\"a.png\",dpi=180)，无数值返回 |\n| unittest.TestCase / unittest.main | 测试基类与发现执行test_方法 | class TestKalman(unittest.TestCase)；调用unittest.main() |\n| assertAlmostEqual / assertEqual / assertGreater / assertLess / assertGreaterEqual / assertRaises | 检查近似相等、相等、大于、小于、大于等于、指定异常 | self.assertAlmostEqual(0.1+0.2,.3)；with self.assertRaises(ValueError): ... |\n| np.testing.assert_allclose / assert_array_equal | 容差比较与严格元素比较，失败抛异常 | np.testing.assert_allclose([.1+.2],[.3],atol=1e-12) |\n"
+        }
+      ],
+      "code": "\"\"\"命令行入口和图像输出，不负责估计器内部数学。\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\nimport matplotlib\nmatplotlib.use(\"Agg\")  # 指定可在无图形界面的环境中保存PNG的后端。\nimport matplotlib.pyplot as plt\nfrom matplotlib import font_manager\nfrom scenarios import run_scenario\n\n\ndef save_charts(r, out):\n    fonts = {f.name for f in font_manager.fontManager.ttflist}\n    for name in (\"Noto Sans CJK SC\", \"Microsoft YaHei\", \"SimHei\", \"PingFang SC\"):\n        if name in fonts:\n            plt.rcParams[\"font.sans-serif\"] = [name, \"DejaVu Sans\"]\n            plt.rcParams[\"axes.unicode_minus\"] = False\n            break\n    root = Path(out)\n    root.mkdir(parents=True, exist_ok=True)\n    # subplots创建Figure和Axes；plot(x,y)画线；None在测量曲线中形成断点。\n    for truth, estimate, title, unit, filename in [\n        (\"truth_p\", \"p\", \"位置估计\", \"位置 (m)\", \"position.png\"),\n        (\"truth_v\", \"v\", \"速度估计\", \"速度 (m/s)\", \"velocity.png\"),\n    ]:\n        fig, ax = plt.subplots(figsize=(8, 4.5))\n        ax.plot(r[\"t\"], r[truth], label=\"教学真值\")\n        if estimate == \"p\":\n            ax.plot(r[\"t\"], r[\"z\"], \".\", label=\"位置测量\", alpha=.45)\n        ax.plot(r[\"t\"], r[estimate], label=\"估计值\")\n        ax.set_xlabel(\"时间 (s)\")\n        ax.set_ylabel(unit)\n        ax.set_title(title)\n        ax.legend()\n        ax.grid(alpha=.25)\n        fig.tight_layout()\n        fig.savefig(root / filename, dpi=180)\n        plt.close(fig)\n    # 两个P对角量单位不同，分两个子图，不将其直接求和或共用纵轴。\n    fig, axes = plt.subplots(2, 1, figsize=(8, 6))\n    for ax, key, unit in [(axes[0], \"pp\", \"位置方差 (m²)\"),\n                          (axes[1], \"pv\", \"速度方差 ((m/s)²)\")]:\n        ax.plot(r[\"t\"], r[key])\n        ax.set_xlabel(\"时间 (s)\")\n        ax.set_ylabel(unit)\n        ax.grid(alpha=.25)\n    fig.tight_layout()\n    fig.savefig(root / \"covariance.png\", dpi=180)\n    plt.close(fig)\n\n\ndef main():\n    # argparse创建命令行解析器；parse_args返回带命名属性的Namespace。\n    parser = argparse.ArgumentParser(description=\"D19一维卡尔曼滤波\")\n    parser.add_argument(\"--scenario\", type=int, choices=range(7), default=0)\n    parser.add_argument(\"--out\", default=\"charts\")\n    args = parser.parse_args()\n    r = run_scenario(args.scenario)\n    # json.dumps将字典转为JSON文本，None转为null。\n    print(\"result_json=\" + json.dumps(r, ensure_ascii=False, allow_nan=False))\n    if not r[\"valid\"]:\n        return 2\n    save_charts(r, args.out)\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n"
     }
   },
   "rules": {
@@ -14288,6 +14945,157 @@
           "S07 · alpha=0 非法输入"
         ]
       ]
+    },
+    "19": {
+      "correct": {
+        "q1": 0,
+        "q2": 1,
+        "q3": 0,
+        "q4": 2,
+        "q5": 0,
+        "q6": 1,
+        "q7": 1,
+        "q8": 1,
+        "q9": 0,
+        "q10": 1,
+        "q11": 0,
+        "q12": 0,
+        "q13": 0,
+        "q14": 1,
+        "q15": 2
+      },
+      "explanations": {
+        "q1": "两个状态是p和v。",
+        "q2": "状态与协方差共同递推。",
+        "q3": "恒速度模型p+=v·dt。",
+        "q4": "H@x为预测位置观测。",
+        "q5": "描述模型误差。",
+        "q6": "位置测量方差。",
+        "q7": "不同单位不可直接相加比较。",
+        "q8": "Pvp参与K的第二个分量。",
+        "q9": "保留时间与预测，不更新。",
+        "q10": "不重复利用首帧测量。",
+        "q11": "避免广播为(2,2)。",
+        "q12": "隔离真值与算法。",
+        "q13": "认为测量不确定性更大，不保证实际RMSE降低。",
+        "q14": "区分非法和缺测。",
+        "q15": "真实工程需本人本地运行。"
+      },
+      "numeric": {
+        "f_pos": [
+          10.2,
+          "10+2*.1"
+        ],
+        "p_pred": [
+          5,
+          "1+4"
+        ],
+        "cross": [
+          4,
+          "1*4"
+        ],
+        "s": [
+          6,
+          "5+1"
+        ],
+        "kp": [
+          0.8333333333333334,
+          "5/6"
+        ],
+        "kv": [
+          0.6666666666666666,
+          "4/6"
+        ],
+        "p_update": [
+          5,
+          "0+5/6*6"
+        ],
+        "v_update": [
+          4,
+          "0+4/6*6"
+        ],
+        "updates": [
+          75,
+          "81−1−5"
+        ]
+      },
+      "labels": {
+        "q1": "Q01",
+        "q2": "Q02",
+        "q3": "Q03",
+        "q4": "Q04",
+        "q5": "Q05",
+        "q6": "Q06",
+        "q7": "Q07",
+        "q8": "Q08",
+        "q9": "Q09",
+        "q10": "Q10",
+        "q11": "Q11",
+        "q12": "Q12",
+        "q13": "Q13",
+        "q14": "Q14",
+        "q15": "Q15",
+        "f_pos": "P1 · 位置10m、速度2m/s、dt=.1s的预测位置(m)",
+        "p_pred": "P2 · dt=1、Q=0、P0=diag(1,4)时预测位置方差(m²)",
+        "cross": "P3 · 同例预测位置速度协方差(m²/s)",
+        "s": "P4 · 预测位置方差5、R=1时创新方差",
+        "kp": "P5 · 同例位置增益Kp（小数）",
+        "kv": "P6 · 同例速度增益Kv（小数）",
+        "p_update": "P7 · 预测位置0、创新6、Kp=5/6时修正位置(m)",
+        "v_update": "P8 · 预测速度0、创新6、Kv=4/6时修正速度(m/s)",
+        "updates": "P9 · 81帧、首帧初始化、缺测5帧，更新次数"
+      },
+      "needed": [
+        [
+          [
+            0
+          ],
+          "lab0",
+          "S01 · 恒速位置速度联合估计"
+        ],
+        [
+          [
+            1
+          ],
+          "lab1",
+          "S02 · 连续5帧缺测后恢复"
+        ],
+        [
+          [
+            2
+          ],
+          "lab2",
+          "S03 · 相同观测，增大R"
+        ],
+        [
+          [
+            3
+          ],
+          "lab3",
+          "S04 · 加速段，q=.25"
+        ],
+        [
+          [
+            4
+          ],
+          "lab4",
+          "S05 · 相同加速段，q=4"
+        ],
+        [
+          [
+            5
+          ],
+          "lab5",
+          "S06 · 相同加速段，q=0"
+        ],
+        [
+          [
+            6
+          ],
+          "lab6",
+          "S07 · 非法R=0拒绝"
+        ]
+      ]
     }
   },
   "curriculum": [
@@ -15132,5 +15940,5 @@
       "stage": "前沿与综合验收"
     }
   ],
-  "release": "day18-20261124-noise-lowpass-v1"
+  "release": "day19-20261125-kalman-architecture-v1"
 }

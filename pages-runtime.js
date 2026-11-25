@@ -1,3 +1,59 @@
+// D19独立浏览器数值演算；真值只用于模拟观测与事后评价。
+function day19Calculate(scenario){
+  if(!Number.isInteger(scenario)||scenario<0||scenario>6)throw Error('D19场景编号应为0至6');
+  const dt=.1,q=[.25,.25,.25,.25,4,0,.25][scenario],r=scenario===2?3:scenario===6?0:1/3;
+  if(r<=0)return {scenario,status:-2,valid:0,error_kind:'invalid_r',diagnostic:'要求R>0'};
+  const t=Array.from({length:81},(_,i)=>i*dt),truth_p=[0],truth_v=[2],z=[];
+  let state=19;
+  for(let i=0;i<t.length;i++){
+    if(i>0){
+      const a=scenario>=3&&scenario<=5&&i>=30&&i<50?.8:0;
+      truth_p.push(truth_p[i-1]+dt*truth_v[i-1]+.5*a*dt**2);
+      truth_v.push(truth_v[i-1]+a*dt);
+    }
+    state=(1664525*state+1013904223)%2**32;
+    const noise=2*state/2**32-1;
+    z.push(scenario===1&&i>=20&&i<25?null:truth_p[i]+noise);
+  }
+  // 此函数作用域只接收测量与配置；不读取外层truth数组。
+  function estimate(measurements,dt,q,r){
+    const mm=(a,b)=>a.map(row=>b[0].map((_,j)=>row.reduce((sum,v,k)=>sum+v*b[k][j],0)));
+    const tr=a=>a[0].map((_,j)=>a.map(row=>row[j]));
+    const add=(a,b)=>a.map((row,i)=>row.map((v,j)=>v+b[i][j]));
+    const scale=(a,c)=>a.map(row=>row.map(v=>v*c));
+    const F=[[1,dt],[0,1]],H=[[1,0]],I=[[1,0],[0,1]],G=[[dt**2/2],[dt]],Q=scale(mm(G,tr(G)),q);
+    let x=[[measurements[0]],[0]],P=[[r,0],[0,4]];
+    const p=[],v=[],pp=[],pv=[],innovations=[],gains=[];
+    for(let k=0;k<measurements.length;k++){
+      let innovation=null,gain=null;
+      if(k>0){
+        x=mm(F,x);P=add(mm(mm(F,P),tr(F)),Q);
+        if(measurements[k]!==null){
+          innovation=measurements[k]-mm(H,x)[0][0];
+          const S=mm(mm(H,P),tr(H))[0][0]+r,K=mm(P,tr(H)).map(row=>row.map(value=>value/S));
+          x=add(x,scale(K,innovation));
+          const A=add(I,scale(mm(K,H),-1));
+          P=add(mm(mm(A,P),tr(A)),scale(mm(K,tr(K)),r));
+          P=scale(add(P,tr(P)),.5);
+          gain=K.map(row=>row[0]);
+        }
+      }
+      p.push(x[0][0]);v.push(x[1][0]);pp.push(P[0][0]);pv.push(P[1][1]);
+      innovations.push(innovation);gains.push(gain);
+    }
+    return {p,v,pp,pv,innovations,gains};
+  }
+  const e=estimate(z,dt,q,r);
+  const available=z.map((v,i)=>v===null?-1:i).filter(i=>i>=0);
+  const rmse=(a,b)=>Math.sqrt(a.reduce((sum,v,i)=>sum+(v-b[i])**2,0)/a.length);
+  return {scenario,status:0,valid:1,dt_s:dt,q,r,sample_count:z.length,
+    predict_only_count:z.length-available.length,update_count:available.length-1,
+    raw_position_rmse_m:rmse(available.map(i=>z[i]),available.map(i=>truth_p[i])),
+    estimated_position_rmse_available_m:rmse(available.map(i=>e.p[i]),available.map(i=>truth_p[i])),
+    position_rmse_m:rmse(e.p,truth_p),speed_rmse_mps:rmse(e.v,truth_v),
+    p_position_before_gap:e.pp[19],p_position_end_gap:e.pp[24],p_position_after_gap:e.pp[25],
+    t,truth_p,truth_v,z,...e};
+}
 // D18：固定种子、逐帧滤波、独立阶跃，与Python完全相同的教学算法。
 function day18Calculate(scenario){
   if(!Number.isInteger(scenario)||scenario<0||scenario>6)throw Error('D18场景编号应为0至6');
@@ -477,6 +533,10 @@ function pagesSimulate(day,values){
       states:rows.map(x=>x.state),alerts:rows.map(x=>x.alert),statuses:rows.map(x=>x.status),
       valids:rows.map(x=>x.valid),alert_changes:rows.filter((x,i)=>i>0&&x.alert!==rows[i-1].alert).length,
       compiler_log:'浏览器JavaScript模拟同一状态机规则，未编译C文件；用户须在WSL独立执行GCC/CTest。'};
+  }else if(day===19){
+    const [scenario]=pagesNumbers(values,1);
+    result=day19Calculate(scenario);
+    result.compiler_log='浏览器JS等价数值演算；真实Python/NumPy在本地运行。';
   }else if(day===18){
     const [scenario]=pagesNumbers(values,1);
     result=day18Calculate(scenario);
@@ -581,6 +641,109 @@ function pagesRegression(day){
     ['T03 未启用',[7],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,5,0]}],
     ['T03 设备故障',[8],{statuses:[0,-3,0],valids:[1,0,1],faults:[0,6,0]}]
   ];
+  cases[19]=[
+  [
+    "S01",
+    [
+      0
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "position_rmse_m": 0.19539962487728849,
+      "speed_rmse_mps": 0.37780493766883755,
+      "predict_only_count": 0,
+      "update_count": 80,
+      "p_position_end_gap": 0.052897830636870695
+    }
+  ],
+  [
+    "S02",
+    [
+      1
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "position_rmse_m": 0.20641716653338785,
+      "speed_rmse_mps": 0.37982619863580286,
+      "predict_only_count": 5,
+      "update_count": 75,
+      "p_position_end_gap": 0.13193966137103916
+    }
+  ],
+  [
+    "S03",
+    [
+      2
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "position_rmse_m": 0.2754450833219326,
+      "speed_rmse_mps": 0.5543957708062447,
+      "predict_only_count": 0,
+      "update_count": 80,
+      "p_position_end_gap": 0.43778662200821356
+    }
+  ],
+  [
+    "S04",
+    [
+      3
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "position_rmse_m": 0.3387798781889888,
+      "speed_rmse_mps": 0.6002534423342377,
+      "predict_only_count": 0,
+      "update_count": 80,
+      "p_position_end_gap": 0.052897830636870695
+    }
+  ],
+  [
+    "S05",
+    [
+      4
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "position_rmse_m": 0.24505774614377812,
+      "speed_rmse_mps": 0.5119966735907161,
+      "predict_only_count": 0,
+      "update_count": 80,
+      "p_position_end_gap": 0.07727530347673175
+    }
+  ],
+  [
+    "S06",
+    [
+      5
+    ],
+    {
+      "status": 0,
+      "valid": 1,
+      "position_rmse_m": 0.802239163848604,
+      "speed_rmse_mps": 0.8254187502385846,
+      "predict_only_count": 0,
+      "update_count": 80,
+      "p_position_end_gap": 0.05002123142250531
+    }
+  ],
+  [
+    "S07",
+    [
+      6
+    ],
+    {
+      "status": -2,
+      "valid": 0,
+      "error_kind": "invalid_r"
+    }
+  ]
+];
   cases[18]=[
   [
     "噪声alpha0.1",

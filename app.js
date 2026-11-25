@@ -380,7 +380,7 @@ async function selectDay(d){
   }else{
     theoryHeading.textContent='按程序执行顺序理解 · 不懂就停在这一段';
     $('appendices').before(theoryHeading,$('reading'));
-    $('codeIntro').textContent='先看完整源码，再按执行顺序逐段学。按职责分段注释，关键语句单独解释；下载可独立运行的源码和完整讲义，配色不改变源码。';
+    $('codeIntro').textContent=lesson.runner==='kalman_cv_day19'?'理论和架构推导在对话中完成。这里先阅读模块接口，再对照12段执行链、完整代码、FUNCTION_GUIDE.md与测试；源码个人副本照常自动保存。':'先看完整源码，再按执行顺序逐段学。按职责分段注释，关键语句单独解释；下载可独立运行的源码和完整讲义，配色不改变源码。';
     $('architectureHeading').textContent='先看整体架构 · 谁调用谁，数据往哪里走';
   }
   $('reading').replaceChildren();
@@ -635,6 +635,29 @@ $('runButton').onclick=async()=>{
         summaryText='D15 '+result.source+' status='+result.status+'，第'+result.error_line+
           '行 '+result.error_field+' '+result.error_kind;
       }
+    }else if(lesson.runner==='kalman_cv_day19'){
+      grid.append(item('案例','S'+String(result.scenario+1).padStart(2,'0')),
+        item('status',result.status,result.status===0?'good':'bad'),
+        item('valid',result.valid,result.valid?'good':'bad'));
+      if(result.valid){
+        const n=x=>Number(x).toFixed(6);
+        grid.append(item('采样帧数',result.sample_count),item('仅预测帧数',result.predict_only_count),
+          item('测量更新次数',result.update_count),item('加速度方差 q (m/s²)²',result.q),
+          item('测量方差 R (m²)',n(result.r)),
+          item('原始位置RMSE (m)',n(result.raw_position_rmse_m)),
+          item('有效测量帧估计位置RMSE (m)',n(result.estimated_position_rmse_available_m)),
+          item('全帧位置RMSE (m)',n(result.position_rmse_m)),
+          item('全帧速度RMSE (m/s)',n(result.speed_rmse_mps)),
+          item('第19帧位置方差 (m²)',n(result.p_position_before_gap)),
+          item('第24帧位置方差 (m²)',n(result.p_position_end_gap)),
+          item('第25帧位置方差 (m²)',n(result.p_position_after_gap)));
+        explanation='首帧初始化，后续逐帧预测；有效位置测量才更新。真值只用于模拟和事后评价。原始/估计位置误差在相同有效观测帧比较；P是模型传播的不确定性，不是实际逐帧误差。浏览器仅执行JS。';
+        summaryText='D19 S'+(result.scenario+1)+' position RMSE='+n(result.position_rmse_m)+' speed RMSE='+n(result.speed_rmse_mps);
+      }else{
+        grid.append(item('错误类别',result.error_kind,'bad'));
+        explanation='配置无效：R必须大于0。拒绝输出估计值和曲线。';
+        summaryText='D19 S'+(result.scenario+1)+' status=-2 valid=0';
+      }
     }else if(lesson.runner==='noise_lowpass_day18'){
       grid.append(item('案例','S'+String(result.scenario+1).padStart(2,'0')),
         item('status',result.status,result.status===0?'good':'bad'),
@@ -820,6 +843,39 @@ $('runButton').onclick=async()=>{
           result.error_field+'，类别'+result.error_kind+'。原始CSV可在完整工程文件标签中查看。';
         $('output').append(msg);
       }
+    }
+    if(lesson.runner==='kalman_cv_day19'&&result.valid){
+      const datasets=[
+        ['位置估计','位置（m）',[[result.truth_p,'教学真值','#248775'],[result.z,'位置测量','#c57d30',true],[result.p,'估计位置','#4583c5']]],
+        ['速度估计','速度（m/s）',[[result.truth_v,'教学真值','#248775'],[result.v,'估计速度','#4583c5']]],
+        ['位置估计方差','Ppp（m²）',[[result.pp,'Ppp','#4583c5']]],
+        ['速度估计方差','Pvv（(m/s)²）',[[result.pv,'Pvv','#248775']]]
+      ];
+      for(const [heading,unit,series] of datasets){
+        const NS='http://www.w3.org/2000/svg',svg=document.createElementNS(NS,'svg');
+        svg.setAttribute('viewBox','0 0 760 300');svg.setAttribute('role','img');svg.setAttribute('aria-label',heading);
+        svg.dataset.role='day19-chart';svg.style.width='100%';svg.style.height='auto';
+        const add=(tag,attrs={},value)=>{const e=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(value!==undefined)e.textContent=value;svg.append(e);return e;};
+        const vals=series.flatMap(a=>a[0].filter(x=>x!==null)),lo=Math.min(...vals),hi=Math.max(...vals),span=Math.max(hi-lo,.01),min=lo-.08*span,max=hi+.08*span;
+        const X=i=>70+i/(result.t.length-1)*650,Y=v=>250-(v-min)/(max-min)*190;
+        add('text',{x:18,y:24,fill:'currentColor','font-size':17},heading);
+        add('text',{x:18,y:46,fill:'currentColor','font-size':12},unit);
+        for(let i=0;i<=4;i++){const v=min+(max-min)*i/4,y=Y(v);add('line',{x1:70,x2:720,y1:y,y2:y,stroke:'#b8c5d3','stroke-opacity':.55});add('text',{x:62,y:y+4,'text-anchor':'end',fill:'currentColor','font-size':11},v.toFixed(2));}
+        if(result.predict_only_count){add('rect',{x:X(19.5),y:60,width:X(24.5)-X(19.5),height:190,fill:'#e4a83d','fill-opacity':.18});}
+        add('line',{x1:70,x2:720,y1:250,y2:250,stroke:'currentColor','stroke-opacity':.5});
+        for(let i=0;i<=4;i++){const k=i*20;add('text',{x:X(k),y:267,'text-anchor':'middle','font-size':11,fill:'currentColor'},result.t[k].toFixed(1));}
+        add('text',{x:675,y:289,'font-size':12,fill:'currentColor'},'时间(s)');
+        series.forEach(([data,label,color,dots],j)=>{
+          if(dots){data.forEach((v,i)=>{if(v!==null)add('circle',{cx:X(i),cy:Y(v),r:2.6,fill:color,'fill-opacity':.65});});}
+          else add('polyline',{points:data.map((v,i)=>X(i)+','+Y(v)).join(' '),fill:'none',stroke:color,'stroke-width':2.3});
+          add('line',{x1:85+j*155,x2:103+j*155,y1:284,y2:284,stroke:color,'stroke-width':3});
+          add('text',{x:110+j*155,y:288,fill:'currentColor','font-size':11},label);
+        });
+        const block=document.createElement('div');block.className='d17-run-chart';block.append(svg);
+        const cap=document.createElement('p');cap.className='muted';cap.textContent='浏览器计算结果；橙色阴影为S02缺测5帧。协方差两分量分别绘制，不共用单位。';block.append(cap);$('output').append(block);
+      }
+      const rows=Array.from({length:7},(_,j)=>j+19).map(i=>[i,result.t[i].toFixed(1),result.z[i]===null?'缺测':result.z[i].toFixed(4),result.p[i].toFixed(4),result.v[i].toFixed(4),result.pp[i].toFixed(6),result.pv[i].toFixed(6),result.gains[i]===null?'仅预测':result.gains[i].map(x=>x.toFixed(4)).join(', ')]);
+      $('output').append(makeTable(['帧','时间(s)','位置测量(m)','估计位置(m)','估计速度(m/s)','位置方差(m²)','速度方差((m/s)²)','Kp / Kv'],rows));
     }
     if(lesson.runner==='noise_lowpass_day18'&&result.valid){
       const pairs=[
